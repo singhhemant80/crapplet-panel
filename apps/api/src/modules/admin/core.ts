@@ -276,7 +276,7 @@ adminCore.get(
         invoice: { include: { items: true, transactions: { orderBy: { createdAt: "asc" } } } },
         services: {
           include: {
-            product: { select: { id: true, name: true, provisioner: true, type: true, cpuCores: true, ramMb: true, diskGb: true, osTemplates: { include: { osTemplate: true } } } },
+            product: { select: { id: true, name: true, provisioner: true, type: true, cpuCores: true, ramMb: true, diskGb: true, moduleConfig: true, servers: { select: { serverId: true } }, osTemplates: { include: { osTemplate: true } } } },
             osTemplate: true,
             server: { select: { id: true, name: true, type: true } },
             ips: { select: { address: true, isPrimary: true } },

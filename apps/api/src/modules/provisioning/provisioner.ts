@@ -206,11 +206,64 @@ async function proxmoxCreate(svc: FullService) {
 
 // ───────────────────────── Virtualizor create ─────────────────────────
 
+export type VirtualizorModuleConfig = {
+  planId?: number;
+  virt?: string;
+  /** legacy single fixed node */
+  slaveServerId?: number;
+  /** auto = Virtualizor decides (optionally inside serverGroupId); least_loaded = we pick among nodeIds; fixed = nodeIds[0] */
+  placement?: "auto" | "least_loaded" | "fixed";
+  nodeIds?: string[];
+  serverGroupId?: number | null;
+  /** "key=value" per line, sent with addvs */
+  extraParams?: string;
+};
+
+/** "vnc=1\nnic_type=virtio" → { vnc: "1", nic_type: "virtio" } (comments and blank lines ignored) */
+export function parseExtraParams(text?: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("=");
+    if (i > 0) out[t.slice(0, i).trim()] = t.slice(i + 1).trim();
+  }
+  return out;
+}
+
+/**
+ * Which Virtualizor node gets the VPS:
+ *  1. a node staff chose for this service (service.node), else
+ *  2. the plan's placement: fixed node / least-loaded allowed node (from the 5-minute monitoring data,
+ *     skipping offline, locked, disabled and over-threshold nodes) / Virtualizor's own node_select.
+ */
+export async function chooseVirtualizorNode(svc: { node: string | null }, server: Server, mc: VirtualizorModuleConfig): Promise<{ serid?: number; serverGroupId?: number; reason: string }> {
+  if (svc.node && /^\d+$/.test(svc.node)) return { serid: Number(svc.node), reason: `node ${svc.node} chosen by staff` };
+  const placement = mc.placement ?? (mc.slaveServerId !== undefined && mc.slaveServerId !== null ? "fixed" : "auto");
+  if (placement === "fixed") {
+    const id = mc.nodeIds?.[0] ?? (mc.slaveServerId !== undefined ? String(mc.slaveServerId) : undefined);
+    if (id === undefined) throw new ProvisionError("The plan is set to a fixed Virtualizor node but none is selected", false);
+    return { serid: Number(id), reason: `fixed node ${id}` };
+  }
+  if (placement === "least_loaded") {
+    const nodes = await prisma.serverNode.findMany({ where: { serverId: server.id, enabled: true, online: true, ...(mc.nodeIds?.length ? { externalId: { in: mc.nodeIds } } : {}) } });
+    const fit = nodes
+      .filter((n) => !(n.meta as { locked?: boolean } | null)?.locked && n.externalId !== null)
+      .filter((n) => (!n.ramTotalMb || (n.ramUsedMb / n.ramTotalMb) * 100 < server.maxRamPct) && (!n.diskTotalGb || (n.diskUsedGb / n.diskTotalGb) * 100 < server.maxDiskPct) && n.cpuPct < server.maxCpuPct)
+      .sort((a, b) => b.ramTotalMb - b.ramUsedMb - (a.ramTotalMb - a.ramUsedMb));
+    if (!fit.length)
+      throw new ProvisionError(`No Virtualizor node of "${server.name}" is online and under the limits (RAM ${server.maxRamPct}%, disk ${server.maxDiskPct}%, CPU ${server.maxCpuPct}%) — check Node Monitoring`);
+    const n = fit[0];
+    return { serid: Number(n.externalId), reason: `least-loaded node ${n.name} (${Math.round(n.ramTotalMb - n.ramUsedMb)} MB RAM free)` };
+  }
+  return { serverGroupId: mc.serverGroupId ?? undefined, reason: mc.serverGroupId != null ? `Virtualizor auto-select in server group ${mc.serverGroupId}` : "Virtualizor auto-select" };
+}
+
 async function virtualizorCreate(svc: FullService) {
   const server = await pickServer(svc);
   const client = virtualizorFor(server);
   const p = svc.product;
-  const mc = ((p.moduleConfig ?? {}) as { virtualizor?: { planId?: number; virt?: string; slaveServerId?: number } }).virtualizor ?? {};
+  const mc = ((p.moduleConfig ?? {}) as { virtualizor?: VirtualizorModuleConfig }).virtualizor ?? {};
   const cfg = (svc.config ?? {}) as Record<string, unknown>;
   if (!svc.osTemplate?.virtualizorOsId) throw new ProvisionError("OS template has no Virtualizor OS id", false);
   // a template synced from another master has a different osid there — use the same image on this master
@@ -227,11 +280,15 @@ async function virtualizorCreate(svc: FullService) {
   const hostname = (svc.hostname || `vps-${svc.id.slice(-6)}.crapplet.cloud`).toLowerCase();
   let vpsid = svc.remoteId;
   if (!vpsid) {
-    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root" } });
+    const placement = await chooseVirtualizorNode(svc, server, mc);
+    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root", ...(placement.serid !== undefined ? { node: String(placement.serid) } : {}) } });
+    await log(svc.id, "create", true, `Placing VPS: ${placement.reason}`);
     vpsid = await client.createVps({
       virt: mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm"),
       planId: mc.planId,
-      serverId: mc.slaveServerId,
+      serverId: placement.serid,
+      serverGroupId: placement.serverGroupId,
+      extra: parseExtraParams(mc.extraParams),
       userEmail: svc.user.email,
       userPass: generatePassword(16),
       hostname,

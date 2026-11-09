@@ -102,6 +102,10 @@ export class VirtualizorClient {
   serverUsage(serid: number | string) {
     return this.call<{ usage?: Record<string, any>; info?: Record<string, any> }>("manageserver", { changeserid: serid });
   }
+  /** Server groups (used for automatic node selection). */
+  serverGroups() {
+    return this.call<{ servergroups?: Record<string, Record<string, unknown>> }>("servergroups");
+  }
   /** Load averages for all nodes. */
   serverLoads() {
     return this.call<{ loads?: Record<string, any>; server_loads?: Record<string, any> }>("serverloads");
@@ -110,7 +114,12 @@ export class VirtualizorClient {
   async createVps(p: {
     virt: string;
     planId?: number;
+    /** Virtualizor serid of the node to build on (0 = master). Omit to let Virtualizor choose (node_select). */
     serverId?: number;
+    /** with automatic placement: limit Virtualizor's choice to this server group */
+    serverGroupId?: number;
+    /** extra addvs fields from the plan's advanced settings (vnc, nic_type, …) */
+    extra?: Record<string, string>;
     userEmail: string;
     userPass: string;
     hostname: string;
@@ -126,8 +135,9 @@ export class VirtualizorClient {
       addvps: 1,
       virt: p.virt,
       plid: p.planId,
-      slave_server: p.serverId ?? 0,
-      node_select: p.serverId === undefined ? 1 : undefined,
+      ...(p.serverId !== undefined
+        ? { slave_server: p.serverId, serid: p.serverId }
+        : { node_select: 1, ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
       user_email: p.userEmail,
       user_pass: p.userPass,
       hostname: p.hostname,
@@ -139,6 +149,7 @@ export class VirtualizorClient {
       space: p.diskGb,
       cores: p.cores,
       bandwidth: p.bandwidthGb ?? 0,
+      ...(p.extra ?? {}),
     });
     const vpsid = r.vs_info?.vpsid ?? r.newvs?.vpsid;
     if (!vpsid) throw new VirtualizorError("Virtualizor did not return a VPS id", r);

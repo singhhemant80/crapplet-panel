@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, CYCLES, date, gb, money } from "@/lib/api";
 import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, PageHeader, Select, cx, toast, useApi } from "@/components/ui";
 import { OsLogo } from "@/components/os-logo";
+import { NodeSelect } from "@/components/admin/node-select";
 
 const VPS = ["PROXMOX", "VIRTUALIZOR"];
 
@@ -131,21 +132,25 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
   const built = !!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status);
   const [hostname, setHostname] = useState(s.hostname ?? "");
   const [os, setOs] = useState(s.osTemplateId ?? "");
+  const numericNode = (v: string | null) => (v && /^\d+$/.test(v) ? v : "");
+  const [node, setNode] = useState(numericNode(s.node));
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setHostname(s.hostname ?? "");
     setOs(s.osTemplateId ?? "");
-  }, [s.hostname, s.osTemplateId]);
+    setNode(numericNode(s.node));
+  }, [s.hostname, s.osTemplateId, s.node]);
+  const virtualizor = s.product.provisioner === "VIRTUALIZOR";
   const options: any[] = s.product.osTemplates;
   const chosen = options.find((t) => t.id === os) ?? (s.osTemplate?.id === os ? s.osTemplate : null);
   const osBad = vps && s.osTemplate && ((s.product.provisioner === "VIRTUALIZOR" && !s.osTemplate.virtualizorOsId) || (s.product.provisioner === "PROXMOX" && !s.osTemplate.proxmoxKvmVmid && !s.osTemplate.proxmoxLxcVolid));
-  const dirty = hostname !== (s.hostname ?? "") || os !== (s.osTemplateId ?? "");
+  const dirty = hostname !== (s.hostname ?? "") || os !== (s.osTemplateId ?? "") || (virtualizor && node !== numericNode(s.node));
   const lastError = s.logs.find((l: any) => !l.success);
 
   async function save(thenProvision = false) {
     setBusy(true);
     try {
-      await api(`/admin/services/${s.id}`, { method: "PUT", body: { hostname: hostname || undefined, ...(built ? {} : { osTemplateId: os || null }) } });
+      await api(`/admin/services/${s.id}`, { method: "PUT", body: { hostname: hostname || undefined, ...(built ? {} : { osTemplateId: os || null, ...(virtualizor ? { node: node || null } : {}) }) } });
       if (thenProvision) {
         await api(`/admin/services/${s.id}/action`, { body: { action: "create" } });
         toast.success("Saved — provisioning queued");
@@ -181,6 +186,9 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
         <Field label="Hostname" hint={built ? "Updates our records; rename inside the server too" : undefined}>
           <Input value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim())} placeholder="server1.example.com" />
         </Field>
+        {virtualizor && (
+          <NodeSelect serverIds={s.serverId ? [s.serverId] : s.product.servers.map((x: any) => x.serverId)} value={node} onChange={setNode} disabled={built} hint={built ? `Built on node #${s.node ?? "?"}` : undefined} />
+        )}
         {vps && (
           <Field label="Operating system" hint={built ? "Server is built — use Reinstall on the service page to change it" : `${options.length} templates offered for this plan`}>
             <Select value={os} disabled={built} onChange={(e) => setOs(e.target.value)}>

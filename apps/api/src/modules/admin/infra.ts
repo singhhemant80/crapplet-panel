@@ -243,6 +243,31 @@ adminInfra.get(
   }),
 );
 
+/** Server groups of a Virtualizor master (for "auto" placement inside a group). */
+adminInfra.get(
+  "/virtualizor/:serverId/groups",
+  requireStaff("products.manage"),
+  ah(async (req, res) => {
+    const s = await prisma.server.findUniqueOrThrow({ where: { id: req.params.serverId } });
+    if (s.type !== "VIRTUALIZOR") throw badRequest("Not a Virtualizor server");
+    const r = await virtualizorFor(s).serverGroups();
+    const groups = Object.entries(r.servergroups ?? {}).map(([k, g]) => ({ sgid: Number((g as any).sgid ?? k), name: String((g as any).sg_name ?? (g as any).name ?? `Group ${k}`), reseller: String((g as any).sg_reseller_name ?? "") }));
+    res.json({ groups });
+  }),
+);
+
+/** Stop / allow new VPS on a node (used by "least loaded" placement). */
+adminInfra.patch(
+  "/monitoring/nodes/:id",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const { enabled } = parse(z.object({ enabled: z.boolean() }), req.body);
+    const n = await prisma.serverNode.update({ where: { id: req.params.id }, data: { enabled } });
+    await audit({ actorId: req.user!.id, action: enabled ? "node.enabled" : "node.disabled", entity: "serverNode", entityId: n.id, details: { name: n.name } });
+    res.json({ ok: true });
+  }),
+);
+
 /** Import OS templates from one Virtualizor master (or all of them with :serverId = "all"). */
 adminInfra.post(
   "/virtualizor/:serverId/sync-os",

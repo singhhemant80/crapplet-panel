@@ -1,5 +1,6 @@
 "use client";
 import { OsLogo } from "@/components/os-logo";
+import { NodeSelect } from "@/components/admin/node-select";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -72,7 +73,11 @@ export default function AdminService() {
                 </Select>
               </Field>
             )}
-            <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
+            {s.product.provisioner === "VIRTUALIZOR" ? (
+              <NodeSelect serverIds={s.server ? [s.server.id] : []} value={edit.node} onChange={(v) => setEdit({ ...edit, node: v })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId ? "Where this VPS lives (change only if it was migrated in Virtualizor)" : undefined} />
+            ) : (
+              <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
+            )}
             <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>
             <div className="sm:col-span-2"><Toggle checked={edit.overrideAutoSuspend} onChange={(v) => setEdit({ ...edit, overrideAutoSuspend: v })} label="Exempt from automatic suspension" /></div>
             <Field label="Notes" className="sm:col-span-2"><Textarea rows={3} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>

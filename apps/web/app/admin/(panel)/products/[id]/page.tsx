@@ -71,7 +71,7 @@ export default function ProductEditor() {
       provisioner: p.provisioner, virtType: p.virtType, cpuCores: num(p.cpuCores), ramMb: num(p.ramMb), diskGb: num(p.diskGb), bandwidthGb: num(p.bandwidthGb),
       ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname, hsnSac: p.hsnSac, taxable: p.taxable,
       stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
-      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId) } },
+      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) } },
       pricing: [
         ...Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
         // USD rows only where staff typed a price; blank cycles fall back to auto-conversion
@@ -216,6 +216,7 @@ export default function ProductEditor() {
                     }))
                   }
                 />
+                <VirtualizorPlacement serverIds={p.serverIds} value={p.moduleConfig.virtualizor ?? {}} onChange={(patch) => set({ moduleConfig: { ...p.moduleConfig, virtualizor: { ...p.moduleConfig.virtualizor, ...patch } } })} />
               </>}
             </>}
           </div>
@@ -335,6 +336,70 @@ function VirtualizorPlanPicker({ serverIds, planId, virt, onPick }: { serverIds:
         </Select>
       </Field>
     </>
+  );
+}
+
+const pct = (u: number, t: number) => (t ? Math.round((u / t) * 100) : 0);
+
+/** Where new VPS of this plan are built: Virtualizor's auto-select, the least-loaded allowed node, or one fixed node. */
+function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: string[]; value: any; onChange: (patch: any) => void }) {
+  const mon = useApi("/admin/monitoring");
+  const firstServer = serverIds[0];
+  const groups = useApi(firstServer ? `/admin/virtualizor/${firstServer}/groups` : null, [firstServer]);
+  const nodes: any[] = (mon.data?.servers ?? []).filter((s: any) => s.type === "VIRTUALIZOR" && (!serverIds.length || serverIds.includes(s.id))).flatMap((s: any) => s.nodes.map((n: any) => ({ ...n, serverName: s.name })));
+  const mode = value.placement ?? (value.slaveServerId !== undefined && value.slaveServerId !== null && value.slaveServerId !== "" ? "fixed" : "auto");
+  const chosen: string[] = value.nodeIds ?? (value.slaveServerId !== undefined && value.slaveServerId !== null && value.slaveServerId !== "" ? [String(value.slaveServerId)] : []);
+  const toggle = (id: string) => onChange({ placement: mode, nodeIds: mode === "fixed" ? [id] : chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id], slaveServerId: undefined });
+  return (
+    <div className="space-y-3 rounded-2xl border border-line bg-[#fbf9ff] p-4 sm:col-span-2">
+      <div className="flex items-center gap-2 text-sm font-extrabold text-ink"><Icon name="hub" className="text-primary-dark" /> Node placement</div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["auto", "Virtualizor decides", "node_select — optionally inside a server group"],
+          ["least_loaded", "Least-loaded node", "We pick the allowed node with most free RAM, under your limits"],
+          ["fixed", "Fixed node", "Always build on one node"],
+        ].map(([k, t, d]) => (
+          <button key={k} type="button" onClick={() => onChange({ placement: k, slaveServerId: undefined, nodeIds: k === "fixed" ? chosen.slice(0, 1) : chosen })}
+            className={cx("rounded-xl border p-3 text-left transition", mode === k ? "border-primary bg-white ring-2 ring-primary/20" : "border-line bg-white/60 hover:border-primary/40")}>
+            <div className="text-sm font-bold text-ink">{t}</div>
+            <div className="mt-0.5 text-xs text-mute">{d}</div>
+          </button>
+        ))}
+      </div>
+      {mode === "auto" && (
+        <Field label="Server group (optional)" hint={groups.error ? `Couldn't load groups: ${groups.error}` : "Leave empty to let Virtualizor choose from all nodes"}>
+          <Select value={value.serverGroupId ?? ""} onChange={(e) => onChange({ serverGroupId: e.target.value === "" ? null : Number(e.target.value) })}>
+            <option value="">Any node</option>
+            {(groups.data?.groups ?? []).map((g: any) => <option key={g.sgid} value={g.sgid}>{g.name} (id {g.sgid})</option>)}
+          </Select>
+        </Field>
+      )}
+      {mode !== "auto" && (
+        <div>
+          <div className="mb-1.5 text-xs font-bold text-mute">{mode === "fixed" ? "Build on this node" : `Allowed nodes ${chosen.length ? `(${chosen.length})` : "(none ticked = all nodes)"}`}</div>
+          {!nodes.length && <Alert tone="warn">No nodes yet — open Node Monitoring and click Refresh now.</Alert>}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {nodes.map((n) => {
+              const on = chosen.includes(n.externalId);
+              const ram = pct(n.ramUsedMb, n.ramTotalMb);
+              return (
+                <button key={n.id} type="button" onClick={() => toggle(n.externalId)} disabled={n.externalId === null}
+                  className={cx("flex items-center gap-3 rounded-xl border p-2.5 text-left transition", on ? "border-primary bg-white ring-2 ring-primary/20" : "border-line bg-white hover:border-primary/40", (!n.online || !n.enabled) && "opacity-60")}>
+                  <span className={cx("grid h-5 w-5 shrink-0 place-items-center border-2", mode === "fixed" ? "rounded-full" : "rounded-md", on ? "border-primary bg-primary text-white" : "border-slate-300")}>{on && <Icon name="check" className="text-[14px]" />}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-ink">{n.name} <span className="font-mono text-xs text-mute">#{n.externalId}</span></span>
+                    <span className="block text-xs text-mute">{n.online ? `RAM ${ram}% · CPU ${Math.round(n.cpuPct)}% · ${n.meta?.vpsCount ?? 0} VPS` : "offline"}{!n.enabled && " · new VPS off"}{n.meta?.locked && " · locked"}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <Field label="Advanced: extra Virtualizor parameters" hint="One key=value per line, sent when the VPS is created — e.g. vnc=1, nic_type=virtio, kvm_cache=writeback. # starts a comment.">
+        <Textarea rows={3} className="font-mono text-xs" value={value.extraParams ?? ""} placeholder={"vnc=1\nnic_type=virtio"} onChange={(e) => onChange({ extraParams: e.target.value })} />
+      </Field>
+    </div>
   );
 }
 

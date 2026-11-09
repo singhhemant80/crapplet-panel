@@ -39,7 +39,7 @@ function Meter({ label, value, detail }: { label: string; value: number; detail:
   );
 }
 
-function NodeCard({ n, server }: { n: Node; server: Srv }) {
+function NodeCard({ n, server, onChanged }: { n: Node & { enabled: boolean }; server: Srv; onChanged: () => void }) {
   const ram = p(n.ramUsedMb, n.ramTotalMb);
   const disk = p(n.diskUsedGb, n.diskTotalGb);
   const m = n.meta ?? {};
@@ -78,6 +78,21 @@ function NodeCard({ n, server }: { n: Node; server: Srv }) {
         {m.os && <span className="truncate px-2" title={m.cpuModel ?? undefined}>{m.os}</span>}
         <span title={new Date(n.updatedAt).toLocaleString()}>{ago(n.updatedAt)}</span>
       </div>
+      {server.type === "VIRTUALIZOR" && (
+        <label className="mt-3 flex cursor-pointer items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-line">
+          <span>Accept new VPS{n.externalId ? <span className="ml-1 font-mono text-mute">#{n.externalId}</span> : null}</span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[#7c3aed]"
+            checked={n.enabled}
+            onChange={(e) =>
+              api(`/admin/monitoring/nodes/${n.id}`, { method: "PATCH", body: { enabled: e.target.checked } })
+                .then(() => { toast.success(e.target.checked ? `${n.name} accepts new VPS` : `${n.name} won't get new VPS`); onChanged(); })
+                .catch((err) => toast.error(err.message))
+            }
+          />
+        </label>
+      )}
       {m.usageError && <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">Live usage unavailable — {m.usageError.replace(/^Virtualizor manageserver: /, "").replace(/[\[\]"]/g, "")}</div>}
     </div>
   );
@@ -187,7 +202,7 @@ export default function Monitoring() {
 
           {rows.length ? (
             <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-              {rows.map(({ n, s }) => <NodeCard key={n.id} n={n} server={s} />)}
+              {rows.map(({ n, s }) => <NodeCard key={n.id} n={n as any} server={s} onChanged={reload} />)}
             </div>
           ) : (
             <Card>
