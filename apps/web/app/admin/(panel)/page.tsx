@@ -72,7 +72,7 @@ export default function AdminDashboard() {
         <Table head={["Order", "Customer", "Total", "Payment", "Status", "Date"]}>
           {data.recentOrders.map((o: any) => (
             <tr key={o.id}>
-              <Td className="font-bold">{o.number}</Td>
+              <Td><Link className="font-bold text-primary-dark hover:underline" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td>
               <Td><div className="font-semibold text-ink">{o.client}</div><div className="text-xs text-mute">{o.email}</div></Td>
               <Td className="font-semibold">{money(o.total, o.currency)}</Td>
               <Td>{o.paid ? <Badge status="PAID" /> : <Badge status="UNPAID" />}</Td>

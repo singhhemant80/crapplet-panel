@@ -1,4 +1,5 @@
 "use client";
+import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,7 +15,7 @@ export default function AdminService() {
   const [edit, setEdit] = useState<any>(null);
   useEffect(() => {
     if (data?.service?.status === "ACTIVE" && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
-    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "" });
+    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "" });
   }, [data, id]);
   if (loading || !data || !edit) return <Loading />;
   const s = data.service;
@@ -22,8 +23,13 @@ export default function AdminService() {
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
   return (
     <>
-      <PageHeader back="/admin/services" title={<span className="flex items-center gap-3">{s.product.name} <Badge status={s.status} /></span>} subtitle={<span>{s.hostname} · <Link className="font-bold text-primary-dark" href={`/admin/clients/${s.user.id}`}>{s.user.email}</Link>{s.reseller && ` · via reseller ${s.reseller.brandName}`}</span>} />
-      {s.status === "FAILED" && <Alert tone="error" className="mb-5">Provisioning failed — see the log below, fix the cause (template, capacity, IPs) and retry.</Alert>}
+      <PageHeader back="/admin/services" title={<span className="flex items-center gap-3">{s.product.name} <Badge status={s.status} /></span>} subtitle={<span>{s.hostname} · <Link className="font-bold text-primary-dark" href={`/admin/clients/${s.user.id}`}>{s.user.email}</Link>{s.order && <> · order <Link className="font-bold text-primary-dark" href={`/admin/orders/${s.order.id}`}>{s.order.number}</Link></>}{s.reseller && ` · via reseller ${s.reseller.brandName}`}</span>} />
+      {s.status === "FAILED" && (
+        <Alert tone="error" className="mb-5">
+          <b>Provisioning failed.</b> {s.logs.find((l: any) => !l.success)?.message ?? "See the log below."}
+          <div className="mt-1 text-xs">Fix the cause (operating system, capacity, IPs) — e.g. change the OS under “Billing &amp; overrides” — then click Retry provisioning.</div>
+        </Alert>
+      )}
       <Card title="Actions" className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : "Provision now"}</Button>}
@@ -33,7 +39,7 @@ export default function AdminService() {
             <Button variant="outline" size="sm" icon="power_settings_new" onClick={() => act("shutdown")}>Shutdown</Button>
             <Button variant="outline" size="sm" icon="stop" onClick={() => act("stop")}>Power off</Button>
             <Button variant="outline" size="sm" icon="key" onClick={() => confirm("Reset password and reboot?") && act("reset_password")}>Reset password</Button>
-            <Select className="h-9 w-56" defaultValue="" onChange={(e) => { if (e.target.value && confirm("Reinstall will ERASE the server. Continue?")) act("reinstall", { osTemplateId: e.target.value }); e.target.value = ""; }}><option value="">Reinstall with…</option>{os.data?.items?.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select>
+            <Select className="h-9 w-56" defaultValue="" onChange={(e) => { if (e.target.value && confirm("Reinstall will ERASE the server. Continue?")) act("reinstall", { osTemplateId: e.target.value }); e.target.value = ""; }}><option value="">Reinstall with…</option>{s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => <option key={x.osTemplate.id} value={x.osTemplate.id}>{x.osTemplate.name}</option>)}</Select>
           </>}
           {s.status === "ACTIVE" && <Button variant="outline" size="sm" icon="pause" onClick={() => { const reason = prompt("Suspension reason", "Suspended by administrator"); if (reason) act("suspend", { reason }); }}>Suspend</Button>}
           {s.status === "SUSPENDED" && <Button variant="secondary" size="sm" icon="play_circle" onClick={() => act("unsuspend")}>Unsuspend</Button>}
@@ -45,7 +51,7 @@ export default function AdminService() {
           <dl className="grid grid-cols-[140px_1fr] gap-y-2.5 text-sm">
             <dt className="text-mute">Hypervisor</dt><dd className="font-semibold">{s.server ? `${s.server.name} (${s.server.type})` : "—"}</dd>
             <dt className="text-mute">Node / VMID</dt><dd className="font-semibold">{s.node ?? "—"} / {s.remoteId ?? "—"} {s.virtType && <span className="text-mute">({s.virtType})</span>}</dd>
-            <dt className="text-mute">OS</dt><dd className="font-semibold">{s.osTemplate?.name ?? "—"}</dd>
+            <dt className="text-mute">OS</dt><dd className="flex items-center gap-2 font-semibold">{s.osTemplate && <OsLogo os={s.osTemplate} size={22} className="rounded-md" />}{s.osTemplate?.name ?? "—"}</dd>
             <dt className="text-mute">IPs</dt><dd className="space-y-1">{s.ips.map((i: any) => <div key={i.id} className="flex items-center gap-1 font-mono text-[13px]">{i.address}{i.isPrimary && <Badge>primary</Badge>}<Copy text={i.address} /><span className="text-xs text-mute">{i.subnet?.cidr} gw {i.subnet?.gateway}</span></div>)}{!s.ips.length && "—"}</dd>
             <dt className="text-mute">Live state</dt><dd className="font-semibold">{live ? (live.error ? <span className="text-rose-600">{live.error}</span> : `${live.state} · CPU ${live.cpuPct ?? "?"}% · RAM ${live.memUsedMb ?? "?"}/${live.memTotalMb ?? "?"} MB`) : "—"}</dd>
             <dt className="text-mute">Credentials</dt><dd>{cred ? <span className="font-mono text-[13px]">{cred.username} / {cred.password} <Copy text={cred.password} /></span> : s.hasPassword ? <button className="text-sm font-bold text-primary-dark" onClick={() => api(`/admin/services/${id}/password`).then(setCred)}>Reveal (logged)</button> : "—"}</dd>
@@ -54,15 +60,24 @@ export default function AdminService() {
         <Card title="Billing & overrides">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Next due date"><Input type="date" value={edit.nextDueDate} onChange={(e) => setEdit({ ...edit, nextDueDate: e.target.value })} /></Field>
-            <Field label="Recurring (₹)"><Input type="number" step="0.01" value={edit.recurringAmount} onChange={(e) => setEdit({ ...edit, recurringAmount: e.target.value })} /></Field>
+            <Field label={`Recurring (${s.currency ?? "INR"})`}><Input type="number" step="0.01" value={edit.recurringAmount} onChange={(e) => setEdit({ ...edit, recurringAmount: e.target.value })} /></Field>
             <Field label="Billing cycle"><Select value={edit.billingCycle} onChange={(e) => setEdit({ ...edit, billingCycle: e.target.value })}>{Object.entries(CYCLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-            <Field label="Hostname"><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value })} /></Field>
+            <Field label="Hostname"><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value.toLowerCase().trim() })} /></Field>
+            {isVps && (
+              <Field label="Operating system" hint={s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? "Built — use Reinstall above to change" : "Used on the next provisioning attempt"}>
+                <Select value={edit.osTemplateId} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} onChange={(e) => setEdit({ ...edit, osTemplateId: e.target.value })}>
+                  {!edit.osTemplateId && <option value="">Choose…</option>}
+                  {s.osTemplate && !s.product.osTemplates.some((x: any) => x.osTemplate.id === s.osTemplate.id) && <option value={s.osTemplate.id}>{s.osTemplate.name} (not offered)</option>}
+                  {s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => <option key={x.osTemplate.id} value={x.osTemplate.id}>{x.osTemplate.name}{x.osTemplate.virtualizorVirt ? ` · ${x.osTemplate.virtualizorVirt}` : ""}</option>)}
+                </Select>
+              </Field>
+            )}
             <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
             <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>
             <div className="sm:col-span-2"><Toggle checked={edit.overrideAutoSuspend} onChange={(v) => setEdit({ ...edit, overrideAutoSuspend: v })} label="Exempt from automatic suspension" /></div>
             <Field label="Notes" className="sm:col-span-2"><Textarea rows={3} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
           </div>
-          <Button className="mt-4" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null } }).then(() => { toast.success("Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save</Button>
+          <Button className="mt-4" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, osTemplateId: s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? undefined : edit.osTemplateId || null, hostname: edit.hostname || undefined, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null } }).then(() => { toast.success("Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save</Button>
           <div className="mt-4 text-xs text-mute">Registered {date(s.registrationDate)} · {CYCLES[s.billingCycle]} · first payment {money(s.firstAmount, s.currency)}</div>
         </Card>
       </div>

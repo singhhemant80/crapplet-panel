@@ -37,7 +37,7 @@ export default function AdminInvoice() {
               </div>
             </div>
             <dl className="mt-4 space-y-1.5 text-sm">
-              {i.order && <div className="flex justify-between"><dt className="text-mute">Order</dt><dd className="font-semibold">{i.order.number}</dd></div>}
+              {i.order && <div className="flex justify-between"><dt className="text-mute">Order</dt><dd><Link className="font-bold text-primary-dark hover:underline" href={`/admin/orders/${i.order.id}`}>{i.order.number}</Link></dd></div>}
               <div className="flex justify-between"><dt className="text-mute">Due</dt><dd className="font-semibold">{date(i.dueDate)}</dd></div>
               {i.currency !== "INR" && <div className="flex justify-between"><dt className="text-mute">INR value</dt><dd className="font-semibold">{money(Math.round(i.total * i.exchangeRate))}</dd></div>}
             </dl>

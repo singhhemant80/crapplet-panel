@@ -208,9 +208,13 @@ adminCore.get(
   requireStaff("orders.view"),
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
-    const where: Prisma.OrderWhereInput = req.query.status ? { status: req.query.status as OrderStatus } : {};
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const where: Prisma.OrderWhereInput = {
+      ...(req.query.status ? { status: req.query.status as OrderStatus } : {}),
+      ...(q ? { OR: [{ number: { contains: q, mode: "insensitive" } }, { user: { email: { contains: q, mode: "insensitive" } } }, { services: { some: { hostname: { contains: q, mode: "insensitive" } } } }] } : {}),
+    };
     const [rows, total] = await Promise.all([
-      prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, firstName: true, lastName: true, email: true } }, invoice: { select: { id: true, status: true, total: true } }, services: { include: { product: { select: { name: true } } } }, domains: { select: { name: true } } } }),
+      prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, firstName: true, lastName: true, email: true } }, invoice: { select: { id: true, status: true, total: true } }, services: { select: { id: true, hostname: true, status: true, product: { select: { name: true } } } }, domains: { select: { name: true } } } }),
       prisma.order.count({ where }),
     ]);
     res.json({ orders: rows, total, page, pageSize });
@@ -249,6 +253,55 @@ adminCore.post(
   }),
 );
 
+/** Changing the OS only makes sense before the VM exists — afterwards it's a reinstall. */
+async function checkOsChange(serviceId: string, osTemplateId: string | null) {
+  const svc = await prisma.service.findUniqueOrThrow({ where: { id: serviceId }, include: { product: true } });
+  if (svc.osTemplateId === osTemplateId) return;
+  if (svc.remoteId && ["ACTIVE", "SUSPENDED"].includes(svc.status)) throw badRequest("This server is already built — use Reinstall to change its operating system");
+  if (!osTemplateId) return;
+  const os = await prisma.osTemplate.findUnique({ where: { id: osTemplateId } });
+  if (!os) throw badRequest("Unknown OS template");
+  if (svc.product.provisioner === "VIRTUALIZOR" && !os.virtualizorOsId) throw badRequest(`"${os.name}" has no Virtualizor OS id — pick a template synced from Virtualizor`);
+  if (svc.product.provisioner === "PROXMOX" && !os.proxmoxKvmVmid && !os.proxmoxLxcVolid) throw badRequest(`"${os.name}" has no Proxmox template configured`);
+}
+
+adminCore.get(
+  "/orders/:id",
+  requireStaff("orders.view"),
+  ah(async (req, res) => {
+    const o = await prisma.order.findFirst({
+      where: { OR: [{ id: req.params.id }, { number: req.params.id }] },
+      include: {
+        user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true, profile: { select: { companyName: true, city: true, state: true, country: true, gstin: true, currency: true } }, _count: { select: { orders: true, services: true } } } },
+        invoice: { include: { items: true, transactions: { orderBy: { createdAt: "asc" } } } },
+        services: {
+          include: {
+            product: { select: { id: true, name: true, provisioner: true, type: true, cpuCores: true, ramMb: true, diskGb: true, osTemplates: { include: { osTemplate: true } } } },
+            osTemplate: true,
+            server: { select: { id: true, name: true, type: true } },
+            ips: { select: { address: true, isPrimary: true } },
+            logs: { orderBy: { createdAt: "desc" }, take: 3 },
+          },
+        },
+        domains: true,
+      },
+    });
+    if (!o) throw notFound("Order not found");
+    const reseller = o.resellerId ? await prisma.reseller.findUnique({ where: { id: o.resellerId }, select: { brandName: true } }) : null;
+    res.json({
+      order: {
+        ...o,
+        reseller,
+        services: o.services.map(({ passwordEnc, product, ...s }) => ({
+          ...s,
+          hasPassword: !!passwordEnc,
+          product: { ...product, osTemplates: product.osTemplates.map((x) => x.osTemplate).filter((t) => t.enabled) },
+        })),
+      },
+    });
+  }),
+);
+
 // ───────────── Services (incl. VPS management) ─────────────
 adminCore.get(
   "/services",
@@ -283,7 +336,7 @@ adminCore.get(
   ah(async (req, res) => {
     const s = await prisma.service.findUnique({
       where: { id: req.params.id },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, product: true, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, product: { include: { osTemplates: { include: { osTemplate: true } } } }, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true },
     });
     if (!s) throw notFound();
     const { passwordEnc, server, ...rest } = s;
@@ -320,7 +373,8 @@ adminCore.put(
         recurringAmount: z.number().int().min(0).optional(),
         billingCycle: z.nativeEnum(BillingCycle).optional(),
         status: z.nativeEnum(ServiceStatus).optional(),
-        hostname: z.string().max(120).optional(),
+        hostname: z.string().trim().toLowerCase().max(120).regex(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/, "Invalid hostname").optional(),
+        osTemplateId: z.string().nullable().optional(),
         serverId: z.string().nullable().optional(),
         node: z.string().nullable().optional(),
         remoteId: z.string().nullable().optional(),
@@ -332,6 +386,7 @@ adminCore.put(
       req.body,
     );
     const { password, ...data } = b;
+    if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
     await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
     await audit({ actorId: req.user!.id, action: "service.updated", entity: "service", entityId: req.params.id, details: Object.keys(b) });
     res.json({ ok: true });
