@@ -87,7 +87,7 @@ clientRouter.put(
 );
 
 // ───── Services ─────
-const svcInclude = { product: { select: { name: true, type: true, provisioner: true, virtType: true, cpuCores: true, ramMb: true, diskGb: true, bandwidthGb: true, osTemplates: { include: { osTemplate: true } } } }, ips: { select: { address: true, isPrimary: true, rdns: true, version: true } }, osTemplate: { select: { id: true, name: true } } };
+const svcInclude = { product: { select: { name: true, type: true, provisioner: true, virtType: true, cpuCores: true, ramMb: true, diskGb: true, bandwidthGb: true, osTemplates: { include: { osTemplate: true } } } }, ips: { select: { address: true, isPrimary: true, rdns: true, version: true } }, osTemplate: { select: { id: true, name: true, family: true, distro: true, logoUrl: true } } };
 
 clientRouter.get(
   "/services",

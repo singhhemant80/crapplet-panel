@@ -1,4 +1,5 @@
 "use client";
+import { OsLogo } from "@/components/os-logo";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, CYCLES } from "@/lib/api";
@@ -401,9 +402,10 @@ function OsPicker({ all, provisioner, serverIds, virt, selected, onChange, onSyn
                 const on = selected.includes(o.id);
                 return (
                   <button key={o.id} type="button" onClick={() => toggle(o.id)} title={o.remoteName ? `${o.remoteName} · osid ${o.virtualizorOsId}` : undefined}
-                    className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition", on ? "bg-primary-dark text-white" : "bg-slate-100 text-slate-600 hover:bg-primary-tint")}>
-                    {on && <Icon name="check" className="text-[15px]" />}
+                    className={cx("inline-flex items-center gap-1.5 rounded-lg py-1 pl-1 pr-2.5 text-xs font-bold transition", on ? "bg-primary-dark text-white" : "bg-slate-100 text-slate-600 hover:bg-primary-tint")}>
+                    <OsLogo os={o} size={20} className="rounded-md shadow-none ring-0" />
                     {o.name}
+                    {on && <Icon name="check" className="text-[15px]" />}
                     {o.virtualizorVirt && <span className={cx("rounded px-1 text-[10px] uppercase", on ? "bg-white/20" : "bg-white text-mute")}>{o.virtualizorVirt}</span>}
                   </button>
                 );

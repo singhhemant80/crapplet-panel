@@ -1,4 +1,5 @@
 "use client";
+import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -46,9 +47,13 @@ function Services() {
               <Link key={s.id} href={`/client/services/${s.id}`} className="group rounded-2xl border border-line bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-primary/50">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary-dark group-hover:bg-primary group-hover:text-white">
-                      <Icon name={vps ? (s.osTemplate?.name?.includes("Windows") ? "desktop_windows" : "terminal") : "cloud"} />
-                    </span>
+                    {vps && s.osTemplate ? (
+                      <OsLogo os={s.osTemplate} size={44} />
+                    ) : (
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary-dark group-hover:bg-primary group-hover:text-white">
+                        <Icon name={vps ? "terminal" : "cloud"} />
+                      </span>
+                    )}
                     <div className="min-w-0">
                       <div className="truncate font-extrabold text-ink">{s.product.name}</div>
                       <div className="truncate text-sm text-mute">{s.hostname ?? "—"}</div>

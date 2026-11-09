@@ -1,5 +1,6 @@
 "use client";
 import { OsChooser } from "@/components/os-chooser";
+import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -145,7 +146,7 @@ export default function ServicePage() {
               </>
             )}
             <dt className="text-mute">Operating system</dt>
-            <dd className="font-semibold text-ink">{svc.osTemplate?.name ?? "—"}</dd>
+            <dd className="flex items-center justify-end gap-2 font-semibold text-ink">{svc.osTemplate && <OsLogo os={svc.osTemplate} size={22} className="rounded-md" />}{svc.osTemplate?.name ?? "—"}</dd>
             {isVps && (
               <>
                 <dt className="text-mute">Resources</dt>

@@ -214,6 +214,7 @@ crud(
     proxmoxLxcVolid: z.string().nullable().optional(),
     virtualizorOsId: z.number().int().nullable().optional(),
     defaultUser: z.string().default("root"),
+    logoUrl: z.string().max(500).regex(/^(https:\/\/|\/)/, "Use an https:// URL or a /path on this site").nullable().optional(),
     enabled: z.boolean().default(true),
     sortOrder: z.number().int().default(0),
   }),

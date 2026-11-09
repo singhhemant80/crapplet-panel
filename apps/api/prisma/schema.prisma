@@ -321,6 +321,8 @@ model OsTemplate {
   virtualizorVirt String?
   distro          String?
   remoteName      String?
+  /// optional image shown on the order page instead of the built-in logo (e.g. an official Windows logo you're licensed to use)
+  logoUrl         String?
   /// manual | virtualizor
   source          String      @default("manual")
   syncedAt        DateTime?

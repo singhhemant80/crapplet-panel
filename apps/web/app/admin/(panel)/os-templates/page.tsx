@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button, toast } from "@/components/ui";
+import { OsLogo } from "@/components/os-logo";
 import { ResourceManager } from "@/components/admin/resource";
 
 export default function Page() {
@@ -35,11 +36,12 @@ export default function Page() {
         { key: "proxmoxLxcVolid", label: "Proxmox LXC template volume", placeholder: "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst" },
         { key: "virtualizorOsId", label: "Virtualizor OS id", type: "number", hint: "Filled in automatically for synced templates" },
         { key: "defaultUser", label: "Default user", default: "root" },
+        { key: "logoUrl", label: "Custom logo URL (optional)", placeholder: "https://… or /images/windows.svg", hint: "Replaces the built-in logo — e.g. an official Windows logo you're licensed to use", full: true },
         { key: "sortOrder", label: "Sort order", type: "number", default: 0 },
         { key: "enabled", label: "Enabled", type: "bool", default: true },
       ]}
       columns={[
-        { label: "Name", render: (r) => <b>{r.name}</b> },
+        { label: "Name", render: (r) => <span className="flex items-center gap-2.5"><OsLogo os={r} size={30} /><b>{r.name}</b></span> },
         {
           label: "Source",
           render: (r) =>
