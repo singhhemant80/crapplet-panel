@@ -28,7 +28,7 @@ export class VirtualizorClient {
 
   private url(act: string, query: Record<string, string | number | undefined> = {}) {
     const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const q = new URLSearchParams({ act, api: "json", adminapikey: this.creds.apiKey, adminapipass: this.creds.apiPass });
+    const q = new URLSearchParams({ act, api: "json", adminapikey: this.creds.apiKey.trim(), adminapipass: this.creds.apiPass.trim() });
     for (const [k, v] of Object.entries(query)) if (v !== undefined) q.set(k, String(v));
     return `https://${host}:${this.creds.port}/index.php?${q.toString()}`;
   }
@@ -58,6 +58,13 @@ export class VirtualizorClient {
     try {
       json = JSON.parse(text);
     } catch {
+      if (res.statusCode >= 300 && res.statusCode < 400) {
+        const loc = String(res.headers.location ?? "");
+        throw new VirtualizorError(
+          `Virtualizor rejected the API login (HTTP ${res.statusCode} redirect${loc ? ` to ${loc.split("?")[0]}` : ""}). Check: (1) the Admin API key and API password are exactly as shown in Virtualizor Admin → Configuration → API Credentials (not your admin login password); (2) that credential has no IP restriction, or allows this panel's public IP; (3) you're using the master's admin port 4085.`,
+          loc,
+        );
+      }
       throw new VirtualizorError(
         `Virtualizor ${act}: the panel answered (HTTP ${res.statusCode}) but not with API data. Check the Admin API key and password, and that this panel's IP is allowed under Virtualizor Admin → Configuration → API Credentials. Use the master's admin port (4085, https).`,
         text.slice(0, 300),

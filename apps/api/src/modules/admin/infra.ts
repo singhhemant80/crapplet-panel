@@ -44,9 +44,9 @@ adminInfra.get(
   "/servers",
   requireStaff("servers.manage"),
   ah(async (_req, res) => {
-    const servers = await prisma.server.findMany({ orderBy: { name: "asc" }, select: { ...serverPublic, _count: { select: { services: { where: { status: { in: ["ACTIVE", "SUSPENDED"] } } }, ips: true } } } });
+    const servers = await prisma.server.findMany({ orderBy: { name: "asc" }, select: { ...serverPublic, apiSecretEnc: true, _count: { select: { services: { where: { status: { in: ["ACTIVE", "SUSPENDED"] } } }, ips: true } } } });
     const free = await prisma.ipAddress.groupBy({ by: ["serverId"], where: { status: "AVAILABLE" }, _count: true });
-    res.json({ servers: servers.map((s) => ({ ...s, freeIps: free.find((f) => f.serverId === s.id)?._count ?? 0 })) });
+    res.json({ servers: servers.map(({ apiSecretEnc, ...s }) => ({ ...s, hasSecret: !!apiSecretEnc, freeIps: free.find((f) => f.serverId === s.id)?._count ?? 0 })) });
   }),
 );
 
