@@ -458,6 +458,10 @@ model ServerNode {
   ramTotalMb Int     @default(0)
   diskUsedGb Int     @default(0)
   diskTotalGb Int    @default(0)
+  /// id of the node on the panel (Virtualizor serid); null for Proxmox
+  externalId String?
+  /// extra live data: ip, vps count, load average, virt, cpu model, uptime, errors…
+  meta      Json?
   updatedAt DateTime @updatedAt
 
   @@unique([serverId, name])

@@ -199,6 +199,34 @@ adminInfra.post(
   }),
 );
 
+// ───────────── Monitoring ─────────────
+/** Every node of every server with its latest usage snapshot (refreshed by the worker every 5 min). */
+adminInfra.get(
+  "/monitoring",
+  requireStaff("servers.manage"),
+  ah(async (_req, res) => {
+    // disabled servers aren't polled, so they're left out
+    const servers = await prisma.server.findMany({
+      where: { type: { in: ["PROXMOX", "VIRTUALIZOR"] }, enabled: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, type: true, hostname: true, enabled: true, lastCheckAt: true, lastStatus: true, location: { select: { name: true } }, nodes: { orderBy: { name: "asc" } }, _count: { select: { services: { where: { status: { in: ["ACTIVE", "SUSPENDED"] } } } } } },
+    });
+    res.json({ servers });
+  }),
+);
+
+/** Re-poll one server (or all) right now instead of waiting for the next 5-minute check. */
+adminInfra.post(
+  "/monitoring/refresh",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const id = typeof req.body?.serverId === "string" ? req.body.serverId : null;
+    const servers = await prisma.server.findMany({ where: { type: { in: ["PROXMOX", "VIRTUALIZOR"] }, ...(id ? { id } : { enabled: true }) }, select: { id: true } });
+    const results = await Promise.all(servers.map((s) => checkServer(s.id).then((r) => ({ id: s.id, ...r }))));
+    res.json({ results });
+  }),
+);
+
 // ───────────── Virtualizor ─────────────
 adminInfra.get(
   "/virtualizor/:serverId/overview",

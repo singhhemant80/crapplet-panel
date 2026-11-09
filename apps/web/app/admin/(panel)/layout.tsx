@@ -32,6 +32,7 @@ const NAV: { group: string; items: Item[] }[] = [
     items: [
       { href: "/admin/servers", label: "Servers", icon: "dns", perm: "servers.manage" },
       { href: "/admin/proxmox", label: "Proxmox", icon: "hub", perm: "servers.manage" },
+      { href: "/admin/monitoring", label: "Node Monitoring", icon: "monitor_heart", perm: "servers.manage" },
       { href: "/admin/virtualizor", label: "Virtualizor", icon: "lan", perm: "servers.manage" },
       { href: "/admin/ips", label: "IP Management", icon: "router", perm: "ips.view" },
       { href: "/admin/services", label: "VPS & Services", icon: "developer_board", perm: "services.view" },

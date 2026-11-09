@@ -1,5 +1,6 @@
 import { prisma, Prisma } from "../db";
-import { proxmoxFor, virtualizorFor } from "../modules/provisioning/provisioner";
+import { proxmoxFor } from "../modules/provisioning/provisioner";
+import { syncVirtualizorNodes } from "../modules/provisioning/virtualizor-nodes";
 
 /** Connection test + node resource snapshot for one server. */
 export async function checkServer(serverId: string) {
@@ -23,8 +24,8 @@ export async function checkServer(serverId: string) {
       }
       status = { ok: true, version: version.version, nodes: nodes.length, online: nodes.filter((n) => n.status === "online").length };
     } else if (s.type === "VIRTUALIZOR") {
-      const v = await virtualizorFor(s).listVps(1, 1);
-      status = { ok: true, vps: Object.keys(v.vs ?? {}).length >= 0 };
+      const r = await syncVirtualizorNodes(s);
+      status = { ok: true, nodes: r.nodes, online: r.online };
     } else status = { ok: true, manual: true };
     status.latencyMs = Date.now() - started;
     await prisma.server.update({ where: { id: s.id }, data: { lastCheckAt: new Date(), lastStatus: status as Prisma.InputJsonValue } });

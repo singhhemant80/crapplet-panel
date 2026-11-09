@@ -93,8 +93,17 @@ export class VirtualizorClient {
   osTemplates() {
     return this.call<{ oslist: Record<string, unknown> }>("ostemplates");
   }
+  /** Every server (master + slave nodes) registered on this Virtualizor master. */
   servers() {
-    return this.call<{ servs: Record<string, Record<string, unknown>> }>("servers");
+    return this.call<{ servs: Record<string, Record<string, unknown>> | Record<string, unknown>[] }>("servers", { page: 1, reslen: 1000 });
+  }
+  /** Live CPU / RAM / disk usage of one node (serid 0 = the master itself). */
+  serverUsage(serid: number | string) {
+    return this.call<{ usage?: Record<string, any>; info?: Record<string, any> }>("manageserver", { changeserid: serid });
+  }
+  /** Load averages for all nodes. */
+  serverLoads() {
+    return this.call<{ loads?: Record<string, any>; server_loads?: Record<string, any> }>("serverloads");
   }
 
   async createVps(p: {
