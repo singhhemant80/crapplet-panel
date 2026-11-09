@@ -57,7 +57,8 @@ REDIS_URL=redis://127.0.0.1:6379
 JWT_SECRET=$(openssl rand -hex 48)
 # AES-256-GCM key for Proxmox/Virtualizor/gateway secrets, VPS passwords and 2FA seeds. NEVER change or lose it.
 APP_ENCRYPTION_KEY=$(openssl rand -hex 32)
-COOKIE_SECURE=true
+# auto = secure cookies on https://, plain cookies when opened over http:// (e.g. by IP before SSL)
+COOKIE_SECURE=auto
 UPLOAD_DIR=/var/lib/crapplet/uploads
 SMTP_HOST=${SMTP_HOST:-}
 SMTP_PORT=${SMTP_PORT:-587}
@@ -73,6 +74,8 @@ ENV
   FIRST_INSTALL=1
 else
   echo "Keeping existing $ENV_FILE"
+  # older installs forced Secure cookies, which breaks logging in over http:// — switch to auto
+  sed -i 's/^COOKIE_SECURE=true$/COOKIE_SECURE=auto/' "$ENV_FILE"
   FIRST_INSTALL=0
 fi
 mkdir -p /var/lib/crapplet/uploads /var/backups/crapplet

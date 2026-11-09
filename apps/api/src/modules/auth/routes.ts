@@ -66,7 +66,8 @@ const registerSchema = profileSchema.extend({
 });
 
 function setAuthCookies(res: Response, access: string, refresh: string) {
-  const base = { httpOnly: true, secure: config.cookieSecure, sameSite: "lax" as const };
+  const secure = config.cookieSecure === "auto" ? !!res.req?.secure : config.cookieSecure;
+  const base = { httpOnly: true, secure, sameSite: "lax" as const };
   res.cookie("cc_at", access, { ...base, path: "/", maxAge: config.accessTokenTtlSec * 1000 });
   res.cookie("cc_rt", refresh, { ...base, path: "/api/auth", maxAge: config.refreshTokenTtlDays * 86400 * 1000 });
 }

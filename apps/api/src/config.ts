@@ -20,7 +20,8 @@ export const config = {
   encryptionKey: req("APP_ENCRYPTION_KEY", isProd ? undefined : "0000000000000000000000000000000000000000000000000000000000000000"),
   accessTokenTtlSec: 15 * 60,
   refreshTokenTtlDays: 30,
-  cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "true" : isProd,
+  // "auto" (default): Secure cookies when the request came over HTTPS (Nginx sets X-Forwarded-Proto), plain cookies on http://
+  cookieSecure: (process.env.COOKIE_SECURE === "true" ? true : process.env.COOKIE_SECURE === "false" ? false : "auto") as boolean | "auto",
   uploadDir: process.env.UPLOAD_DIR ?? "./storage/uploads",
   smtp: {
     host: process.env.SMTP_HOST ?? "",

@@ -64,6 +64,16 @@ export function LoginForm({ portal = "client" }: { portal?: "client" | "admin" }
           return;
         }
       }
+      // make sure the browser actually kept the session cookie before navigating
+      const ok = await api("/auth/me").then(() => true, () => false);
+      if (!ok) {
+        setError(
+          window.location.protocol === "http:"
+            ? "Your password was accepted, but the browser refused the login cookie because this page is on http://. Open the site with https:// (or set COOKIE_SECURE=auto in apps/api/.env and restart)."
+            : "Your password was accepted, but the browser didn't keep the login cookie. Allow cookies for this site and try again.",
+        );
+        return;
+      }
       await reload();
       router.replace(next);
     } catch (e: any) {
