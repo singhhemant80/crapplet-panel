@@ -77,7 +77,10 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
       unitMonthly: o.unitMonthly,
       unitPrices: perCurrency(rs, o.unitMonthly, o.unitPrices),
     })),
-    osTemplates: p.osTemplates.filter((o) => o.osTemplate.enabled).map((o) => ({ id: o.osTemplate.id, name: o.osTemplate.name, family: o.osTemplate.family })),
+    osTemplates: p.osTemplates
+      .filter((o) => o.osTemplate.enabled)
+      .map((o) => ({ id: o.osTemplate.id, name: o.osTemplate.name, family: o.osTemplate.family, distro: o.osTemplate.distro ?? o.osTemplate.name.split(" ")[0].toLowerCase(), serverId: o.osTemplate.virtualizorServerId }))
+      .sort((a, b) => a.family.localeCompare(b.family) || a.name.localeCompare(b.name, undefined, { numeric: true })),
     addons: p.addons.filter((a) => a.addon.enabled).map((a) => ({ id: a.addon.id, name: a.addon.name, description: a.addon.description, monthly: a.addon.monthly, setupFee: a.addon.setupFee, prices: { monthly: perCurrency(rs, a.addon.monthly, a.addon.prices, "monthly"), setupFee: perCurrency(rs, a.addon.setupFee, a.addon.prices, "setupFee") } })),
   };
 }

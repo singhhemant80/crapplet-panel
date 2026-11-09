@@ -1,3 +1,4 @@
+import { getSettings } from "../../lib/settings";
 import { inrPerUnit, listCurrencies, requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
@@ -395,7 +396,8 @@ adminCore.get(
   ah(async (req, res) => {
     const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { items: true, transactions: true, creditNotes: true, paymentIntents: true, user: { select: { id: true, email: true, firstName: true, lastName: true } }, order: true } });
     if (!inv) throw notFound();
-    res.json({ invoice: inv, label: invoiceLabel(inv) });
+    const st = await getSettings();
+    res.json({ invoice: inv, label: invoiceLabel(inv), company: st.company, bankDetails: st.invoice.bankDetails, footerNote: st.invoice.footerNote, lutArn: st.currency.lutArn });
   }),
 );
 

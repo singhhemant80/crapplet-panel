@@ -9,6 +9,7 @@ import { requireStaff } from "../../middleware/auth";
 import { adminAssignIp, importCidr, importCsv, logIp, setIpStatus } from "../ipam/service";
 import { proxmoxFor, virtualizorFor } from "../provisioning/provisioner";
 import { checkServer } from "../../jobs/health";
+import { syncVirtualizorOs } from "../provisioning/virtualizor-os";
 import { crud } from "./crud";
 
 export const adminInfra = Router();
@@ -239,6 +240,26 @@ adminInfra.get(
     const ids = Object.keys(vps.vs ?? {});
     const linked = await prisma.service.findMany({ where: { serverId: s.id, remoteId: { in: ids } }, select: { id: true, remoteId: true, status: true, user: { select: { email: true } } } });
     res.json({ vps: Object.entries(vps.vs ?? {}).map(([id, v]) => ({ vpsid: id, ...v, service: linked.find((l) => l.remoteId === id) ?? null })), plans: Object.values(plans.plans ?? {}) });
+  }),
+);
+
+/** Import OS templates from one Virtualizor master (or all of them with :serverId = "all"). */
+adminInfra.post(
+  "/virtualizor/:serverId/sync-os",
+  requireStaff("products.manage"),
+  ah(async (req, res) => {
+    const servers = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", ...(req.params.serverId === "all" ? { enabled: true } : { id: req.params.serverId }) } });
+    if (!servers.length) throw badRequest("Add a Virtualizor server first (Infrastructure → Servers)");
+    const results = await Promise.all(
+      servers.map((s) =>
+        syncVirtualizorOs(s).then(
+          (r) => ({ serverId: s.id, serverName: s.name, ok: true as const, ...r }),
+          (e) => ({ serverId: s.id, serverName: s.name, ok: false as const, error: String((e as Error).message ?? e) }),
+        ),
+      ),
+    );
+    await audit({ actorId: req.user!.id, action: "os.synced", entity: "server", entityId: req.params.serverId, details: results });
+    res.json({ results });
   }),
 );
 

@@ -1,4 +1,5 @@
 "use client";
+import { InvoiceSheet } from "@/components/invoice-sheet";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -24,29 +25,24 @@ export default function AdminInvoice() {
           </>}
           {i.status === "PAID" && <Button size="sm" variant="outline" icon="undo" onClick={() => setCn(true)}>Credit note</Button>}
         </>} />
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <Card pad={false}>
-          <Table head={["Item", "SAC", "Qty", "Amount"]}>
-            {i.items.map((it: any) => <tr key={it.id}><Td><div className="font-semibold">{it.description}</div>{it.periodStart && <div className="text-xs text-mute">{date(it.periodStart)} – {date(it.periodEnd)}</div>}<div className="text-[11px] text-mute">{it.type}{it.relId ? ` · ${it.relId}` : ""}</div></Td><Td>{it.hsnSac}</Td><Td>{it.quantity}</Td><Td className="text-right font-semibold">{money(it.amount, i.currency)}</Td></tr>)}
-          </Table>
-          <div className="ml-auto max-w-xs space-y-1 p-5 text-sm">
-            {[["Subtotal", i.subtotal], ["Discount", -i.discount], ["Taxable", i.taxableAmount], ["CGST", i.cgst], ["SGST", i.sgst], ["IGST", i.igst]].filter(([, v]) => v).map(([l, v]: any) => <div key={l} className="flex justify-between"><span className="text-mute">{l}</span><span>{money(v, i.currency)}</span></div>)}
-            <div className="flex justify-between border-t border-line pt-2 text-base font-extrabold"><span>Total</span><span>{money(i.total, i.currency)}</span></div>
-            <div className="flex justify-between"><span className="text-mute">Paid</span><span>{money(i.amountPaid, i.currency)}</span></div>
-          </div>
-        </Card>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <InvoiceSheet data={data} admin />
         <div className="space-y-6">
-          <Card title="Customer GST">
-            <div className="text-sm"><div>GSTIN: <b className="font-mono">{i.customerGstin ?? "Unregistered (B2C)"}</b></div><div>State code: {i.placeOfSupplyCode ?? "—"} · rate {i.gstRate}% · {i.taxInclusive ? "inclusive" : "exclusive"}</div>
-              {i.currency !== "INR" && (
-                <div className="mt-2 rounded-lg bg-primary-tint px-3 py-2 text-xs">
-                  Billed in <b>{i.currency}</b> @ ₹{Number(i.exchangeRate).toFixed(4)} — INR value <b>{money(Math.round(i.total * i.exchangeRate))}</b>
-                  {!i.taxTotal && i.placeOfSupplyCode === "96" && <div className="text-mute">Export of services (zero-rated, LUT)</div>}
-                </div>
-              )}
+          <Card title="Customer">
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-tint text-sm font-black text-primary-dark">{(i.user.firstName?.[0] ?? "") + (i.user.lastName?.[0] ?? "")}</span>
+              <div className="min-w-0 text-sm">
+                <Link className="font-bold text-primary-dark hover:underline" href={`/admin/clients/${i.user.id}`}>{i.user.firstName} {i.user.lastName}</Link>
+                <div className="truncate text-mute">{i.user.email}</div>
+              </div>
             </div>
+            <dl className="mt-4 space-y-1.5 text-sm">
+              {i.order && <div className="flex justify-between"><dt className="text-mute">Order</dt><dd className="font-semibold">{i.order.number}</dd></div>}
+              <div className="flex justify-between"><dt className="text-mute">Due</dt><dd className="font-semibold">{date(i.dueDate)}</dd></div>
+              {i.currency !== "INR" && <div className="flex justify-between"><dt className="text-mute">INR value</dt><dd className="font-semibold">{money(Math.round(i.total * i.exchangeRate))}</dd></div>}
+            </dl>
           </Card>
-          <Card title="Transactions" pad={false}>
+          <Card title="Ledger" pad={false}>
             <ul className="divide-y divide-[#f3effb] text-sm">{i.transactions.map((t: any) => <li key={t.id} className="flex justify-between px-5 py-2.5"><span><b className="uppercase">{t.gateway}</b> <span className="font-mono text-xs text-mute">{t.gatewayTxnId.slice(0, 22)}</span><div className="text-xs text-mute">{date(t.createdAt, true)} · {t.type}</div></span><b>{money(t.amount, t.currency)}</b></li>)}{!i.transactions.length && <li className="px-5 py-4 text-mute">None</li>}</ul>
           </Card>
           {i.creditNotes.length > 0 && <Card title="Credit notes" pad={false}><ul className="divide-y text-sm">{i.creditNotes.map((c: any) => <li key={c.id} className="flex justify-between px-5 py-2.5"><span>{c.number}<div className="text-xs text-mute">{c.reason}</div></span><b>{money(c.amount, i.currency)}</b></li>)}</ul></Card>}

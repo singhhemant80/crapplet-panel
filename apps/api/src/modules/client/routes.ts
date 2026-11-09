@@ -214,7 +214,7 @@ clientRouter.get(
     });
     if (!inv) throw notFound("Invoice not found");
     const s = await getSettings();
-    res.json({ invoice: inv, label: invoiceLabel(inv), company: s.company, bankDetails: s.invoice.bankDetails });
+    res.json({ invoice: inv, label: invoiceLabel(inv), company: s.company, bankDetails: s.invoice.bankDetails, footerNote: s.invoice.footerNote, lutArn: s.currency.lutArn });
   }),
 );
 

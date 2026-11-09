@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { readCart, writeCart, type CartItem } from "@/lib/cart";
 import { Alert, Button, Card, Field, Icon, Input, Loading, Select, Spinner, cx, toast, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
+import { OsChooser } from "@/components/os-chooser";
 import { CurrencySwitch, pick, priceRow, rowsIn, taxNote, useCurrency } from "@/lib/currency";
 
 function useCountdown(until?: string | null) {
@@ -19,6 +20,12 @@ function useCountdown(until?: string | null) {
   const s = Math.max(0, Math.floor((new Date(until).getTime() - now) / 1000));
   const c = Math.min(s, 15 * 60);
   return { s, label: `${Math.floor(c / 60)}:${String(c % 60).padStart(2, "0")}` };
+}
+
+/** Pre-select the newest Ubuntu (most popular), else the first Linux image. */
+function defaultOs(list: any[]): string {
+  const ubuntu = list.filter((o) => /ubuntu/i.test(o.distro ?? o.name)).sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
+  return (ubuntu[0] ?? list.find((o) => o.family !== "windows") ?? list[0]).id;
 }
 
 function Configure() {
@@ -50,7 +57,7 @@ function Configure() {
     if (!p) return;
     const rows = rowsIn(p.pricing, currency);
     if (rows.length && !rows.some((x: any) => x.cycle === cycle)) setCycle(rows[0].cycle);
-    if (p.osTemplates.length && !os) setOs(p.osTemplates[0].id);
+    if (p.osTemplates.length && !os) setOs(defaultOs(p.osTemplates));
     try {
       const pending = JSON.parse(sessionStorage.getItem(`cc_pick_${p.slug}`) ?? "null");
       if (pending && new Date(pending.expiresAt) > new Date()) {
@@ -85,6 +92,11 @@ function Configure() {
     }
   }, [countdown, reservation]);
 
+  // templates synced from a specific Virtualizor master only install there
+  const osOptions = (p?.osTemplates ?? []).filter((o: any) => !o.serverId || !serverId || o.serverId === serverId);
+  useEffect(() => {
+    if (osOptions.length && !osOptions.some((o: any) => o.id === os)) setOs(defaultOs(osOptions));
+  }, [serverId, p]); // eslint-disable-line react-hooks/exhaustive-deps
   const months = CYCLE_MONTHS[cycle] ?? 1;
   const price = p ? priceRow(p.pricing, cycle, currency) : undefined;
   const optionsMonthly = useMemo(() => {
@@ -245,13 +257,7 @@ function Configure() {
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.osTemplates.length > 0 && (
                   <Field label="Operating system" className="sm:col-span-2">
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {p.osTemplates.map((o: any) => (
-                        <button key={o.id} onClick={() => setOs(o.id)} className={cx("flex items-center gap-2 rounded-xl border p-3 text-left text-sm font-bold", os === o.id ? "border-primary bg-primary-tint text-primary-dark ring-2 ring-primary/20" : "border-line bg-white text-slate-700")}>
-                          <Icon name={o.family === "windows" ? "desktop_windows" : "terminal"} />{o.name}
-                        </button>
-                      ))}
-                    </div>
+                    <OsChooser options={osOptions} value={os} onChange={setOs} />
                   </Field>
                 )}
                 <Field label="Hostname" hint="e.g. server1.yourdomain.com" className="sm:col-span-2">

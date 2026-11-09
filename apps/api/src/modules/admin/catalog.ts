@@ -218,7 +218,7 @@ crud(
     sortOrder: z.number().int().default(0),
   }),
   "products.manage",
-  { orderBy: { sortOrder: "asc" } },
+  { orderBy: [{ source: "asc" }, { sortOrder: "asc" }, { name: "asc" }] },
 );
 
 crud(adminCatalog, "/domain-pricing", "domainPricing", z.object({ tld: z.string().regex(/^\.[a-z0-9.-]+$/), register: z.number().int().min(0), transfer: z.number().int().min(0), renew: z.number().int().min(0), prices: curMapOf({ register: z.number().int().min(0), transfer: z.number().int().min(0), renew: z.number().int().min(0) }), enabled: z.boolean().default(true), registrar: z.string().default("manual") }), "domains.manage", { idField: "tld", orderBy: { tld: "asc" } });

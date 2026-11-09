@@ -90,8 +90,9 @@ export class VirtualizorClient {
   plans() {
     return this.call<{ plans: Record<string, Record<string, unknown>> }>("plans");
   }
+  /** All OS templates on the master (`ostemplates` keyed by osid; older versions also send `oslist`). */
   osTemplates() {
-    return this.call<{ oslist: Record<string, unknown> }>("ostemplates");
+    return this.call<{ ostemplates?: unknown; oslist?: unknown }>("ostemplates", { page: 1, reslen: 1000 });
   }
   /** Every server (master + slave nodes) registered on this Virtualizor master. */
   servers() {

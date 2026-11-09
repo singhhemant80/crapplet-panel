@@ -316,11 +316,21 @@ model OsTemplate {
   proxmoxKvmVmid  Int?
   proxmoxLxcVolid String?
   virtualizorOsId Int?
+  /// set for templates imported from a Virtualizor master: which server, its virt type (kvm, proxk…), distro and raw file name
+  virtualizorServerId String?
+  virtualizorVirt String?
+  distro          String?
+  remoteName      String?
+  /// manual | virtualizor
+  source          String      @default("manual")
+  syncedAt        DateTime?
   defaultUser     String      @default("root")
   enabled         Boolean     @default(true)
   sortOrder       Int         @default(0)
   products        ProductOs[]
   services        Service[]
+
+  @@unique([virtualizorServerId, virtualizorOsId])
 }
 
 model ProductOs {

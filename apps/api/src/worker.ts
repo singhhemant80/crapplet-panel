@@ -10,6 +10,7 @@ import { expireReservations } from "./modules/ipam/service";
 import { runBillingCycle } from "./jobs/billing";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
+import { syncVirtualizorOs } from "./modules/provisioning/virtualizor-os";
 import { getSettings } from "./lib/settings";
 import { prisma } from "./db";
 import { executeMigrationRun } from "./modules/migration/service";
@@ -44,6 +45,11 @@ const maintenance = new Worker(
         return checkAllServers();
       case "daily-billing":
         return runBillingCycle();
+      case "sync-os": {
+        // keep OS templates in step with every Virtualizor master
+        const masters = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", enabled: true } });
+        return Promise.all(masters.map((m) => syncVirtualizorOs(m).catch((e) => ({ server: m.name, error: String(e.message ?? e) }))));
+      }
       case "fx-rates": {
         if (!(await getSettings()).currency.autoUpdateRates) return { skipped: "auto-update off" };
         return refreshExchangeRates();
@@ -64,6 +70,7 @@ async function schedule() {
   await q.upsertJobScheduler("server-health", { every: 5 * 60_000 }, { name: "server-health" });
   await q.upsertJobScheduler("daily-billing", { pattern: "0 9 * * *", tz: "Asia/Kolkata" }, { name: "daily-billing" });
   // before billing runs, so renewal invoices use today's rate
+  await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), billing (09:00 IST)");
 }

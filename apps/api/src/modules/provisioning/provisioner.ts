@@ -213,6 +213,13 @@ async function virtualizorCreate(svc: FullService) {
   const mc = ((p.moduleConfig ?? {}) as { virtualizor?: { planId?: number; virt?: string; slaveServerId?: number } }).virtualizor ?? {};
   const cfg = (svc.config ?? {}) as Record<string, unknown>;
   if (!svc.osTemplate?.virtualizorOsId) throw new ProvisionError("OS template has no Virtualizor OS id", false);
+  // a template synced from another master has a different osid there — use the same image on this master
+  let osId = svc.osTemplate.virtualizorOsId;
+  if (svc.osTemplate.virtualizorServerId && svc.osTemplate.virtualizorServerId !== server.id) {
+    const same = await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, remoteName: svc.osTemplate.remoteName ?? undefined, enabled: true } });
+    if (!same?.virtualizorOsId) throw new ProvisionError(`"${svc.osTemplate.name}" isn't available on ${server.name} — sync OS templates for that master`, false);
+    osId = same.virtualizorOsId;
+  }
   const ips = await prisma.$transaction((tx) =>
     allocateIpsForService(tx, { serviceId: svc.id, userId: svc.userId, serverId: server.id, orderId: svc.orderId, requestedIpId: (cfg.requestedIpId as string) ?? null, count: Math.max(1, p.ipv4Count) }),
   );
@@ -229,7 +236,7 @@ async function virtualizorCreate(svc: FullService) {
       userPass: generatePassword(16),
       hostname,
       rootPass: password,
-      osId: svc.osTemplate.virtualizorOsId,
+      osId,
       ips: ips.map((i) => i.address),
       ramMb: p.ramMb ?? undefined,
       diskGb: p.diskGb ?? undefined,

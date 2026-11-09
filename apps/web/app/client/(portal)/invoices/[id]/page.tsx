@@ -1,4 +1,5 @@
 "use client";
+import { InvoiceSheet } from "@/components/invoice-sheet";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api, date, invNo, money } from "@/lib/api";
@@ -135,7 +136,6 @@ function InvoiceView() {
     }
   }
 
-  const bill = inv.billingSnapshot ?? {};
   return (
     <>
       <PageHeader
@@ -156,88 +156,11 @@ function InvoiceView() {
           <span className="font-semibold">Confirming your payment with the gateway…</span>
         </Alert>
       )}
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <Card pad={false}>
-          <div className="grid gap-6 border-b border-line p-5 sm:grid-cols-2">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-primary-dark">Billed to</div>
-              <div className="mt-1 font-bold text-ink">{bill.companyName || bill.name}</div>
-              <div className="text-sm text-mute">
-                {bill.address1}
-                {bill.address2 ? `, ${bill.address2}` : ""}
-                <br />
-                {[bill.city, bill.state, bill.postcode].filter(Boolean).join(", ")}
-                {inv.customerGstin && (
-                  <>
-                    <br />
-                    GSTIN: {inv.customerGstin}
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="text-sm sm:text-right">
-              <div className="text-xs font-bold uppercase tracking-wider text-primary-dark">From</div>
-              <div className="mt-1 font-bold text-ink">{data.company.legalName}</div>
-              <div className="text-mute">GSTIN: {data.company.gstin}</div>
-              <div className="mt-2 text-mute">
-                Issued {date(inv.issueDate)} · Due {date(inv.dueDate)}
-                <br />
-                Place of supply: {inv.placeOfSupply ?? "—"}
-              </div>
-            </div>
-          </div>
-          <Table head={["Description", "SAC", "Amount"]}>
-            {inv.items.map((it: any) => (
-              <tr key={it.id}>
-                <Td>
-                  <div className="font-semibold text-ink">{it.description}</div>
-                  {it.periodStart && it.periodEnd && (
-                    <div className="text-xs text-mute">
-                      {date(it.periodStart)} – {date(it.periodEnd)}
-                    </div>
-                  )}
-                </Td>
-                <Td className="text-mute">{it.hsnSac}</Td>
-                <Td className="text-right font-semibold">{money(it.amount, inv.currency)}</Td>
-              </tr>
-            ))}
-          </Table>
-          <div className="ml-auto max-w-sm space-y-1.5 p-5 text-sm">
-            <Row l="Subtotal" v={money(inv.subtotal, inv.currency)} />
-            {inv.discount > 0 && <Row l="Discount" v={`− ${money(inv.discount, inv.currency)}`} />}
-            {inv.cgst > 0 && <Row l={`CGST @ ${inv.gstRate / 2}%`} v={money(inv.cgst, inv.currency)} />}
-            {inv.sgst > 0 && <Row l={`SGST @ ${inv.gstRate / 2}%`} v={money(inv.sgst, inv.currency)} />}
-            {inv.igst > 0 && <Row l={`IGST @ ${inv.gstRate}%`} v={money(inv.igst, inv.currency)} />}
-            {inv.currency !== "INR" && !inv.taxTotal && <Row l="GST" v="Not applicable (export)" />}
-            <div className="flex justify-between border-t border-line pt-2 text-base font-extrabold text-ink">
-              <span>Total</span>
-              <span>{money(inv.total, inv.currency)}</span>
-            </div>
-            {inv.amountPaid > 0 && <Row l="Paid" v={money(inv.amountPaid, inv.currency)} />}
-            {inv.status === "UNPAID" && (
-              <div className="flex justify-between font-extrabold text-primary-dark">
-                <span>Balance due</span>
-                <span>{money(due, inv.currency)}</span>
-              </div>
-            )}
-          </div>
-          {inv.transactions.length > 0 && (
-            <div className="border-t border-line p-5">
-              <div className="mb-2 text-xs font-bold uppercase tracking-wider text-mute">Transactions</div>
-              {inv.transactions.map((t: any) => (
-                <div key={t.id} className="flex justify-between py-1 text-sm">
-                  <span className="text-mute">
-                    {date(t.createdAt, true)} · {t.gateway.toUpperCase()} · {t.gatewayTxnId.slice(0, 24)}
-                  </span>
-                  <span className="font-semibold">{money(t.amount, t.currency)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+      <div className={inv.status === "UNPAID" ? "grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]" : "mx-auto max-w-5xl"}>
+        <InvoiceSheet data={data} />
 
         {inv.status === "UNPAID" && (
-          <div className="space-y-4">
+          <div className="order-first space-y-4 2xl:order-none 2xl:sticky 2xl:top-24">
             <Card title="Pay this invoice">
               {pendingReview ? (
                 <Alert tone="info">Your payment reference has been submitted and is being verified by our billing team. Services activate automatically once confirmed.</Alert>

@@ -1,4 +1,5 @@
 "use client";
+import { OsChooser } from "@/components/os-chooser";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -245,19 +246,20 @@ function ReinstallModal({ open, onClose, svc, onSubmit, busy }: { open: boolean;
   const [os, setOs] = useState(svc.osTemplate?.id ?? "");
   const [c, setC] = useState("");
   return (
-    <Modal open={open} onClose={onClose} title="Reinstall operating system">
+    <Modal open={open} onClose={onClose} title="Reinstall operating system" wide>
       <Alert tone="error" className="mb-4">
         All data on this server will be permanently erased. Your IP address stays the same; a new password will be emailed to you.
       </Alert>
       <div className="space-y-4">
         <Field label="Operating system">
-          <Select value={os} onChange={(e) => setOs(e.target.value)}>
-            {svc.product.osTemplates.map((o: any) => (
-              <option key={o.osTemplate.id} value={o.osTemplate.id}>
-                {o.osTemplate.name}
-              </option>
-            ))}
-          </Select>
+          <OsChooser
+            value={os}
+            onChange={setOs}
+            options={svc.product.osTemplates
+              .map((o: any) => o.osTemplate)
+              // only images available on the server this VPS lives on
+              .filter((o: any) => o.enabled !== false && (!o.virtualizorServerId || !svc.serverId || o.virtualizorServerId === svc.serverId))}
+          />
         </Field>
         <Field label='Type "REINSTALL" to confirm'>
           <Input value={c} onChange={(e) => setC(e.target.value)} />

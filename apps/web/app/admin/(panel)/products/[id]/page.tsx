@@ -223,7 +223,17 @@ export default function ProductEditor() {
           {isVps && !p.serverIds.length && <Alert tone="warn" className="mb-3">Assign at least one {srvType === "PROXMOX" ? "Proxmox" : "Virtualizor"} server — its IP pool is what customers choose from.</Alert>}
           <div className="space-y-4">
             <Chips label="Servers" items={(servers.data?.servers ?? []).filter((s: any) => !isVps || s.type === srvType).map((s: any) => ({ id: s.id, label: `${s.name} · ${s.freeIps} free IPs` }))} selected={p.serverIds} onToggle={(v) => toggleIn("serverIds", v)} />
-            {isVps && <Chips label="Operating systems" items={(os.data?.items ?? []).map((o: any) => ({ id: o.id, label: o.name }))} selected={p.osTemplateIds} onToggle={(v) => toggleIn("osTemplateIds", v)} />}
+            {isVps && (
+              <OsPicker
+                all={os.data?.items ?? []}
+                provisioner={p.provisioner}
+                serverIds={p.serverIds}
+                virt={p.provisioner === "VIRTUALIZOR" ? p.moduleConfig.virtualizor?.virt : null}
+                selected={p.osTemplateIds}
+                onChange={(ids) => set({ osTemplateIds: ids })}
+                onSynced={os.reload}
+              />
+            )}
             <Chips label="Add-ons" items={(addons.data?.items ?? []).map((a: any) => ({ id: a.id, label: a.name }))} selected={p.addonIds} onToggle={(v) => toggleIn("addonIds", v)} />
           </div>
         </Card>
@@ -324,6 +334,88 @@ function VirtualizorPlanPicker({ serverIds, planId, virt, onPick }: { serverIds:
         </Select>
       </Field>
     </>
+  );
+}
+
+/** Virtualizor plans and OS templates use the same virt names (kvm, proxk, proxl…). */
+const sameVirt = (a?: string | null, b?: string | null) => !a || !b || a === b || (a === "kvm" && b === "proxk") || (a === "proxk" && b === "kvm");
+
+function OsPicker({ all, provisioner, serverIds, virt, selected, onChange, onSynced }: { all: any[]; provisioner: string; serverIds: string[]; virt?: string | null; selected: string[]; onChange: (ids: string[]) => void; onSynced: () => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const virtualizor = provisioner === "VIRTUALIZOR";
+  // what fits this product: Virtualizor → templates of its masters with a matching virt type; Proxmox → manual templates
+  const fits = (o: any) =>
+    virtualizor ? o.source === "virtualizor" && (!serverIds.length || serverIds.includes(o.virtualizorServerId)) && sameVirt(virt, o.virtualizorVirt) : o.source !== "virtualizor";
+  const shown = all.filter((o) => o.enabled !== false && (showAll || fits(o) || selected.includes(o.id)));
+  const groups = [
+    ["Linux", shown.filter((o) => o.family !== "windows")],
+    ["Windows", shown.filter((o) => o.family === "windows")],
+  ] as const;
+  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const fitting = all.filter((o) => o.enabled !== false && fits(o));
+  const mismatched = selected.map((id) => all.find((o) => o.id === id)).filter((o) => o && !fits(o));
+
+  async function sync() {
+    setSyncing(true);
+    try {
+      const target = serverIds.length === 1 ? serverIds[0] : "all";
+      const r = await api(`/admin/virtualizor/${target}/sync-os`, { body: {} });
+      for (const x of r.results) x.ok ? toast.success(`${x.serverName}: ${x.found} templates (${x.created} new)`) : toast.error(`${x.serverName}: ${x.error}`);
+      onSynced();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-bold text-ink">
+          Operating systems <span className="font-semibold text-mute">· {selected.length} offered</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {virtualizor && <Button size="sm" variant="outline" icon="sync" loading={syncing} onClick={sync}>Sync from Virtualizor</Button>}
+          <Button size="sm" variant="ghost" onClick={() => onChange([...new Set([...selected, ...fitting.map((o) => o.id)])])} disabled={!fitting.length}>Select all</Button>
+          <Button size="sm" variant="ghost" onClick={() => onChange([])} disabled={!selected.length}>Clear</Button>
+        </div>
+      </div>
+      {virtualizor && !fitting.length && (
+        <Alert tone="warn" className="mb-2">
+          No OS templates from {serverIds.length ? "the selected Virtualizor server" : "Virtualizor"}{virt ? ` for ${virt.toUpperCase()}` : ""} yet — click <b>Sync from Virtualizor</b>.
+        </Alert>
+      )}
+      {mismatched.length > 0 && (
+        <Alert tone="warn" className="mb-2">
+          {mismatched.map((o: any) => o.name).join(", ")} {mismatched.length === 1 ? "doesn't" : "don't"} belong to this product's {virtualizor ? "Virtualizor server / virt type" : "module"} and may fail to install.
+        </Alert>
+      )}
+      {groups.map(([label, list]) =>
+        list.length ? (
+          <div key={label} className="mb-2">
+            <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wider text-mute">{label}</div>
+            <div className="flex flex-wrap gap-2">
+              {list.map((o: any) => {
+                const on = selected.includes(o.id);
+                return (
+                  <button key={o.id} type="button" onClick={() => toggle(o.id)} title={o.remoteName ? `${o.remoteName} · osid ${o.virtualizorOsId}` : undefined}
+                    className={cx("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition", on ? "bg-primary-dark text-white" : "bg-slate-100 text-slate-600 hover:bg-primary-tint")}>
+                    {on && <Icon name="check" className="text-[15px]" />}
+                    {o.name}
+                    {o.virtualizorVirt && <span className={cx("rounded px-1 text-[10px] uppercase", on ? "bg-white/20" : "bg-white text-mute")}>{o.virtualizorVirt}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null,
+      )}
+      <button type="button" className="text-xs font-bold text-primary-dark hover:underline" onClick={() => setShowAll(!showAll)}>
+        {showAll ? "Show only matching templates" : `Show all templates (${all.length})`}
+      </button>
+    </div>
   );
 }
 

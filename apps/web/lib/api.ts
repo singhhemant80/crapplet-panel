@@ -51,10 +51,12 @@ export const put = <T = any>(p: string, body?: unknown) => api<T>(p, { method: "
 export const del = <T = any>(p: string) => api<T>(p, { method: "DELETE" });
 
 // ── formatting ──
-export function money(minor: number | null | undefined, currency = "INR") {
-  const v = (minor ?? 0) / 100;
+export function money(minor: number | null | undefined, currency = "INR"): string {
+  const m = minor ?? 0;
+  if (m < 0) return "−" + money(-m, currency); // −₹59.85, not ₹-59.85
+  const v = m / 100;
   if (currency === "INR") return "₹" + v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(v);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "INR" }).format(v);
 }
 export const rupees = (minor: number) => "₹" + (minor / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 export function date(d: string | Date | null | undefined, withTime = false) {
