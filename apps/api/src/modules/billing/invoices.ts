@@ -1,3 +1,4 @@
+import { inrPerUnit, requireCurrency } from "../../lib/currency";
 import { prisma, type Db, type Tx, InvoiceItemType, Prisma } from "../../db";
 import { HttpError, badRequest, conflict, notFound } from "../../lib/http";
 import { getSettings } from "../../lib/settings";
@@ -41,12 +42,14 @@ export async function createInvoice(
     },
   );
   const discount = -items.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
+  const cur = await requireCurrency(args.currency ?? p?.currency ?? "INR", db);
   const seq = await nextSequence("proforma", db);
   const invoice = await db.invoice.create({
     data: {
       proformaNumber: `${settings.invoice.proformaPrefix}${String(seq).padStart(6, "0")}`,
       userId: args.userId,
-      currency: args.currency ?? p?.currency ?? "INR",
+      currency: cur.code,
+      exchangeRate: inrPerUnit(cur),
       dueDate: args.dueDate ?? addDays(new Date(), settings.invoice.dueDays),
       subtotal: tax.subtotal + discount,
       discount,
@@ -153,8 +156,8 @@ export async function applyPayment(input: PaymentInput): Promise<{ duplicate: bo
   let becamePaid = false;
   try {
     await prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<{ id: string; status: string; total: number; amountPaid: number; userId: string }[]>`
-        SELECT "id", "status", "total", "amountPaid", "userId" FROM "Invoice" WHERE "id" = ${input.invoiceId} FOR UPDATE`;
+      const locked = await tx.$queryRaw<{ id: string; status: string; total: number; amountPaid: number; userId: string; currency: string }[]>`
+        SELECT "id", "status", "total", "amountPaid", "userId", "currency" FROM "Invoice" WHERE "id" = ${input.invoiceId} FOR UPDATE`;
       const inv = locked[0];
       if (!inv) throw notFound("Invoice not found");
       await tx.transaction.create({
@@ -165,6 +168,7 @@ export async function applyPayment(input: PaymentInput): Promise<{ duplicate: bo
           gatewayTxnId: input.gatewayTxnId,
           type: "PAYMENT",
           amount: input.amount,
+          currency: inv.currency,
           fee: input.fee ?? 0,
           description: input.description ?? `Payment for invoice`,
           raw: (input.raw ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -205,19 +209,21 @@ export async function applyPayment(input: PaymentInput): Promise<{ duplicate: bo
 export async function applyCreditToInvoice(userId: string, invoiceId: string, maxAmount?: number) {
   let becamePaid = false;
   const applied = await prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ id: string; status: string; total: number; amountPaid: number; userId: string; isWalletTopup: boolean }[]>`
-      SELECT "id", "status", "total", "amountPaid", "userId", "isWalletTopup" FROM "Invoice" WHERE "id" = ${invoiceId} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ id: string; status: string; total: number; amountPaid: number; userId: string; isWalletTopup: boolean; currency: string }[]>`
+      SELECT "id", "status", "total", "amountPaid", "userId", "isWalletTopup", "currency" FROM "Invoice" WHERE "id" = ${invoiceId} FOR UPDATE`;
     const inv = locked[0];
     if (!inv || inv.userId !== userId) throw notFound("Invoice not found");
     if (inv.status !== "UNPAID") throw conflict("Invoice is not payable");
     if (inv.isWalletTopup) throw badRequest("Credit cannot be used to pay a wallet top-up");
     const profile = await tx.clientProfile.findUniqueOrThrow({ where: { userId } });
+    // the wallet is kept in the account currency — never mix currencies
+    if (inv.currency !== profile.currency) throw badRequest(`Your credit balance is in ${profile.currency}; this invoice is in ${inv.currency}`);
     const due = Number(inv.total) - Number(inv.amountPaid);
     const amount = Math.min(due, profile.creditBalance, maxAmount ?? Infinity);
     if (amount <= 0) throw new HttpError(402, "No credit balance available", "INSUFFICIENT_CREDIT");
     const ledgerBalance = await adjustCredit(tx, { userId, amount: -amount, description: `Applied to invoice`, refType: "invoice", refId: invoiceId });
     await tx.transaction.create({
-      data: { userId, invoiceId, gateway: "credit", gatewayTxnId: `credit-${invoiceId}-${Date.now()}-${ledgerBalance}`, type: "CREDIT_APPLIED", amount, description: "Credit balance applied" },
+      data: { userId, invoiceId, gateway: "credit", gatewayTxnId: `credit-${invoiceId}-${Date.now()}-${ledgerBalance}`, type: "CREDIT_APPLIED", amount, currency: inv.currency, description: "Credit balance applied" },
     });
     const paidNow = Number(inv.amountPaid) + amount;
     const fully = paidNow >= Number(inv.total);

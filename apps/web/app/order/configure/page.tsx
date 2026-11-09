@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { readCart, writeCart, type CartItem } from "@/lib/cart";
 import { Alert, Button, Card, Field, Icon, Input, Loading, Select, Spinner, cx, toast, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
+import { CurrencySwitch, pick, priceRow, rowsIn, taxNote, useCurrency } from "@/lib/currency";
 
 function useCountdown(until?: string | null) {
   const [now, setNow] = useState(Date.now());
@@ -24,6 +25,8 @@ function Configure() {
   const sp = useSearchParams();
   const router = useRouter();
   const { me } = useSession();
+  const { currency } = useCurrency();
+  const cm = (v: number | null | undefined) => money(v, currency);
   const key = sp.get("product") ?? sp.get("pid") ?? "";
   const { data, loading, error } = useApi(key ? `/catalog/products/${key}` : null, [key]);
   const p = data?.product;
@@ -45,7 +48,8 @@ function Configure() {
   // restore an in-progress reservation for this product (e.g. after signing in)
   useEffect(() => {
     if (!p) return;
-    if (p.pricing.length && !p.pricing.some((x: any) => x.cycle === cycle)) setCycle(p.pricing[0].cycle);
+    const rows = rowsIn(p.pricing, currency);
+    if (rows.length && !rows.some((x: any) => x.cycle === cycle)) setCycle(rows[0].cycle);
     if (p.osTemplates.length && !os) setOs(p.osTemplates[0].id);
     try {
       const pending = JSON.parse(sessionStorage.getItem(`cc_pick_${p.slug}`) ?? "null");
@@ -56,7 +60,7 @@ function Configure() {
     } catch {
       /* ignore */
     }
-  }, [p]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [p, currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (locs.data?.locations?.length && !serverId) setServerId(locs.data.locations[0].serverId);
@@ -82,24 +86,26 @@ function Configure() {
   }, [countdown, reservation]);
 
   const months = CYCLE_MONTHS[cycle] ?? 1;
-  const price = p?.pricing.find((x: any) => x.cycle === cycle);
+  const price = p ? priceRow(p.pricing, cycle, currency) : undefined;
   const optionsMonthly = useMemo(() => {
     if (!p) return 0;
     let m = 0;
     for (const o of p.configOptions) {
       const v = cfg[o.key];
-      if (o.type === "SELECT") m += o.choices.find((c: any) => c.value === v)?.monthly ?? 0;
-      else if (o.type === "QUANTITY") m += (Number(v) || 0) * o.unitMonthly;
-      else if (o.type === "YESNO" && v) m += o.unitMonthly;
+      const choice = o.type === "SELECT" ? o.choices.find((c: any) => c.value === v) : null;
+      if (choice) m += pick(choice.prices, currency, choice.monthly);
+      else if (o.type === "QUANTITY") m += (Number(v) || 0) * pick(o.unitPrices, currency, o.unitMonthly);
+      else if (o.type === "YESNO" && v) m += pick(o.unitPrices, currency, o.unitMonthly);
     }
-    for (const a of p.addons) if (addons.includes(a.id)) m += a.monthly;
+    for (const a of p.addons) if (addons.includes(a.id)) m += pick(a.prices?.monthly, currency, a.monthly);
     return m;
-  }, [p, cfg, addons]);
+  }, [p, cfg, addons, currency]);
+  const addonSetup = p ? p.addons.filter((a: any) => addons.includes(a.id)).reduce((t: number, a: any) => t + pick(a.prices?.setupFee, currency, a.setupFee), 0) : 0;
 
   if (loading) return <Loading />;
   if (error || !p) return <div className="mx-auto max-w-3xl px-4 py-16"><Alert tone="error">This plan is not available. <a className="font-bold underline" href="/order">Browse plans</a></Alert></div>;
 
-  const total = (price?.price ?? 0) + optionsMonthly * months + (price?.setupFee ?? 0);
+  const total = (price?.price ?? 0) + optionsMonthly * months + (price?.setupFee ?? 0) + addonSetup;
 
   async function pickIp(ip: any) {
     if (!me || me.type !== "CLIENT") {
@@ -157,7 +163,10 @@ function Configure() {
         <div className="space-y-6">
           <div>
             <div className="text-sm font-bold text-primary-dark">{p.group?.name}</div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-ink">{p.name}</h1>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-3xl font-extrabold tracking-tight text-ink">{p.name}</h1>
+              <CurrencySwitch />
+            </div>
             <p className="mt-1 text-mute">{p.tagline}</p>
             {p.isVps && (
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
@@ -170,15 +179,15 @@ function Configure() {
 
           <Card title="1. Billing cycle">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {p.pricing.map((x: any) => {
-                const monthlyBase = p.pricing.find((y: any) => y.cycle === "MONTHLY")?.price;
+              {rowsIn(p.pricing, currency).map((x: any) => {
+                const monthlyBase = priceRow(p.pricing, "MONTHLY", currency)?.price;
                 const perMonth = x.price / (CYCLE_MONTHS[x.cycle] || 1);
                 const save = monthlyBase && x.cycle !== "MONTHLY" ? Math.round((1 - perMonth / monthlyBase) * 100) : 0;
                 return (
                   <button key={x.cycle} onClick={() => setCycle(x.cycle)} className={cx("rounded-xl border p-4 text-left transition", cycle === x.cycle ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line bg-white hover:border-primary/40")}>
                     <div className="text-sm font-bold text-ink">{CYCLES[x.cycle]}</div>
-                    <div className="mt-1 text-lg font-extrabold text-ink">{money(x.price).replace(".00", "")}</div>
-                    <div className="text-xs text-mute">{money(perMonth).replace(".00", "")}/mo{save > 0 && <span className="ml-1 font-bold text-emerald-600">save {save}%</span>}</div>
+                    <div className="mt-1 text-lg font-extrabold text-ink">{cm(x.price).replace(".00", "")}</div>
+                    <div className="text-xs text-mute">{cm(perMonth).replace(".00", "")}/mo{save > 0 && <span className="ml-1 font-bold text-emerald-600">save {save}%</span>}</div>
                   </button>
                 );
               })}
@@ -260,19 +269,19 @@ function Configure() {
                     {o.type === "SELECT" ? (
                       <Select value={cfg[o.key] ?? ""} onChange={(e) => setCfg({ ...cfg, [o.key]: e.target.value })}>
                         <option value="">Default</option>
-                        {o.choices.map((c: any) => <option key={c.value} value={c.value}>{c.label}{c.monthly ? ` (+${money(c.monthly)}/mo)` : ""}</option>)}
+                        {o.choices.map((c: any) => <option key={c.value} value={c.value}>{c.label}{pick(c.prices, currency, c.monthly) ? ` (+${cm(pick(c.prices, currency, c.monthly))}/mo)` : ""}</option>)}
                       </Select>
                     ) : o.type === "QUANTITY" ? (
                       <Input type="number" min={o.minQty} max={o.maxQty} value={cfg[o.key] ?? o.minQty} onChange={(e) => setCfg({ ...cfg, [o.key]: Number(e.target.value) })} />
                     ) : (
-                      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#7c3aed]" checked={!!cfg[o.key]} onChange={(e) => setCfg({ ...cfg, [o.key]: e.target.checked })} /> +{money(o.unitMonthly)}/mo</label>
+                      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#7c3aed]" checked={!!cfg[o.key]} onChange={(e) => setCfg({ ...cfg, [o.key]: e.target.checked })} /> +{cm(pick(o.unitPrices, currency, o.unitMonthly))}/mo</label>
                     )}
                   </Field>
                 ))}
                 {p.addons.map((a: any) => (
                   <label key={a.id} className={cx("flex cursor-pointer items-start gap-3 rounded-xl border p-3", addons.includes(a.id) ? "border-primary bg-primary-tint" : "border-line")}>
                     <input type="checkbox" className="mt-1 accent-[#7c3aed]" checked={addons.includes(a.id)} onChange={(e) => setAddons(e.target.checked ? [...addons, a.id] : addons.filter((x) => x !== a.id))} />
-                    <span><span className="block text-sm font-bold text-ink">{a.name} · {money(a.monthly)}/mo</span><span className="text-xs text-mute">{a.description}</span></span>
+                    <span><span className="block text-sm font-bold text-ink">{a.name} · {cm(pick(a.prices?.monthly, currency, a.monthly))}/mo</span><span className="text-xs text-mute">{a.description}</span></span>
                   </label>
                 ))}
               </div>
@@ -284,18 +293,18 @@ function Configure() {
           <div className="sticky top-[150px] rounded-2xl border border-line bg-white p-5 shadow-card">
             <h3 className="font-extrabold text-ink">Order summary</h3>
             <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-mute">{p.name}</dt><dd className="font-semibold">{money(price?.price)}</dd></div>
-              {optionsMonthly > 0 && <div className="flex justify-between"><dt className="text-mute">Extras × {months} mo</dt><dd className="font-semibold">{money(optionsMonthly * months)}</dd></div>}
-              {price?.setupFee > 0 && <div className="flex justify-between"><dt className="text-mute">Setup fee</dt><dd className="font-semibold">{money(price.setupFee)}</dd></div>}
+              <div className="flex justify-between"><dt className="text-mute">{p.name}</dt><dd className="font-semibold">{cm(price?.price)}</dd></div>
+              {optionsMonthly > 0 && <div className="flex justify-between"><dt className="text-mute">Extras × {months} mo</dt><dd className="font-semibold">{cm(optionsMonthly * months)}</dd></div>}
+              {price?.setupFee + addonSetup > 0 && <div className="flex justify-between"><dt className="text-mute">Setup fee</dt><dd className="font-semibold">{cm((price?.setupFee ?? 0) + addonSetup)}</dd></div>}
               {reservation && <div className="flex justify-between"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold">{reservation.address}</dd></div>}
-              <div className="flex justify-between border-t border-line pt-3 text-base"><dt className="font-extrabold text-ink">Due today</dt><dd className="font-extrabold text-ink">{money(total)}</dd></div>
-              <div className="text-right text-xs text-mute">+ 18% GST · {CYCLES[cycle]}</div>
+              <div className="flex justify-between border-t border-line pt-3 text-base"><dt className="font-extrabold text-ink">Due today</dt><dd className="font-extrabold text-ink">{cm(total)}</dd></div>
+              <div className="text-right text-xs text-mute">{taxNote(currency)} · {CYCLES[cycle]}</div>
             </dl>
             <Button size="lg" className="mt-5 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue</Button>
             <ul className="mt-5 space-y-2 text-xs font-semibold text-slate-600">
               <li className="flex items-center gap-2"><Icon name="bolt" className="text-primary" /> Deployed automatically after payment</li>
               <li className="flex items-center gap-2"><Icon name="shield" className="text-primary" /> DDoS protected network</li>
-              <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-primary" /> GST invoice with your GSTIN</li>
+              <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-primary" /> {currency === "INR" ? "GST invoice with your GSTIN" : `Invoice in ${currency} · cards & PayPal`}</li>
             </ul>
           </div>
         </aside>

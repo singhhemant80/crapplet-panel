@@ -63,11 +63,11 @@ export default function AdminService() {
             <Field label="Notes" className="sm:col-span-2"><Textarea rows={3} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
           </div>
           <Button className="mt-4" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null } }).then(() => { toast.success("Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save</Button>
-          <div className="mt-4 text-xs text-mute">Registered {date(s.registrationDate)} · {CYCLES[s.billingCycle]} · first payment {money(s.firstAmount)}</div>
+          <div className="mt-4 text-xs text-mute">Registered {date(s.registrationDate)} · {CYCLES[s.billingCycle]} · first payment {money(s.firstAmount, s.currency)}</div>
         </Card>
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card title="Invoices" pad={false}><Table head={["Invoice", "Total", "Due", "Status"]}>{data.invoices.map((i: any) => <tr key={i.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td><Td>{money(i.total)}</Td><Td>{date(i.dueDate)}</Td><Td><Badge status={i.status} /></Td></tr>)}</Table></Card>
+        <Card title="Invoices" pad={false}><Table head={["Invoice", "Total", "Due", "Status"]}>{data.invoices.map((i: any) => <tr key={i.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td><Td>{money(i.total, i.currency)}</Td><Td>{date(i.dueDate)}</Td><Td><Badge status={i.status} /></Td></tr>)}</Table></Card>
         <Card title="Provisioning log" pad={false}>
           <ul className="max-h-96 divide-y divide-[#f3effb] overflow-y-auto text-sm">
             {s.logs.map((l: any) => (

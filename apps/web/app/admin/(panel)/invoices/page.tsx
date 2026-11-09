@@ -21,7 +21,14 @@ function Invoices() {
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["UNPAID", "PAID", "CANCELLED", "REFUNDED"].map((s) => <option key={s}>{s}</option>)}</Select>
         <Select value={overdue} onChange={(e) => { setOverdue(e.target.value); setPage(1); }}><option value="">Any due date</option><option value="1">Overdue only</option></Select>
       </div>
-      {data?.sums && <div className="mb-4 flex flex-wrap gap-6 text-sm text-mute"><span>Total <b className="text-ink">{money(data.sums.total)}</b></span><span>Collected <b className="text-ink">{money(data.sums.amountPaid)}</b></span><span>GST <b className="text-ink">{money(data.sums.taxTotal)}</b></span></div>}
+      {(data?.sumsByCurrency ?? []).map((g: any) => (
+        <div key={g.currency} className="mb-2 flex flex-wrap gap-6 text-sm text-mute">
+          <span className="font-extrabold text-ink">{g.currency}</span>
+          <span>Total <b className="text-ink">{money(g.total, g.currency)}</b></span>
+          <span>Collected <b className="text-ink">{money(g.amountPaid, g.currency)}</b></span>
+          {g.taxTotal > 0 && <span>GST <b className="text-ink">{money(g.taxTotal, g.currency)}</b></span>}
+        </div>
+      ))}
       <Card pad={false}>
         {loading ? <Loading /> : (
           <>
@@ -32,8 +39,8 @@ function Invoices() {
                   <Td className="text-xs">{i.user.firstName} {i.user.lastName}<div className="text-mute">{i.user.email}</div></Td>
                   <Td className="whitespace-nowrap text-mute">{date(i.issueDate)}</Td>
                   <Td className={i.status === "UNPAID" && new Date(i.dueDate) < new Date() ? "font-bold text-rose-600" : "text-mute"}>{date(i.dueDate)}</Td>
-                  <Td className="font-semibold">{money(i.total)}</Td>
-                  <Td className="text-xs text-mute">{money(i.taxTotal)}</Td>
+                  <Td className="font-semibold">{money(i.total, i.currency)}</Td>
+                  <Td className="text-xs text-mute">{money(i.taxTotal, i.currency)}</Td>
                   <Td><Badge status={i.status} /></Td>
                 </tr>
               ))}

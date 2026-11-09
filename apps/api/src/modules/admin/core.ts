@@ -1,3 +1,4 @@
+import { inrPerUnit, listCurrencies, requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -32,22 +33,25 @@ adminCore.get(
       prisma.service.count({ where: { ...vpsWhere, status: { notIn: ["CANCELLED", "TERMINATED"] } } }),
       prisma.service.count({ where: { ...vpsWhere, status: "ACTIVE" } }),
       prisma.service.count({ where: { ...vpsWhere, status: "SUSPENDED" } }),
-      prisma.invoice.aggregate({ where: { status: "UNPAID" }, _sum: { total: true, amountPaid: true }, _count: true }),
+      // money totals are reported in INR: foreign-currency amounts use the invoice's stored exchange rate
+      prisma.$queryRaw<{ count: bigint; due: number | null }[]>`SELECT COUNT(*) AS count, SUM(("total" - "amountPaid") * "exchangeRate") AS due FROM "Invoice" WHERE "status" = 'UNPAID'`,
       prisma.invoice.count({ where: { status: "PAID", paidAt: { gte: monthStart } } }),
-      prisma.transaction.aggregate({ where: { type: "PAYMENT", createdAt: { gte: monthStart } }, _sum: { amount: true } }),
+      prisma.$queryRaw<{ total: number | null }[]>`SELECT SUM(t."amount" * COALESCE(i."exchangeRate", 1)) AS total FROM "Transaction" t LEFT JOIN "Invoice" i ON i."id" = t."invoiceId" WHERE t."type" = 'PAYMENT' AND t."createdAt" >= ${monthStart}`,
       prisma.order.count({ where: { createdAt: { gte: new Date(Date.now() - 86400000 * 7) } } }),
       prisma.order.count({ where: { status: "PENDING" } }),
       prisma.ticket.count({ where: { status: { in: ["OPEN", "CUSTOMER_REPLY", "IN_PROGRESS"] } } }),
       prisma.server.findMany({ include: { nodes: true, location: true, _count: { select: { services: { where: { status: "ACTIVE" } } } } } }),
       prisma.paymentIntent.count({ where: { status: "PENDING_REVIEW" } }),
       prisma.service.count({ where: { status: "FAILED" } }),
-      prisma.service.findMany({ where: { status: { in: ["ACTIVE", "SUSPENDED"] }, billingCycle: { not: "ONETIME" } }, select: { recurringAmount: true, billingCycle: true } }),
+      prisma.service.findMany({ where: { status: { in: ["ACTIVE", "SUSPENDED"] }, billingCycle: { not: "ONETIME" } }, select: { recurringAmount: true, billingCycle: true, currency: true } }),
     ]);
+    const rates = Object.fromEntries((await listCurrencies()).map((c) => [c.code, inrPerUnit(c)]));
     const months: Record<BillingCycle, number> = { ONETIME: 0, MONTHLY: 1, QUARTERLY: 3, SEMIANNUAL: 6, ANNUAL: 12, BIENNIAL: 24, TRIENNIAL: 36 };
-    const mrr = recurring.reduce((s, r) => s + (months[r.billingCycle] ? r.recurringAmount / months[r.billingCycle] : 0), 0);
+    const mrr = recurring.reduce((s, r) => s + (months[r.billingCycle] ? (r.recurringAmount * (rates[r.currency] ?? 1)) / months[r.billingCycle] : 0), 0);
     const revenue = await prisma.$queryRaw<{ month: string; total: bigint }[]>`
-      SELECT to_char(date_trunc('month', "createdAt" AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM') AS month, SUM("amount")::bigint AS total
-      FROM "Transaction" WHERE "type" = 'PAYMENT' AND "createdAt" > now() - interval '12 months'
+      SELECT to_char(date_trunc('month', t."createdAt" AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM') AS month, ROUND(SUM(t."amount" * COALESCE(i."exchangeRate", 1)))::bigint AS total
+      FROM "Transaction" t LEFT JOIN "Invoice" i ON i."id" = t."invoiceId"
+      WHERE t."type" = 'PAYMENT' AND t."createdAt" > now() - interval '12 months'
       GROUP BY 1 ORDER BY 1`;
     const recentOrders = await prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { user: { select: { firstName: true, lastName: true, email: true } }, invoice: { select: { status: true } } } });
     res.json({
@@ -59,9 +63,9 @@ adminCore.get(
         vpsSuspended,
         mrr: Math.round(mrr),
         arr: Math.round(mrr * 12),
-        monthRevenue: monthRevenue._sum.amount ?? 0,
-        unpaidInvoices: unpaid._count,
-        outstanding: (unpaid._sum.total ?? 0) - (unpaid._sum.amountPaid ?? 0),
+        monthRevenue: Math.round(Number(monthRevenue[0]?.total ?? 0)),
+        unpaidInvoices: Number(unpaid[0]?.count ?? 0),
+        outstanding: Math.round(Number(unpaid[0]?.due ?? 0)),
         paidThisMonth: paidCount,
         newOrders,
         pendingOrders,
@@ -71,7 +75,7 @@ adminCore.get(
       },
       revenue: revenue.map((r) => ({ month: r.month, total: Number(r.total) })),
       servers: servers.map((s) => ({ id: s.id, name: s.name, type: s.type, location: s.location?.name, enabled: s.enabled, lastCheckAt: s.lastCheckAt, status: s.lastStatus, activeServices: s._count.services, nodes: s.nodes })),
-      recentOrders: recentOrders.map((o) => ({ id: o.id, number: o.number, client: `${o.user.firstName} ${o.user.lastName}`.trim(), email: o.user.email, total: o.total, status: o.status, paid: o.invoice?.status === "PAID", createdAt: o.createdAt })),
+      recentOrders: recentOrders.map((o) => ({ id: o.id, number: o.number, client: `${o.user.firstName} ${o.user.lastName}`.trim(), email: o.user.email, total: o.total, currency: o.currency, status: o.status, paid: o.invoice?.status === "PAID", createdAt: o.createdAt })),
     });
   }),
 );
@@ -126,7 +130,8 @@ adminCore.post(
   "/clients",
   requireStaff("clients.manage"),
   ah(async (req, res) => {
-    const b = parse(profileSchema.extend({ email: z.string().email().toLowerCase(), password: z.string().min(8).optional(), sendWelcome: z.boolean().default(true) }), req.body);
+    const b = parse(profileSchema.extend({ email: z.string().email().toLowerCase(), password: z.string().min(8).optional(), sendWelcome: z.boolean().default(true), currency: z.string().length(3).toUpperCase().optional() }), req.body);
+    if (b.currency) await requireCurrency(b.currency);
     if (await prisma.user.findUnique({ where: { email: b.email } })) throw conflict("Email already in use");
     const password = b.password ?? randomToken(12);
     const u = await prisma.user.create({
@@ -137,7 +142,7 @@ adminCore.post(
         lastName: b.lastName,
         phone: b.phone,
         emailVerifiedAt: new Date(),
-        profile: { create: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode: resolveStateCode(b.country, b.state, b.gstin, b.stateCode), country: b.country, postcode: b.postcode, currency: b.country === "IN" ? "INR" : "USD" } },
+        profile: { create: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode: resolveStateCode(b.country, b.state, b.gstin, b.stateCode), country: b.country, postcode: b.postcode, currency: b.currency ?? (b.country === "IN" ? "INR" : "USD") } },
       },
     });
     if (b.sendWelcome) await queueEmail("auth.welcome", u.email, { name: u.firstName }, u.id);
@@ -150,9 +155,20 @@ adminCore.put(
   "/clients/:id",
   requireStaff("clients.manage"),
   ah(async (req, res) => {
-    const b = parse(profileSchema.partial().extend({ email: z.string().email().toLowerCase().optional(), status: z.enum(["ACTIVE", "INACTIVE", "CLOSED"]).optional(), notes: z.string().max(5000).optional() }), req.body);
-    const { email, status, firstName, lastName, phone, notes, ...profile } = b;
+    const b = parse(profileSchema.partial().extend({ email: z.string().email().toLowerCase().optional(), status: z.enum(["ACTIVE", "INACTIVE", "CLOSED"]).optional(), notes: z.string().max(5000).optional(), currency: z.string().length(3).toUpperCase().optional() }), req.body);
+    const { email, status, firstName, lastName, phone, notes, currency, ...profile } = b;
     const current = await prisma.clientProfile.findUnique({ where: { userId: req.params.id } });
+    if (currency && currency !== current?.currency) {
+      // switching currency mid-life would mix rupees and dollars on one account
+      await requireCurrency(currency);
+      const [unpaid, live] = await Promise.all([
+        prisma.invoice.count({ where: { userId: req.params.id, status: "UNPAID" } }),
+        prisma.service.count({ where: { userId: req.params.id, status: { in: ["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED"] } } }),
+      ]);
+      if (unpaid || live || (current?.creditBalance ?? 0) !== 0)
+        throw badRequest("Currency can only be changed when the client has no unpaid invoices, no active services and a zero credit balance");
+      (profile as Record<string, unknown>).currency = currency;
+    }
     const stateCode = profile.country || profile.state || profile.gstin ? resolveStateCode(profile.country ?? current?.country ?? "IN", profile.state ?? current?.state ?? "", profile.gstin ?? current?.gstin, profile.stateCode) : undefined;
     await prisma.user.update({
       where: { id: req.params.id },
@@ -365,9 +381,11 @@ adminCore.get(
     const [rows, total, sums] = await Promise.all([
       prisma.invoice.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } }),
       prisma.invoice.count({ where }),
-      prisma.invoice.aggregate({ where, _sum: { total: true, amountPaid: true, taxTotal: true } }),
+      prisma.invoice.groupBy({ by: ["currency"], where, _sum: { total: true, amountPaid: true, taxTotal: true } }),
     ]);
-    res.json({ invoices: rows, total, page, pageSize, sums: sums._sum });
+    // never add rupees to dollars: one total per currency
+    const byCurrency = sums.map((g) => ({ currency: g.currency, ...g._sum }));
+    res.json({ invoices: rows, total, page, pageSize, sums: byCurrency.find((g) => g.currency === "INR") ?? { total: 0, amountPaid: 0, taxTotal: 0 }, sumsByCurrency: byCurrency });
   }),
 );
 
@@ -516,21 +534,26 @@ adminCore.get(
     const from = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 365 * 86400000);
     const to = req.query.to ? new Date(String(req.query.to)) : new Date();
     const [gst, byType, newClients, gateways] = await Promise.all([
-      prisma.$queryRaw<{ month: string; invoices: bigint; taxable: bigint; cgst: bigint; sgst: bigint; igst: bigint; total: bigint }[]>`
+      // everything in INR (foreign invoices at their stored rate); exports = zero-rated supplies for GSTR-1 table 6A
+      prisma.$queryRaw<{ month: string; invoices: bigint; taxable: bigint; cgst: bigint; sgst: bigint; igst: bigint; total: bigint; exports: bigint; foreign: bigint }[]>`
         SELECT to_char(date_trunc('month', "paidAt" AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM') AS month, COUNT(*)::bigint AS invoices,
-          SUM("taxableAmount")::bigint AS taxable, SUM("cgst")::bigint AS cgst, SUM("sgst")::bigint AS sgst, SUM("igst")::bigint AS igst, SUM("total")::bigint AS total
+          ROUND(SUM("taxableAmount" * "exchangeRate"))::bigint AS taxable, ROUND(SUM("cgst" * "exchangeRate"))::bigint AS cgst, ROUND(SUM("sgst" * "exchangeRate"))::bigint AS sgst,
+          ROUND(SUM("igst" * "exchangeRate"))::bigint AS igst, ROUND(SUM("total" * "exchangeRate"))::bigint AS total,
+          ROUND(SUM(CASE WHEN "taxTotal" = 0 AND "placeOfSupplyCode" = '96' THEN "taxableAmount" * "exchangeRate" ELSE 0 END))::bigint AS exports,
+          COUNT(*) FILTER (WHERE "currency" <> 'INR')::bigint AS foreign
         FROM "Invoice" WHERE "status" = 'PAID' AND "isWalletTopup" = false AND "paidAt" BETWEEN ${from} AND ${to}
         GROUP BY 1 ORDER BY 1`,
       prisma.$queryRaw<{ type: string; services: bigint; mrr: bigint }[]>`
         SELECT p."type"::text AS type, COUNT(*)::bigint AS services,
-          SUM(CASE s."billingCycle" WHEN 'MONTHLY' THEN s."recurringAmount" WHEN 'QUARTERLY' THEN s."recurringAmount"/3 WHEN 'SEMIANNUAL' THEN s."recurringAmount"/6 WHEN 'ANNUAL' THEN s."recurringAmount"/12 WHEN 'BIENNIAL' THEN s."recurringAmount"/24 WHEN 'TRIENNIAL' THEN s."recurringAmount"/36 ELSE 0 END)::bigint AS mrr
-        FROM "Service" s JOIN "Product" p ON p."id" = s."productId" WHERE s."status" IN ('ACTIVE','SUSPENDED') GROUP BY 1 ORDER BY 3 DESC`,
+          ROUND(SUM((CASE s."billingCycle" WHEN 'MONTHLY' THEN s."recurringAmount" WHEN 'QUARTERLY' THEN s."recurringAmount"/3.0 WHEN 'SEMIANNUAL' THEN s."recurringAmount"/6.0 WHEN 'ANNUAL' THEN s."recurringAmount"/12.0 WHEN 'BIENNIAL' THEN s."recurringAmount"/24.0 WHEN 'TRIENNIAL' THEN s."recurringAmount"/36.0 ELSE 0 END)
+            / CASE WHEN s."currency" = 'INR' OR c."rate" IS NULL OR c."rate" = 0 THEN 1 ELSE c."rate" END))::bigint AS mrr
+        FROM "Service" s JOIN "Product" p ON p."id" = s."productId" LEFT JOIN "Currency" c ON c."code" = s."currency" WHERE s."status" IN ('ACTIVE','SUSPENDED') GROUP BY 1 ORDER BY 3 DESC`,
       prisma.$queryRaw<{ month: string; clients: bigint }[]>`
         SELECT to_char(date_trunc('month', "createdAt" AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM') AS month, COUNT(*)::bigint AS clients
         FROM "User" WHERE "type" = 'CLIENT' AND "createdAt" BETWEEN ${from} AND ${to} GROUP BY 1 ORDER BY 1`,
       prisma.$queryRaw<{ gateway: string; payments: bigint; amount: bigint }[]>`
-        SELECT "gateway", COUNT(*)::bigint AS payments, SUM("amount")::bigint AS amount FROM "Transaction"
-        WHERE "type" = 'PAYMENT' AND "createdAt" BETWEEN ${from} AND ${to} GROUP BY 1 ORDER BY 3 DESC`,
+        SELECT t."gateway", COUNT(*)::bigint AS payments, ROUND(SUM(t."amount" * COALESCE(i."exchangeRate", 1)))::bigint AS amount FROM "Transaction" t LEFT JOIN "Invoice" i ON i."id" = t."invoiceId"
+        WHERE t."type" = 'PAYMENT' AND t."createdAt" BETWEEN ${from} AND ${to} GROUP BY 1 ORDER BY 3 DESC`,
     ]);
     const num = <T extends Record<string, unknown>>(rows: T[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === "bigint" ? Number(v) : v])));
     res.json({ gst: num(gst), byType: num(byType), newClients: num(newClients), gateways: num(gateways) });

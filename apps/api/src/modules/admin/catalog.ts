@@ -6,11 +6,16 @@ import { ah, badRequest, conflict, notFound, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { decryptJson, encryptJson } from "../../lib/crypto";
 import { getSettings, updateSettings, DEFAULT_SETTINGS, type SettingKey } from "../../lib/settings";
+import { refreshExchangeRates } from "../../lib/currency";
 import { PERMISSIONS, requireStaff } from "../../middleware/auth";
-import { GATEWAYS, GATEWAY_FIELDS } from "../payments/gateways";
+import { GATEWAYS, GATEWAY_FIELDS, gatewayCurrencies } from "../payments/gateways";
 import { DEFAULT_TEMPLATES } from "../email/templates";
 import { render, sendTemplatedEmail } from "../email/mailer";
 import { crud } from "./crud";
+
+/** { USD: 499 } style maps; keys are 3-letter currency codes, values minor units */
+const curMap = z.record(z.string().length(3), z.number().int().min(0)).default({});
+const curMapOf = <T extends z.ZodRawShape>(shape: T) => z.record(z.string().length(3), z.object(shape).partial()).default({});
 
 export const adminCatalog = Router();
 const slug = z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/, "Use lowercase letters, numbers and dashes");
@@ -67,7 +72,8 @@ const productSchema = z.object({
         minQty: z.number().int().default(0),
         maxQty: z.number().int().default(0),
         unitMonthly: z.number().int().default(0),
-        choices: z.array(z.object({ value: z.string(), label: z.string(), monthly: z.number().int() })).default([]),
+        unitPrices: curMap,
+        choices: z.array(z.object({ value: z.string(), label: z.string(), monthly: z.number().int(), prices: curMap.optional() })).default([]),
         sortOrder: z.number().int().default(0),
       }),
     )
@@ -173,7 +179,7 @@ adminCatalog.delete(
 );
 
 // ───────────── Add-ons, promos, OS templates ─────────────
-crud(adminCatalog, "/addons", "addon", z.object({ name: z.string().min(1), description: z.string().nullable().optional(), monthly: z.number().int().min(0), setupFee: z.number().int().min(0).default(0), taxable: z.boolean().default(true), enabled: z.boolean().default(true) }), "products.manage");
+crud(adminCatalog, "/addons", "addon", z.object({ name: z.string().min(1), description: z.string().nullable().optional(), monthly: z.number().int().min(0), setupFee: z.number().int().min(0).default(0), prices: curMapOf({ monthly: z.number().int().min(0), setupFee: z.number().int().min(0) }), taxable: z.boolean().default(true), enabled: z.boolean().default(true) }), "products.manage");
 
 crud(
   adminCatalog,
@@ -183,6 +189,7 @@ crud(
     code: z.string().trim().toUpperCase().min(3).max(30),
     type: z.nativeEnum(PromoType),
     value: z.number().int().min(1),
+    fixedAmounts: curMap,
     recurring: z.boolean().default(false),
     productIds: z.array(z.string()).default([]),
     cycles: z.array(z.nativeEnum(BillingCycle)).default([]),
@@ -214,9 +221,22 @@ crud(
   { orderBy: { sortOrder: "asc" } },
 );
 
-crud(adminCatalog, "/domain-pricing", "domainPricing", z.object({ tld: z.string().regex(/^\.[a-z0-9.-]+$/), register: z.number().int().min(0), transfer: z.number().int().min(0), renew: z.number().int().min(0), enabled: z.boolean().default(true), registrar: z.string().default("manual") }), "domains.manage", { idField: "tld", orderBy: { tld: "asc" } });
+crud(adminCatalog, "/domain-pricing", "domainPricing", z.object({ tld: z.string().regex(/^\.[a-z0-9.-]+$/), register: z.number().int().min(0), transfer: z.number().int().min(0), renew: z.number().int().min(0), prices: curMapOf({ register: z.number().int().min(0), transfer: z.number().int().min(0), renew: z.number().int().min(0) }), enabled: z.boolean().default(true), registrar: z.string().default("manual") }), "domains.manage", { idField: "tld", orderBy: { tld: "asc" } });
 
-crud(adminCatalog, "/currencies", "currency", z.object({ code: z.string().length(3).toUpperCase(), prefix: z.string(), suffix: z.string().default(""), rate: z.number().positive(), isDefault: z.boolean().default(false) }), "settings.manage", { idField: "code" });
+crud(adminCatalog, "/currencies", "currency", z.object({ code: z.string().length(3).toUpperCase(), prefix: z.string(), suffix: z.string().default(""), rate: z.number().positive(), isDefault: z.boolean().default(false), enabled: z.boolean().default(true) }), "settings.manage", { idField: "code" });
+
+/** Pull today's exchange rates from a public FX API (also runs daily when enabled in settings). */
+adminCatalog.post(
+  "/currencies/refresh-rates",
+  requireStaff("settings.manage"),
+  ah(async (req, res) => {
+    const updated = await refreshExchangeRates().catch((e) => {
+      throw badRequest(`Couldn't fetch exchange rates: ${(e as Error).message}`);
+    });
+    await audit({ actorId: req.user!.id, action: "currency.rates_refreshed", entity: "currency", entityId: "all", details: updated });
+    res.json({ updated });
+  }),
+);
 
 // ───────────── Content ─────────────
 crud(adminCatalog, "/announcements", "announcement", z.object({ title: z.string().min(1).max(200), body: z.string().min(1), published: z.boolean().default(true), publishedAt: z.coerce.date().optional() }), "content.manage", { orderBy: { publishedAt: "desc" } });
@@ -241,6 +261,8 @@ adminCatalog.get(
           testMode: r?.testMode ?? true,
           sortOrder: r?.sortOrder ?? 0,
           offline: !!GATEWAYS[code].offline,
+          defaultCurrencies: GATEWAYS[code].currencies,
+          currencies: gatewayCurrencies(code, r?.publicConfig),
           fields: GATEWAY_FIELDS[code],
           configured: Object.fromEntries(GATEWAY_FIELDS[code].secret.map((f) => [f, secrets[f] ? `••••${String(secrets[f]).slice(-4)}` : ""])),
           publicConfig: r?.publicConfig ?? {},
@@ -262,7 +284,7 @@ adminCatalog.put(
     const secrets = { ...decryptJson<Record<string, string>>(existing?.configEnc) };
     for (const [k, v] of Object.entries(b.secrets ?? {})) if (v && !v.startsWith("••••")) secrets[k] = v.trim();
     if (b.enabled) {
-      const missing = GATEWAY_FIELDS[code].secret.filter((f) => !secrets[f] && f !== "webhookSecret");
+      const missing = GATEWAY_FIELDS[code].secret.filter((f) => !secrets[f] && f !== "webhookSecret" && f !== "webhookId");
       if (missing.length) throw badRequest(`Missing: ${missing.join(", ")}`);
     }
     const data = {

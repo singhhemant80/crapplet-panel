@@ -192,7 +192,7 @@ export default function ServicePage() {
             <dt className="text-mute">Billing cycle</dt>
             <dd className="font-semibold text-ink">{CYCLES[svc.billingCycle]}</dd>
             <dt className="text-mute">Recurring</dt>
-            <dd className="font-semibold text-ink">{money(svc.recurringAmount)} + GST</dd>
+            <dd className="font-semibold text-ink">{money(svc.recurringAmount, svc.currency)}{svc.currency === "INR" ? " + GST" : ""}</dd>
             <dt className="text-mute">Next due date</dt>
             <dd className="font-semibold text-ink">{date(svc.nextDueDate)}</dd>
           </dl>
@@ -203,7 +203,7 @@ export default function ServicePage() {
                   <Link href={`/client/invoices/${i.id}`} className="flex items-center justify-between py-2.5 text-sm hover:text-primary-dark">
                     <span className="font-semibold">{invNo(i)}</span>
                     <span className="flex items-center gap-3">
-                      {money(i.total)} <Badge status={i.status} />
+                      {money(i.total, i.currency)} <Badge status={i.status} />
                     </span>
                   </Link>
                 </li>

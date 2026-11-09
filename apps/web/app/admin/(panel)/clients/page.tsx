@@ -27,7 +27,7 @@ function Clients() {
                   <Td><div>{c.profile?.companyName ?? "—"}</div><div className="font-mono text-xs text-mute">{c.profile?.gstin}</div></Td>
                   <Td className="text-mute">{[c.profile?.city, c.profile?.state].filter(Boolean).join(", ")}</Td>
                   <Td>{c._count.services}</Td>
-                  <Td>{money(c.profile?.creditBalance)}</Td>
+                  <Td>{money(c.profile?.creditBalance, c.profile?.currency)}</Td>
                   <Td><Badge status={c.status} />{c.ownerResellerId && <span className="ml-1 text-xs text-mute">reseller customer</span>}</Td>
                   <Td className="whitespace-nowrap text-mute">{date(c.createdAt)}</Td>
                 </tr>

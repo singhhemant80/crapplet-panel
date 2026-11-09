@@ -32,7 +32,7 @@ function Services() {
                   <Td className="font-mono text-xs">{s.ips.map((i: any) => i.address).join(", ") || "—"}</Td>
                   <Td className="text-xs">{s.server?.name ?? "—"}{s.remoteId && <div className="text-mute">{s.node ? `${s.node} · ` : ""}#{s.remoteId}</div>}</Td>
                   <Td><Badge status={s.status} /></Td>
-                  <Td>{money(s.recurringAmount)}</Td>
+                  <Td>{money(s.recurringAmount, s.currency)}</Td>
                   <Td className="whitespace-nowrap text-mute">{date(s.nextDueDate)}</Td>
                 </tr>
               ))}

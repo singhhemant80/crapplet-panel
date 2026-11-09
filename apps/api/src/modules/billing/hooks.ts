@@ -61,7 +61,8 @@ export async function onInvoicePaid(invoiceId: string) {
     if (profile?.affiliateRef) {
       const aff = await prisma.affiliate.findUnique({ where: { code: profile.affiliateRef } });
       if (aff && aff.userId !== inv.userId) {
-        const amount = Math.round(((inv.total - inv.taxTotal) * aff.commissionPct) / 100);
+        // commissions are paid out in INR — convert foreign-currency invoices at the invoice's rate
+        const amount = Math.round(((inv.total - inv.taxTotal) * (inv.exchangeRate || 1) * aff.commissionPct) / 100);
         await prisma.referral
           .create({ data: { affiliateId: aff.id, referredUserId: inv.userId, invoiceId: inv.id, amount, status: "PENDING" } })
           .catch(() => undefined); // unique(invoiceId) → already recorded

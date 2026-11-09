@@ -2,7 +2,7 @@ import { prisma, Prisma } from "../../db";
 import { decryptJson } from "../../lib/crypto";
 import { badRequest, conflict, HttpError, notFound } from "../../lib/http";
 import { applyPayment, invoiceLabel } from "../billing/invoices";
-import { GATEWAYS, type Verified } from "./gateways";
+import { GATEWAYS, gatewayCurrencies, type Verified } from "./gateways";
 
 export async function gatewayConfig(code: string) {
   const g = await prisma.paymentGateway.findUnique({ where: { code } });
@@ -17,8 +17,9 @@ export async function startPayment(args: { userId: string; invoiceId: string; ga
   if (inv.status !== "UNPAID") throw conflict("This invoice is not awaiting payment");
   const due = inv.total - inv.amountPaid;
   const amount = args.amount ? Math.min(args.amount, due) : due;
-  if (amount < 100) throw badRequest("Minimum payment is ₹1");
+  if (amount < 100) throw badRequest(`Minimum payment is ${inv.currency === "INR" ? "₹1" : `1 ${inv.currency}`}`);
   const { impl, secrets, pub, row } = await gatewayConfig(args.gateway);
+  if (!gatewayCurrencies(args.gateway, pub).includes(inv.currency)) throw badRequest(`${row.name} can't take ${inv.currency} payments — please choose another method`);
   if (impl.offline && (await prisma.paymentIntent.count({ where: { invoiceId: inv.id, status: "PENDING_REVIEW" } })))
     throw conflict("A payment for this invoice is already awaiting verification by our billing team");
 
@@ -41,6 +42,11 @@ export async function settleVerified(gateway: string, v: Verified) {
     where: { gateway, OR: [...(v.gatewayOrderId ? [{ gatewayOrderId: v.gatewayOrderId }] : []), ...(v.intentId ? [{ id: v.intentId }] : [])] },
   });
   if (!intent) throw notFound("Payment intent not found");
+  if (v.currency && v.currency.toUpperCase() !== intent.currency) {
+    // never credit a USD invoice with an INR charge (or vice versa)
+    console.error(`[payments] ${gateway} ${v.gatewayTxnId} charged ${v.currency}, intent is ${intent.currency} — not applied`);
+    throw badRequest(`Payment currency ${v.currency} doesn't match the invoice (${intent.currency}). Our billing team has been notified.`);
+  }
   if (v.amount < intent.amount) {
     // underpaid — record what was received as a partial payment, keep the invoice open
     console.warn(`[payments] ${gateway} ${v.gatewayTxnId} amount ${v.amount} < intent ${intent.amount}`);
@@ -130,7 +136,7 @@ export async function refundTransaction(args: { transactionId: string; amount: n
     refundId = (await impl.refund(t.gatewayTxnId, args.amount, secrets, row.testMode)).refundId;
   }
   await prisma.transaction.create({
-    data: { userId: t.userId, invoiceId: t.invoiceId, gateway: args.toCredit ? "credit" : t.gateway, gatewayTxnId: refundId, type: "REFUND", amount: args.amount, description: `Refund of ${t.gatewayTxnId}: ${args.reason}` },
+    data: { userId: t.userId, invoiceId: t.invoiceId, gateway: args.toCredit ? "credit" : t.gateway, gatewayTxnId: refundId, type: "REFUND", amount: args.amount, currency: t.currency, description: `Refund of ${t.gatewayTxnId}: ${args.reason}` },
   });
   if (t.invoiceId) {
     const { issueCreditNote } = await import("../billing/invoices");

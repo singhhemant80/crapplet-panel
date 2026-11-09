@@ -47,11 +47,11 @@ export function cartCount() {
   const c = readCart();
   return c.items.length + c.domains.length;
 }
-export function toApiCart(c: Cart) {
+export function toApiCart(c: Cart, currency = "INR") {
   return {
     items: c.items.map(({ productId, cycle, osTemplateId, hostname, serverId, ipId, config, addonIds, quantity }) => ({ productId, cycle, osTemplateId: osTemplateId || null, hostname: hostname || null, serverId: serverId || null, ipId: ipId || null, config, addonIds, quantity })),
     domains: c.domains,
     promoCode: c.promoCode || null,
-    currency: "INR",
+    currency,
   };
 }

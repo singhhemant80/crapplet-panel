@@ -6,6 +6,7 @@ import { Badge, Button, Card, Empty, Icon, Loading, Stat, useApi } from "@/compo
 
 export default function Dashboard() {
   const { me } = useSession();
+  const ac: string = me?.profile?.currency ?? "INR";
   const { data, loading } = useApi("/client/dashboard");
   if (loading || !data) return <Loading />;
   const s = data.stats;
@@ -30,7 +31,7 @@ export default function Dashboard() {
         <Stat label="Active services" value={s.activeServices} icon="dns" tone="green" href="/client/services?status=ACTIVE" />
         <Stat label="Pending services" value={s.pendingServices} icon="hourglass_top" tone="amber" href="/client/services" />
         <Stat label="Suspended" value={s.suspendedServices} icon="pause_circle" tone="rose" href="/client/services?status=SUSPENDED" />
-        <Stat label="Unpaid invoices" value={s.unpaidInvoices} icon="receipt_long" tone="purple" href="/client/invoices?status=UNPAID" hint={s.outstanding ? `${money(s.outstanding)} outstanding` : undefined} />
+        <Stat label="Unpaid invoices" value={s.unpaidInvoices} icon="receipt_long" tone="purple" href="/client/invoices?status=UNPAID" hint={s.outstanding ? `${money(s.outstanding, ac)} outstanding` : undefined} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -50,7 +51,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-bold text-ink">{money(r.amount)}</div>
+                      <div className="text-sm font-bold text-ink">{money(r.amount, r.currency ?? ac)}</div>
                       <div className="text-xs text-mute">due {date(r.nextDueDate)}</div>
                     </div>
                     <Badge status={r.status} />
@@ -72,7 +73,7 @@ export default function Dashboard() {
           <Card title="Account balance">
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-3xl font-extrabold text-ink">{money(s.creditBalance)}</div>
+                <div className="text-3xl font-extrabold text-ink">{money(s.creditBalance, ac)}</div>
                 <div className="text-xs text-mute">Wallet credit — applied automatically to new invoices</div>
               </div>
               <Button size="sm" variant="secondary" href="/client/wallet" icon="add">

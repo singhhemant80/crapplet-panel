@@ -168,6 +168,7 @@ model Currency {
   suffix    String  @default("")
   rate      Float   @default(1) // units per 1 INR
   isDefault Boolean @default(false)
+  enabled   Boolean @default(true)
 }
 
 // ───────────────────────────── Catalogue ─────────────────────────────
@@ -349,6 +350,8 @@ model ConfigOption {
   // SELECT: [{ value, label, monthly }]; QUANTITY/YESNO: unit monthly price in `unitMonthly`
   choices   Json             @default("[]")
   unitMonthly Int            @default(0)
+  /// other currencies for unitMonthly: { "USD": 120 }; SELECT choices carry their own { prices: { USD } }
+  unitPrices Json            @default("{}")
   sortOrder Int              @default(0)
 
   @@unique([productId, key])
@@ -360,6 +363,8 @@ model Addon {
   description String?
   monthly     Int
   setupFee    Int            @default(0)
+  /// other currencies: { "USD": { "monthly": 199, "setupFee": 0 } } (minor units); missing = auto-convert
+  prices      Json           @default("{}")
   taxable     Boolean        @default(true)
   enabled     Boolean        @default(true)
   products    AddonProduct[]
@@ -384,7 +389,9 @@ model PromoCode {
   id          String         @id @default(cuid())
   code        String         @unique
   type        PromoType
-  value       Int // percent (0-100) or fixed amount in minor units
+  value       Int // percent (0-100) or fixed amount in minor units (INR)
+  /// FIXED promos in other currencies: { "USD": 500 }; missing = auto-convert from INR
+  fixedAmounts Json          @default("{}")
   recurring   Boolean        @default(false)
   productIds  String[] @default([]) // empty = all
   cycles      BillingCycle[] @default([]) // empty = all
@@ -662,6 +669,8 @@ model Invoice {
   user             User          @relation(fields: [userId], references: [id])
   status           InvoiceStatus @default(UNPAID)
   currency         String        @default("INR")
+  /// INR per 1 unit of `currency` when issued (1 for INR) — for GST returns / export invoices
+  exchangeRate     Float         @default(1)
   issueDate        DateTime      @default(now())
   dueDate          DateTime
   paidAt           DateTime?
@@ -855,6 +864,7 @@ model Domain {
   expiryDate      DateTime?
   nextDueDate     DateTime?
   recurringAmount Int
+  currency        String       @default("INR")
   autoRenew       Boolean      @default(true)
   locked          Boolean      @default(true)
   idProtection    Boolean      @default(false)
@@ -880,6 +890,8 @@ model DomainPricing {
   register Int
   transfer Int
   renew    Int
+  /// other currencies: { "USD": { "register": 1199, "transfer": 1199, "renew": 1299 } }
+  prices   Json    @default("{}")
   enabled  Boolean @default(true)
   registrar String @default("manual")
 }

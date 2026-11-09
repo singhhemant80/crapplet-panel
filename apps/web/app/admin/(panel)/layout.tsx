@@ -47,6 +47,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { href: "/admin/transactions", label: "Transactions", icon: "payments", perm: "billing.view" },
       { href: "/admin/payment-reviews", label: "Payment Reviews", icon: "fact_check", perm: "billing.view" },
       { href: "/admin/gateways", label: "Payment Gateways", icon: "account_balance", perm: "payments.manage" },
+      { href: "/admin/currencies", label: "Currencies", icon: "currency_exchange", perm: "settings.manage" },
       { href: "/admin/reports", label: "Reports", icon: "monitoring", perm: "reports.view" },
     ],
   },

@@ -107,6 +107,7 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
             years: d.years,
             status: d.action === "transfer" ? "PENDING_TRANSFER" : "PENDING",
             recurringAmount: line.recurring,
+            currency: priced.currency,
             nameservers: ["ns1.crapplet.co.in", "ns2.crapplet.co.in"],
             eppCodeEnc: d.eppCode ? encrypt(d.eppCode) : null,
           },

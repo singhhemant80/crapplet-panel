@@ -3,11 +3,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, money } from "@/lib/api";
 import { readCart, writeCart } from "@/lib/cart";
+import { CurrencySwitch, pick, useCurrency } from "@/lib/currency";
 import { Alert, Button, Card, Icon, Input, Select, useApi } from "@/components/ui";
 
 export default function DomainSearch() {
   const router = useRouter();
   const tlds = useApi("/catalog/domains/pricing");
+  const { currency } = useCurrency();
+  const cm = (v: number) => money(v, currency);
   const [q, setQ] = useState("");
   const [res, setRes] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export default function DomainSearch() {
       <div className="text-center">
         <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">Find your perfect domain</h1>
         <p className="mt-2 text-mute">Register or transfer .in, .co.in, .com and more.</p>
+        <CurrencySwitch className="mt-4" />
       </div>
       <form onSubmit={search} className="mt-8 flex gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="yourbrand.in" className="h-14 text-lg" />
@@ -60,11 +64,11 @@ export default function DomainSearch() {
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={years} onChange={(e) => setYears(Number(e.target.value))} className="h-10 w-28">{[1, 2, 3, 5].map((y) => <option key={y} value={y}>{y} year{y > 1 ? "s" : ""}</option>)}</Select>
                 {res.available !== false ? (
-                  <Button onClick={() => add("register")}>Register · {money(res.pricing.register * years)}</Button>
+                  <Button onClick={() => add("register")}>Register · {cm(pick(res.prices?.register, currency, res.pricing.register) * years)}</Button>
                 ) : (
                   <>
                     <Input value={epp} onChange={(e) => setEpp(e.target.value)} placeholder="EPP / auth code" className="h-10 w-40" />
-                    <Button disabled={!epp} onClick={() => add("transfer")}>Transfer · {money(res.pricing.transfer)}</Button>
+                    <Button disabled={!epp} onClick={() => add("transfer")}>Transfer · {cm(pick(res.prices?.transfer, currency, res.pricing.transfer))}</Button>
                   </>
                 )}
               </div>
@@ -79,8 +83,8 @@ export default function DomainSearch() {
           {tlds.data.tlds.map((t: any) => (
             <div key={t.tld} className="rounded-2xl border border-line bg-white p-4 text-center shadow-card">
               <div className="text-xl font-extrabold text-primary-dark">{t.tld}</div>
-              <div className="mt-1 text-sm font-semibold text-ink">{money(t.register)}/yr</div>
-              <div className="text-xs text-mute">renews {money(t.renew)}</div>
+              <div className="mt-1 text-sm font-semibold text-ink">{cm(pick(t.prices?.register, currency, t.register))}/yr</div>
+              <div className="text-xs text-mute">renews {cm(pick(t.prices?.renew, currency, t.renew))}</div>
             </div>
           ))}
         </div>

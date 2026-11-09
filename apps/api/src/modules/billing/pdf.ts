@@ -9,8 +9,10 @@ import { CYCLE_LABEL } from "../../lib/money";
 const ASSETS = path.resolve(process.env.ASSETS_DIR ?? path.join(process.cwd(), "assets"));
 const font = (f: string) => path.join(ASSETS, "fonts", f);
 
+const SYMBOL: Record<string, string> = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
 const money = (minor: number, currency: string) =>
-  (currency === "INR" ? "₹" : currency + " ") + (minor / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  (SYMBOL[currency] ?? currency + " ") + (minor / 100).toLocaleString(currency === "INR" ? "en-IN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const UNIT_NAMES: Record<string, [string, string]> = { USD: ["US Dollars", "Cents"], EUR: ["Euros", "Cents"], GBP: ["Pounds Sterling", "Pence"] };
 const date = (d: Date | null | undefined) => (d ? d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric" }) : "—");
 
 function amountInWords(rupees: number): string {
@@ -147,6 +149,17 @@ export async function renderInvoicePdf(invoiceId: string): Promise<Buffer> {
 
   if (inv.currency === "INR") {
     doc.font("R").fontSize(8).fillColor(mute).text(`Amount in words: Indian Rupees ${amountInWords(Math.floor(inv.total / 100))}${inv.total % 100 ? ` and ${amountInWords(inv.total % 100)} Paise` : ""} Only`, 40, y + 6, { width: W - 240 });
+  } else {
+    // export invoice: words in the billed currency + INR value at the invoice-date rate (GST Rule 34 / FEMA)
+    const [major, minorName] = UNIT_NAMES[inv.currency] ?? [inv.currency, "cents"];
+    const inrValue = Math.round(inv.total * (inv.exchangeRate || 1));
+    const lines = [
+      `Amount in words: ${major} ${amountInWords(Math.floor(inv.total / 100))}${inv.total % 100 ? ` and ${amountInWords(inv.total % 100)} ${minorName}` : ""} Only`,
+      `INR equivalent: ${money(inrValue, "INR")} @ ₹${(inv.exchangeRate || 1).toFixed(4)} per ${inv.currency}`,
+    ];
+    if (!inv.taxTotal && inv.placeOfSupplyCode === "96")
+      lines.push(`Supply meant for export of services under LUT without payment of IGST${s.currency?.lutArn ? ` (LUT ARN ${s.currency.lutArn})` : ""}.`);
+    doc.font("R").fontSize(8).fillColor(mute).text(lines.join("\n"), 40, y + 6, { width: W - 240 });
   }
 
   // payments
@@ -161,7 +174,7 @@ export async function renderInvoicePdf(invoiceId: string): Promise<Buffer> {
       y += 12;
     }
   }
-  if (s.invoice.bankDetails && inv.status === "UNPAID") {
+  if (s.invoice.bankDetails && inv.status === "UNPAID" && inv.currency === "INR") {
     y += 8;
     doc.font("S").fontSize(9).fillColor(ink).text("Bank transfer details", 40, y);
     doc.font("R").fontSize(8).fillColor(mute).text(s.invoice.bankDetails, 40, y + 13, { width: W });

@@ -36,6 +36,18 @@ export const DEFAULT_SETTINGS = {
     footerNote: "This is a computer generated invoice and does not require a signature.",
     bankDetails: "",
   },
+  currency: {
+    /** derive missing USD (etc.) prices from INR with the exchange rate */
+    autoConvert: true,
+    /** extra % on converted prices to cover FX / card fees */
+    markupPct: 0,
+    /** cent | whole | nice99 (4.99) */
+    rounding: "nice99",
+    /** refresh Currency.rate daily from a public FX API */
+    autoUpdateRates: false,
+    /** GST LUT ARN printed on export invoices (zero-rated supply) */
+    lutArn: "",
+  },
   automation: {
     invoiceDaysBeforeDue: 10,
     reminderDaysBefore: [7, 3],

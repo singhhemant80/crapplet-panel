@@ -13,7 +13,24 @@ export type FieldDef = {
   placeholder?: string;
   full?: boolean;
   default?: unknown;
+  /** money fields: which currency the amount is in (label shows ₹ / US$) */
+  currency?: string;
+  /** store the value inside a JSON column instead of its own key, e.g. { column: "prices", path: ["USD", "monthly"] } — blank removes it */
+  json?: { column: string; path: string[] };
 };
+
+const getPath = (o: any, path: string[]) => path.reduce((x, k) => (x && typeof x === "object" ? x[k] : undefined), o);
+function setPath(o: any, path: string[], v: unknown) {
+  const root = structuredClone(o ?? {});
+  let cur = root;
+  for (const k of path.slice(0, -1)) cur = cur[k] = cur[k] && typeof cur[k] === "object" ? cur[k] : {};
+  const last = path[path.length - 1];
+  if (v === undefined) delete cur[last];
+  else cur[last] = v;
+  // drop now-empty parent objects
+  if (path.length > 1 && Object.keys(cur).length === 0) return setPath(root, path.slice(0, -1), undefined);
+  return root;
+}
 export type ColDef = { label: string; render: (row: any) => ReactNode };
 
 /** Generic list + create/edit modal for simple admin resources backed by the /admin CRUD routes. */
@@ -36,7 +53,7 @@ export function ResourceManager({ title, subtitle, endpoint, idKey = "id", field
   const open = (row?: any) => {
     const init: Record<string, any> = {};
     for (const f of fields) {
-      let v = row ? row[f.key] : f.default;
+      let v = f.json ? getPath(row?.[f.json.column], f.json.path) : row ? row[f.key] : f.default;
       if (f.type === "money" && typeof v === "number") v = v / 100;
       if (f.type === "list" && Array.isArray(v)) v = v.join("\n");
       if (f.type === "date" && v) v = String(v).slice(0, 10);
@@ -51,6 +68,12 @@ export function ResourceManager({ title, subtitle, endpoint, idKey = "id", field
     const body: Record<string, any> = {};
     for (const f of fields) {
       let v = form[f.key];
+      if (f.json) {
+        const col = f.json.column;
+        if (!(col in body)) body[col] = structuredClone(editing?.[col] ?? {});
+        body[col] = setPath(body[col], f.json.path, v === "" || v === null || v === undefined ? undefined : Math.round(Number(v) * 100));
+        continue;
+      }
       if (f.type === "number") v = v === "" || v === null ? null : Number(v);
       if (f.type === "money") v = v === "" ? 0 : Math.round(Number(v) * 100);
       if (f.type === "list") v = String(v ?? "").split(/\n|,/).map((x) => x.trim()).filter(Boolean);
@@ -95,7 +118,7 @@ export function ResourceManager({ title, subtitle, endpoint, idKey = "id", field
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.[idKey] ? `Edit ${title.replace(/s$/, "").toLowerCase()}` : `New ${title.replace(/s$/, "").toLowerCase()}`} wide={fields.length > 6}>
         <div className="grid gap-4 sm:grid-cols-2">
           {fields.map((f) => (
-            <Field key={f.key} label={f.label + (f.type === "money" ? " (₹)" : "")} hint={f.hint} className={f.full || f.type === "textarea" || f.type === "list" ? "sm:col-span-2" : ""}>
+            <Field key={f.key} label={f.label + (f.type === "money" ? (f.currency && f.currency !== "INR" ? ` (${f.currency === "USD" ? "US$" : f.currency})` : " (₹)") : "")} hint={f.hint} className={f.full || f.type === "textarea" || f.type === "list" ? "sm:col-span-2" : ""}>
               {f.type === "textarea" || f.type === "list" ? (
                 <Textarea rows={f.type === "list" ? 4 : 6} value={form[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
               ) : f.type === "bool" ? (

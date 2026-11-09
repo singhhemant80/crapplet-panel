@@ -46,7 +46,7 @@ export async function generateRenewalInvoices() {
     const exists = await prisma.invoiceItem.count({ where: { relId: d.id, type: "DOMAIN", periodStart, invoice: { status: { notIn: ["CANCELLED"] } } } });
     if (exists) continue;
     const inv = await prisma.$transaction((tx) =>
-      createInvoice(tx, { userId: d.userId, dueDate: periodStart, items: [{ type: "DOMAIN", relId: d.id, description: `Domain renewal — ${d.name} (1 yr)`, unitPrice: d.recurringAmount, periodStart, periodEnd: addMonths(periodStart, 12) }] }),
+      createInvoice(tx, { userId: d.userId, dueDate: periodStart, currency: d.currency, items: [{ type: "DOMAIN", relId: d.id, description: `Domain renewal — ${d.name} (1 yr)`, unitPrice: d.recurringAmount, periodStart, periodEnd: addMonths(periodStart, 12) }] }),
     );
     created++;
     await queueEmail("invoice.created", d.user.email, invoiceEmailVars(inv, d.user.firstName), d.userId);

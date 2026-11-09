@@ -74,7 +74,7 @@ export default function AdminDashboard() {
             <tr key={o.id}>
               <Td className="font-bold">{o.number}</Td>
               <Td><div className="font-semibold text-ink">{o.client}</div><div className="text-xs text-mute">{o.email}</div></Td>
-              <Td className="font-semibold">{money(o.total)}</Td>
+              <Td className="font-semibold">{money(o.total, o.currency)}</Td>
               <Td>{o.paid ? <Badge status="PAID" /> : <Badge status="UNPAID" />}</Td>
               <Td><Badge status={o.status} /></Td>
               <Td className="whitespace-nowrap text-mute">{date(o.createdAt, true)}</Td>

@@ -29,7 +29,8 @@ function InvoiceView() {
   const router = useRouter();
   const { me } = useSession();
   const { data, loading, reload } = useApi(`/client/invoices/${id}`);
-  const methods = useApi("/payments/methods");
+  // only methods that can charge this invoice's currency (e.g. PayPal / Stripe / wire for USD)
+  const methods = useApi(data?.invoice ? `/payments/methods?currency=${data.invoice.currency}` : null, [data?.invoice?.currency]);
   const [method, setMethod] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState<any>(null);
@@ -38,13 +39,14 @@ function InvoiceView() {
   const verified = useRef(false);
 
   useEffect(() => {
-    if (methods.data?.methods?.length && !method) setMethod(methods.data.methods[0].code);
+    const list = methods.data?.methods ?? [];
+    if (list.length && !list.some((m: any) => m.code === method)) setMethod(list[0].code);
   }, [methods.data, method]);
 
   // returning from Stripe / Cashfree / PayU
   useEffect(() => {
     const gateway = sp.get("gateway");
-    const orderId = sp.get("session_id") || sp.get("order_id");
+    const orderId = sp.get("session_id") || sp.get("order_id") || sp.get("token"); // Stripe / Cashfree / PayPal
     if (verified.current) return;
     if (gateway && orderId) {
       verified.current = true;
@@ -206,6 +208,7 @@ function InvoiceView() {
             {inv.cgst > 0 && <Row l={`CGST @ ${inv.gstRate / 2}%`} v={money(inv.cgst, inv.currency)} />}
             {inv.sgst > 0 && <Row l={`SGST @ ${inv.gstRate / 2}%`} v={money(inv.sgst, inv.currency)} />}
             {inv.igst > 0 && <Row l={`IGST @ ${inv.gstRate}%`} v={money(inv.igst, inv.currency)} />}
+            {inv.currency !== "INR" && !inv.taxTotal && <Row l="GST" v="Not applicable (export)" />}
             <div className="flex justify-between border-t border-line pt-2 text-base font-extrabold text-ink">
               <span>Total</span>
               <span>{money(inv.total, inv.currency)}</span>
@@ -244,7 +247,7 @@ function InvoiceView() {
                 <div className="space-y-3">
                   {credit > 0 && !inv.isWalletTopup && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
-                      <div className="font-bold text-emerald-800">You have {money(credit)} wallet credit</div>
+                      <div className="font-bold text-emerald-800">You have {money(credit, inv.currency)} wallet credit</div>
                       <Button
                         size="sm"
                         className="mt-2"
@@ -252,7 +255,7 @@ function InvoiceView() {
                         onClick={() =>
                           api(`/client/invoices/${id}/apply-credit`, { body: {} })
                             .then((r) => {
-                              toast.success(r.paid ? "Invoice paid from credit" : `Applied ${money(r.applied)} credit`);
+                              toast.success(r.paid ? "Invoice paid from credit" : `Applied ${money(r.applied, inv.currency)} credit`);
                               reload();
                             })
                             .catch((e) => toast.error(e.message))
@@ -262,11 +265,11 @@ function InvoiceView() {
                       </Button>
                     </div>
                   )}
-                  {!methods.data?.methods?.length && <Alert tone="warn">Online payments are being set up. Please contact billing@crapplet.co.in.</Alert>}
+                  {methods.data && !methods.data.methods?.length && <Alert tone="warn">No payment method is set up for {inv.currency} yet. Please contact billing@crapplet.co.in.</Alert>}
                   {methods.data?.methods?.map((m: any) => (
                     <label key={m.code} className={cx("flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition", method === m.code ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line hover:border-primary/40")}>
                       <input type="radio" className="accent-[#7c3aed]" checked={method === m.code} onChange={() => setMethod(m.code)} />
-                      <Icon name={m.code === "upi" ? "qr_code_2" : m.code === "bank" ? "account_balance" : m.code === "stripe" ? "credit_card" : m.offline ? "payments" : "bolt"} className="text-primary-dark" />
+                      <Icon name={m.code === "upi" ? "qr_code_2" : m.code === "bank" || m.code === "wire" ? "account_balance" : m.code === "stripe" ? "credit_card" : m.code === "paypal" ? "account_balance_wallet" : m.offline ? "payments" : "bolt"} className="text-primary-dark" />
                       <span className="text-sm font-semibold text-ink">{m.name}</span>
                     </label>
                   ))}

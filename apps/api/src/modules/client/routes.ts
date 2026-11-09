@@ -1,3 +1,4 @@
+import { requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma, TicketPriority } from "../../db";
@@ -45,7 +46,7 @@ clientRouter.get(
       transactions: txns,
       tickets: tickets.map((t) => ({ id: t.id, number: t.number, subject: t.subject, status: t.status, department: t.department.name, lastReplyAt: t.lastReplyAt })),
       announcements,
-      renewals: renewals.map((s) => ({ id: s.id, product: s.product.name, hostname: s.hostname, ip: s.ips[0]?.address ?? null, nextDueDate: s.nextDueDate, amount: s.recurringAmount, status: s.status })),
+      renewals: renewals.map((s) => ({ id: s.id, product: s.product.name, hostname: s.hostname, ip: s.ips[0]?.address ?? null, nextDueDate: s.nextDueDate, amount: s.recurringAmount, currency: s.currency, status: s.status })),
     });
   }),
 );
@@ -54,8 +55,19 @@ clientRouter.get(
 clientRouter.put(
   "/profile",
   ah(async (req, res) => {
-    const b = parse(profileSchema, req.body);
+    const b = parse(profileSchema.extend({ currency: z.string().length(3).toUpperCase().optional() }), req.body);
     const stateCode = resolveStateCode(b.country, b.state, b.gstin, b.stateCode);
+    // Billing currency follows the country until the first invoice: Indian accounts bill in INR (with GST),
+    // overseas accounts in USD (or another enabled currency they pick). After that only support can change it.
+    const cur = await prisma.clientProfile.findUnique({ where: { userId: req.user!.id }, select: { currency: true, creditBalance: true } });
+    const fresh = !(await prisma.invoice.count({ where: { userId: req.user!.id } })) && !(cur?.creditBalance ?? 0);
+    let currency: string | undefined;
+    if (fresh) {
+      currency = b.country === "IN" ? "INR" : (b.currency && b.currency !== "INR" ? b.currency : cur?.currency && cur.currency !== "INR" ? cur.currency : "USD");
+      await requireCurrency(currency);
+    } else if (b.currency && b.currency !== cur?.currency) {
+      throw badRequest("Your billing currency is fixed once you've been invoiced — please contact support to change it");
+    }
     await prisma.user.update({
       where: { id: req.user!.id },
       data: {
@@ -64,8 +76,8 @@ clientRouter.put(
         phone: b.phone,
         profile: {
           upsert: {
-            create: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode, country: b.country, postcode: b.postcode },
-            update: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode, country: b.country, postcode: b.postcode },
+            create: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode, country: b.country, postcode: b.postcode, ...(currency ? { currency } : {}) },
+            update: { companyName: b.companyName, gstin: b.gstin, pan: b.pan, address1: b.address1, address2: b.address2, city: b.city, state: b.state, stateCode, country: b.country, postcode: b.postcode, ...(currency ? { currency } : {}) },
           },
         },
       },
@@ -252,7 +264,10 @@ clientRouter.get(
 clientRouter.post(
   "/credit/topup",
   ah(async (req, res) => {
-    const { amount } = parse(z.object({ amount: z.number().int().min(10000).max(50000000) }), req.body);
+    const prof = await prisma.clientProfile.findUnique({ where: { userId: req.user!.id }, select: { currency: true } });
+    const inr = (prof?.currency ?? "INR") === "INR";
+    // minimum top-up: ₹100 / 5.00 in other currencies
+    const { amount } = parse(z.object({ amount: z.number().int().min(inr ? 10000 : 500, inr ? "Minimum top-up is ₹100" : `Minimum top-up is 5 ${prof?.currency}`).max(inr ? 50000000 : 600000) }), req.body);
     const inv = await prisma.$transaction((tx) => createInvoice(tx, { userId: req.user!.id, isWalletTopup: true, items: [{ type: "WALLET", description: "Account credit / wallet top-up", unitPrice: amount, taxable: false }] }));
     res.status(201).json({ invoiceId: inv.id });
   }),

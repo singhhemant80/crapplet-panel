@@ -72,7 +72,7 @@ function Services() {
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-mute">
-                    {money(s.recurringAmount)} / {CYCLES[s.billingCycle]?.toLowerCase()}
+                    {money(s.recurringAmount, s.currency)} / {CYCLES[s.billingCycle]?.toLowerCase()}
                   </span>
                   <span className="font-bold text-primary-dark">Manage →</span>
                 </div>

@@ -4,7 +4,7 @@ import { prisma } from "../../db";
 import { config } from "../../config";
 import { ah, parse } from "../../lib/http";
 import { requireAuth } from "../../middleware/auth";
-import { GATEWAYS } from "./gateways";
+import { GATEWAYS, gatewayCurrencies } from "./gateways";
 import { handleWebhook, startPayment, submitOfflineReference, verifyReturn, gatewayConfig } from "./service";
 
 export const paymentsRouter = Router();
@@ -12,9 +12,16 @@ export const webhooksRouter = Router();
 
 paymentsRouter.get(
   "/methods",
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    // ?currency=USD → only methods that can charge that currency
+    const cur = typeof req.query.currency === "string" ? req.query.currency.toUpperCase() : null;
     const rows = await prisma.paymentGateway.findMany({ where: { enabled: true }, orderBy: { sortOrder: "asc" } });
-    res.json({ methods: rows.filter((r) => GATEWAYS[r.code]).map((r) => ({ code: r.code, name: r.name, offline: !!GATEWAYS[r.code].offline })) });
+    res.json({
+      methods: rows
+        .filter((r) => GATEWAYS[r.code])
+        .map((r) => ({ code: r.code, name: r.name, offline: !!GATEWAYS[r.code].offline, currencies: gatewayCurrencies(r.code, r.publicConfig) }))
+        .filter((m) => !cur || m.currencies.includes(cur)),
+    });
   }),
 );
 

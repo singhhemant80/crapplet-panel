@@ -2,12 +2,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, date, money } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { Button, Card, Empty, Field, Input, Loading, PageHeader, Table, Td, toast, useApi } from "@/components/ui";
 
 export default function Wallet() {
   const router = useRouter();
   const { data, loading } = useApi("/client/credit");
-  const [amount, setAmount] = useState("1000");
+  const { me } = useSession();
+  const ac: string = me?.profile?.currency ?? "INR";
+  const inr = ac === "INR";
+  const [amount, setAmount] = useState<string | null>(null);
+  const amt = amount ?? (inr ? "1000" : "20");
   const [busy, setBusy] = useState(false);
   return (
     <>
@@ -15,12 +20,12 @@ export default function Wallet() {
       <div className="mb-6 grid gap-6 md:grid-cols-2">
         <Card>
           <div className="text-sm font-semibold text-mute">Available balance</div>
-          <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink">{loading ? "…" : money(data?.balance)}</div>
+          <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink">{loading ? "…" : money(data?.balance, ac)}</div>
         </Card>
         <Card title="Add funds">
           <div className="flex flex-wrap items-end gap-3">
-            <Field label="Amount (₹)" className="min-w-[160px] flex-1">
-              <Input type="number" min={100} step={100} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Field label={`Amount (${inr ? "₹" : ac})`} hint={inr ? "Minimum ₹100" : `Minimum 5 ${ac}`} className="min-w-[160px] flex-1">
+              <Input type="number" min={inr ? 100 : 5} step={inr ? 100 : 5} value={amt} onChange={(e) => setAmount(e.target.value)} />
             </Field>
             <Button
               loading={busy}
@@ -28,7 +33,7 @@ export default function Wallet() {
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await api("/client/credit/topup", { body: { amount: Math.round(Number(amount) * 100) } });
+                  const r = await api("/client/credit/topup", { body: { amount: Math.round(Number(amt) * 100) } });
                   router.push(`/client/invoices/${r.invoiceId}`);
                 } catch (e: any) {
                   toast.error(e.message);
@@ -55,9 +60,9 @@ export default function Wallet() {
                 <Td className="font-semibold text-ink">{l.description}</Td>
                 <Td className={l.amount < 0 ? "font-bold text-rose-600" : "font-bold text-emerald-600"}>
                   {l.amount < 0 ? "−" : "+"}
-                  {money(Math.abs(l.amount))}
+                  {money(Math.abs(l.amount), ac)}
                 </Td>
-                <Td className="font-semibold">{money(l.balanceAfter)}</Td>
+                <Td className="font-semibold">{money(l.balanceAfter, ac)}</Td>
               </tr>
             ))}
           </Table>

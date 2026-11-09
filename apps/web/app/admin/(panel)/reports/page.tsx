@@ -8,7 +8,7 @@ export default function Reports() {
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
   const { data, loading } = useApi(`/admin/reports/summary?from=${from}&to=${to}T23:59:59`, [from, to]);
   const csv = () => {
-    const rows = [["Month", "Invoices", "Taxable", "CGST", "SGST", "IGST", "Total"], ...data.gst.map((r: any) => [r.month, r.invoices, r.taxable / 100, r.cgst / 100, r.sgst / 100, r.igst / 100, r.total / 100])];
+    const rows = [["Month", "Invoices", "Taxable (INR)", "CGST", "SGST", "IGST", "Exports zero-rated (INR)", "Total (INR)"], ...data.gst.map((r: any) => [r.month, r.invoices, r.taxable / 100, r.cgst / 100, r.sgst / 100, r.igst / 100, r.exports / 100, r.total / 100])];
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([rows.map((r) => r.join(",")).join("\n")], { type: "text/csv" }));
     a.download = `gst-summary-${from}-${to}.csv`;
@@ -19,9 +19,9 @@ export default function Reports() {
       <PageHeader title="Reports" actions={<div className="flex gap-2"><Field><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field><Field><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field></div>} />
       {loading || !data ? <Loading /> : (
         <div className="space-y-6">
-          <Card title="GST summary (paid tax invoices, for GSTR-1 / 3B)" action={<button className="text-sm font-bold text-primary-dark" onClick={csv}>Export CSV</button>} pad={false}>
-            <Table head={["Month", "Invoices", "Taxable value", "CGST", "SGST", "IGST", "Invoice total"]}>
-              {data.gst.map((r: any) => <tr key={r.month}><Td className="font-bold">{r.month}</Td><Td>{r.invoices}</Td><Td>{money(r.taxable)}</Td><Td>{money(r.cgst)}</Td><Td>{money(r.sgst)}</Td><Td>{money(r.igst)}</Td><Td className="font-bold">{money(r.total)}</Td></tr>)}
+          <Card title="GST summary in INR (paid tax invoices, for GSTR-1 / 3B — foreign-currency invoices at their invoice-date rate)" action={<button className="text-sm font-bold text-primary-dark" onClick={csv}>Export CSV</button>} pad={false}>
+            <Table head={["Month", "Invoices", "Taxable value", "CGST", "SGST", "IGST", "Exports (zero-rated)", "Invoice total"]}>
+              {data.gst.map((r: any) => <tr key={r.month}><Td className="font-bold">{r.month}</Td><Td>{r.invoices}{r.foreign > 0 && <span className="ml-1 text-xs text-mute">({r.foreign} USD)</span>}</Td><Td>{money(r.taxable)}</Td><Td>{money(r.cgst)}</Td><Td>{money(r.sgst)}</Td><Td>{money(r.igst)}</Td><Td>{money(r.exports)}</Td><Td className="font-bold">{money(r.total)}</Td></tr>)}
             </Table>
           </Card>
           <div className="grid gap-6 lg:grid-cols-3">

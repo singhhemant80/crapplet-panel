@@ -21,7 +21,7 @@ export default function Orders() {
                   <Td className="font-bold">{o.number}</Td>
                   <Td><Link className="font-semibold text-primary-dark" href={`/admin/clients/${o.user.id}`}>{o.user.firstName} {o.user.lastName}</Link><div className="text-xs text-mute">{o.ip}</div></Td>
                   <Td className="text-xs">{[...o.services.map((s: any) => `${s.product.name}${s.hostname ? ` (${s.hostname})` : ""}`), ...o.domains.map((d: any) => d.name)].join(", ")}{o.promoCode && <div className="font-bold text-emerald-600">{o.promoCode}</div>}</Td>
-                  <Td className="font-semibold">{money(o.total)}</Td>
+                  <Td className="font-semibold">{money(o.total, o.currency)}</Td>
                   <Td>{o.invoice && <Link href={`/admin/invoices/${o.invoice.id}`}><Badge status={o.invoice.status} /></Link>}</Td>
                   <Td><Badge status={o.status} /></Td>
                   <Td className="whitespace-nowrap text-mute">{date(o.createdAt, true)}</Td>

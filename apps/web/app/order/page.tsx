@@ -5,19 +5,28 @@ import { useSearchParams } from "next/navigation";
 import { gb, money } from "@/lib/api";
 import { Icon, Loading, cx, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
+import { CurrencySwitch, priceRow, rowsIn, useCurrency } from "@/lib/currency";
 
 function Catalog() {
   const sp = useSearchParams();
   const { data, loading } = useApi("/catalog/groups");
   const [group, setGroup] = useState<string>(sp.get("group") ?? "");
+  const { currency } = useCurrency();
   if (loading || !data) return <Loading />;
   const groups = data.groups.filter((g: any) => g.products.length);
   const shown = groups.filter((g: any) => !group || g.slug === group);
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6">
       <OrderSteps step={1} />
-      <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">Choose your plan</h1>
-      <p className="mt-2 text-mute">All prices exclude 18% GST. VPS plans let you pick your own IPv4 address.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">Choose your plan</h1>
+          <p className="mt-2 text-mute">
+            {currency === "INR" ? "All prices exclude 18% GST." : "Prices in US dollars. No Indian GST for customers outside India."} VPS plans let you pick your own IPv4 address.
+          </p>
+        </div>
+        <CurrencySwitch />
+      </div>
       <div className="my-6 flex gap-2 overflow-x-auto pb-1">
         <button onClick={() => setGroup("")} className={cx("whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold", !group ? "bg-primary-dark text-white" : "bg-white text-slate-600 ring-1 ring-line")}>All</button>
         {groups.map((g: any) => (
@@ -35,14 +44,14 @@ function Catalog() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {g.products.map((p: any) => {
-              const monthly = p.pricing.find((x: any) => x.cycle === "MONTHLY") ?? p.pricing[0];
+              const monthly = priceRow(p.pricing, "MONTHLY", currency) ?? rowsIn(p.pricing, currency)[0];
               return (
                 <div key={p.id} className={cx("relative flex flex-col rounded-2xl border bg-white p-6 shadow-card transition hover:-translate-y-1", p.featured ? "border-primary ring-2 ring-primary/20" : "border-line")}>
                   {p.featured && <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-primary to-primary-dark px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white">Most popular</span>}
                   <h3 className="text-lg font-extrabold text-ink">{p.name}</h3>
                   <p className="mt-1 min-h-[40px] text-sm text-mute">{p.tagline}</p>
                   <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-ink">{monthly ? money(monthly.price).replace(".00", "") : "—"}</span>
+                    <span className="text-3xl font-extrabold tracking-tight text-ink">{monthly ? money(monthly.price, currency).replace(/\.00$/, "") : "—"}</span>
                     <span className="text-sm font-semibold text-mute">/mo</span>
                   </div>
                   {p.isVps ? (

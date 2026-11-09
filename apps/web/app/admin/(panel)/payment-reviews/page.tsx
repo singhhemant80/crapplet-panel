@@ -22,7 +22,7 @@ export default function Reviews() {
                 <Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${p.invoice.id}`}>{invNo(p.invoice)}</Link></Td>
                 <Td className="uppercase">{p.gateway}</Td>
                 <Td className="font-mono font-bold">{p.reference}</Td>
-                <Td className="font-bold">{money(p.amount)}</Td>
+                <Td className="font-bold">{money(p.amount, p.currency)}</Td>
                 <Td className="whitespace-nowrap text-right"><Button size="sm" onClick={() => confirm(`Confirm ₹${p.amount / 100} received with reference ${p.reference}?`) && act(p.id, true)}>Approve</Button><button className="ml-3 text-sm font-bold text-rose-600" onClick={() => act(p.id, false)}>Reject</button></Td>
               </tr>
             ))}

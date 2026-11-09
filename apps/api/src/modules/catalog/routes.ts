@@ -7,6 +7,23 @@ import { listAvailableIps, releaseIpReservation, reserveIp } from "../ipam/servi
 import { cartSchema, priceCart } from "../orders/pricing";
 import { checkout } from "../orders/checkout";
 import { checkDomain } from "../domains/service";
+import { BASE_CURRENCY, jsonPrice, listCurrencies, priceResolver } from "../../lib/currency";
+
+type Resolvers = Awaited<ReturnType<typeof priceResolver>>[];
+/** one price resolver per currency the shop bills in */
+async function resolvers(): Promise<Resolvers> {
+  const cur = (await listCurrencies()).filter((c) => c.enabled || c.code === BASE_CURRENCY);
+  return Promise.all(cur.map((c) => priceResolver(c.code)));
+}
+/** { INR: x, USD: y } for every currency that has (or can derive) a price */
+function perCurrency(rs: Resolvers, inr: number, map: unknown, field?: string) {
+  const out: Record<string, number> = {};
+  for (const r of rs) {
+    const v = r.price(inr, jsonPrice(map, r.currency.code, field));
+    if (v !== null) out[r.currency.code] = v;
+  }
+  return out;
+}
 
 export const catalogRouter = Router();
 
@@ -17,8 +34,21 @@ const productInclude = {
   addons: { include: { addon: true } },
 };
 
-function publicProduct(p: Awaited<ReturnType<typeof findProduct>>) {
+function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers) {
   if (!p) return null;
+  // prices in every billing currency: explicit rows win, otherwise derived from INR
+  const pricing = rs.flatMap((r) => {
+    const code = r.currency.code;
+    const cycles = new Set(p.pricing.map((x) => x.cycle));
+    return [...cycles].flatMap((cycle) => {
+      const base = p.pricing.find((x) => x.cycle === cycle && x.currency === BASE_CURRENCY && x.enabled);
+      const own = code === BASE_CURRENCY ? undefined : p.pricing.find((x) => x.cycle === cycle && x.currency === code);
+      if (own && !own.enabled) return [];
+      const price = r.price(base?.price, own?.price);
+      if (price === null) return [];
+      return [{ cycle, currency: code, price, setupFee: r.price(base?.setupFee ?? 0, own?.setupFee) ?? 0, converted: code !== BASE_CURRENCY && !own }];
+    });
+  });
   return {
     id: p.id,
     legacyPid: p.legacyPid,
@@ -36,10 +66,19 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>) {
     requireHostname: p.requireHostname,
     featured: p.featured,
     outOfStock: p.stockControl && p.stockQty <= 0,
-    pricing: p.pricing.map((x) => ({ cycle: x.cycle, currency: x.currency, price: x.price, setupFee: x.setupFee })),
-    configOptions: p.configOptions.map((o) => ({ key: o.key, label: o.label, type: o.type, minQty: o.minQty, maxQty: o.maxQty, choices: o.choices, unitMonthly: o.unitMonthly })),
+    pricing,
+    configOptions: p.configOptions.map((o) => ({
+      key: o.key,
+      label: o.label,
+      type: o.type,
+      minQty: o.minQty,
+      maxQty: o.maxQty,
+      choices: (o.choices as { value: string; label: string; monthly: number; prices?: unknown }[]).map((c) => ({ value: c.value, label: c.label, monthly: c.monthly, prices: perCurrency(rs, c.monthly, c.prices) })),
+      unitMonthly: o.unitMonthly,
+      unitPrices: perCurrency(rs, o.unitMonthly, o.unitPrices),
+    })),
     osTemplates: p.osTemplates.filter((o) => o.osTemplate.enabled).map((o) => ({ id: o.osTemplate.id, name: o.osTemplate.name, family: o.osTemplate.family })),
-    addons: p.addons.filter((a) => a.addon.enabled).map((a) => ({ id: a.addon.id, name: a.addon.name, description: a.addon.description, monthly: a.addon.monthly, setupFee: a.addon.setupFee })),
+    addons: p.addons.filter((a) => a.addon.enabled).map((a) => ({ id: a.addon.id, name: a.addon.name, description: a.addon.description, monthly: a.addon.monthly, setupFee: a.addon.setupFee, prices: { monthly: perCurrency(rs, a.addon.monthly, a.addon.prices, "monthly"), setupFee: perCurrency(rs, a.addon.setupFee, a.addon.prices, "setupFee") } })),
   };
 }
 
@@ -57,7 +96,8 @@ catalogRouter.get(
       orderBy: { sortOrder: "asc" },
       include: { products: { where: { enabled: true, hidden: false }, orderBy: { sortOrder: "asc" }, include: { ...productInclude, group: true } } },
     });
-    res.json({ groups: groups.map((g) => ({ id: g.id, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map(publicProduct) })) });
+    const rs = await resolvers();
+    res.json({ groups: groups.map((g) => ({ id: g.id, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map((p) => publicProduct(p, rs)) })) });
   }),
 );
 
@@ -66,7 +106,7 @@ catalogRouter.get(
   ah(async (req, res) => {
     const p = await findProduct(req.params.key);
     if (!p) throw notFound("Product not found");
-    res.json({ product: publicProduct(p) });
+    res.json({ product: publicProduct(p, await resolvers()) });
   }),
 );
 
@@ -123,21 +163,30 @@ catalogRouter.get(
   "/domains/check",
   ah(async (req, res) => {
     const { name } = parse(z.object({ name: z.string().trim().toLowerCase().regex(/^[a-z0-9-]{1,63}(\.[a-z0-9-]{2,63})+$/, "Enter a domain like example.in") }), req.query);
-    res.json(await checkDomain(name));
+    const r = await checkDomain(name);
+    if (!r.pricing) return res.json(r);
+    // add the price in every billing currency
+    const row = await prisma.domainPricing.findUnique({ where: { tld: r.tld } });
+    const rs = await resolvers();
+    res.json({ ...r, prices: { register: perCurrency(rs, r.pricing.register, row?.prices, "register"), transfer: perCurrency(rs, r.pricing.transfer, row?.prices, "transfer"), renew: perCurrency(rs, r.pricing.renew, row?.prices, "renew") } });
   }),
 );
 
 catalogRouter.get(
   "/domains/pricing",
   ah(async (_req, res) => {
-    res.json({ tlds: await prisma.domainPricing.findMany({ where: { enabled: true }, orderBy: { register: "asc" } }) });
+    const rs = await resolvers();
+    const tlds = await prisma.domainPricing.findMany({ where: { enabled: true }, orderBy: { register: "asc" } });
+    res.json({
+      tlds: tlds.map((t) => ({ ...t, prices: { register: perCurrency(rs, t.register, t.prices, "register"), transfer: perCurrency(rs, t.transfer, t.prices, "transfer"), renew: perCurrency(rs, t.renew, t.prices, "renew") } })),
+    });
   }),
 );
 
 catalogRouter.get(
   "/currencies",
   ah(async (_req, res) => {
-    res.json({ currencies: await prisma.currency.findMany() });
+    res.json({ currencies: (await listCurrencies()).filter((c) => c.enabled || c.code === BASE_CURRENCY).map(({ code, prefix, suffix, isDefault }) => ({ code, prefix, suffix, isDefault })) });
   }),
 );
 

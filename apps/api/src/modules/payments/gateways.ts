@@ -30,6 +30,8 @@ export interface Verified {
   gatewayOrderId?: string;
   gatewayTxnId: string;
   amount: number;
+  /** ISO currency the gateway actually charged in (checked against the invoice) */
+  currency?: string;
   paid: boolean;
   fee?: number;
   raw?: unknown;
@@ -48,6 +50,8 @@ export interface Gateway {
   code: string;
   name: string;
   offline?: boolean;
+  /** currencies this gateway can charge by default (admins can narrow/extend per gateway) */
+  currencies: string[];
   createPayment(intent: IntentLike, payer: Payer, cfg: GatewayConfig, pub: PublicGatewayConfig, testMode: boolean, label: string): Promise<{ gatewayOrderId?: string; client: Record<string, unknown> }>;
   verifyReturn?(body: Record<string, unknown>, cfg: GatewayConfig, testMode: boolean, intent: IntentLike): Promise<Verified>;
   parseWebhook?(raw: Buffer, headers: Record<string, string | string[] | undefined>, cfg: GatewayConfig, testMode: boolean): Promise<WebhookResult>;
@@ -75,6 +79,7 @@ async function httpJson<T>(url: string, init: { method: string; headers?: Record
 // ───────────────────────── Razorpay ─────────────────────────
 const razorpay: Gateway = {
   code: "razorpay",
+  currencies: ["INR"],
   name: "Razorpay (UPI, Cards, Netbanking, Wallets)",
   async createPayment(intent, payer, cfg, _pub, _t, label) {
     const auth = "Basic " + Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
@@ -122,6 +127,7 @@ const razorpay: Gateway = {
 // ───────────────────────── Stripe ─────────────────────────
 const stripe: Gateway = {
   code: "stripe",
+  currencies: ["INR", "USD"],
   name: "Stripe (International cards)",
   async createPayment(intent, payer, cfg, _pub, _t, label) {
     const f = new URLSearchParams({
@@ -147,11 +153,11 @@ const stripe: Gateway = {
   async verifyReturn(body, cfg, _t, intent) {
     const sid = String(body.session_id ?? "");
     if (!sid || sid !== intent.gatewayOrderId) throw new HttpError(400, "Invalid Stripe session");
-    const s = await httpJson<{ id: string; payment_status: string; amount_total: number; payment_intent: string; client_reference_id: string }>(`https://api.stripe.com/v1/checkout/sessions/${sid}`, {
+    const s = await httpJson<{ id: string; payment_status: string; amount_total: number; currency: string; payment_intent: string; client_reference_id: string }>(`https://api.stripe.com/v1/checkout/sessions/${sid}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${cfg.secretKey}` },
     });
-    return { intentId: s.client_reference_id, gatewayOrderId: s.id, gatewayTxnId: s.payment_intent, amount: s.amount_total, paid: s.payment_status === "paid", raw: s };
+    return { intentId: s.client_reference_id, gatewayOrderId: s.id, gatewayTxnId: s.payment_intent, amount: s.amount_total, currency: s.currency?.toUpperCase(), paid: s.payment_status === "paid", raw: s };
   },
   async parseWebhook(raw, headers, cfg) {
     const header = h(headers, "stripe-signature");
@@ -166,7 +172,7 @@ const stripe: Gateway = {
     const payments: Verified[] = [];
     if (evt.type === "checkout.session.completed" || evt.type === "checkout.session.async_payment_succeeded") {
       const s = evt.data.object;
-      payments.push({ intentId: s.client_reference_id, gatewayOrderId: s.id, gatewayTxnId: s.payment_intent, amount: s.amount_total, paid: s.payment_status === "paid", raw: s });
+      payments.push({ intentId: s.client_reference_id, gatewayOrderId: s.id, gatewayTxnId: s.payment_intent, amount: s.amount_total, currency: s.currency?.toUpperCase(), paid: s.payment_status === "paid", raw: s });
     }
     return { eventId: evt.id, type: evt.type, payments };
   },
@@ -185,6 +191,7 @@ const cfBase = (test: boolean) => (test ? "https://sandbox.cashfree.com/pg" : "h
 const cfHeaders = (cfg: GatewayConfig) => ({ "x-client-id": cfg.appId, "x-client-secret": cfg.secretKey, "x-api-version": "2023-08-01", "Content-Type": "application/json" });
 const cashfree: Gateway = {
   code: "cashfree",
+  currencies: ["INR"],
   name: "Cashfree (UPI, Cards, Netbanking)",
   async createPayment(intent, payer, cfg, _pub, test) {
     const o = await httpJson<{ order_id: string; payment_session_id: string }>(`${cfBase(test)}/orders`, {
@@ -236,6 +243,7 @@ const cashfree: Gateway = {
 const payuHash = (s: string) => crypto.createHash("sha512").update(s).digest("hex");
 const payu: Gateway = {
   code: "payu",
+  currencies: ["INR"],
   name: "PayU",
   async createPayment(intent, payer, cfg, _pub, test, label) {
     const txnid = intent.id;
@@ -266,6 +274,7 @@ const payu: Gateway = {
 // ───────────────────────── Offline: bank transfer, UPI, manual ─────────────────────────
 const bank: Gateway = {
   code: "bank",
+  currencies: ["INR"],
   name: "Bank Transfer (NEFT / RTGS / IMPS)",
   offline: true,
   async createPayment(intent, _p, _c, pub) {
@@ -274,9 +283,11 @@ const bank: Gateway = {
 };
 const upi: Gateway = {
   code: "upi",
+  currencies: ["INR"],
   name: "UPI (Scan & Pay)",
   offline: true,
   async createPayment(intent, _p, _c, pub, _t, label) {
+    if (intent.currency !== "INR") throw new HttpError(400, "UPI only accepts INR");
     const vpa = String(pub.vpa ?? "");
     if (!vpa) throw new HttpError(503, "UPI is not configured");
     const uri = `upi://pay?${new URLSearchParams({ pa: vpa, pn: String(pub.payeeName ?? "Crapplet Infotech"), am: (intent.amount / 100).toFixed(2), cu: "INR", tn: label.slice(0, 50), tr: intent.id.slice(-12) }).toString()}`;
@@ -285,10 +296,162 @@ const upi: Gateway = {
 };
 const manual: Gateway = {
   code: "manual",
+  currencies: ["INR", "USD"],
   name: "Manual / Cash / Cheque",
   offline: true,
   async createPayment(intent, _p, _c, pub) {
     return { client: { type: "instructions", title: "Manual payment", details: pub.instructions ?? "Contact billing to arrange payment.", reference: intent.id.slice(-8).toUpperCase(), needsReference: true } };
+  },
+};
+
+const wire: Gateway = {
+  code: "wire",
+  name: "International wire transfer (SWIFT)",
+  currencies: ["USD"],
+  offline: true,
+  async createPayment(intent, _p, _c, pub) {
+    return {
+      client: {
+        type: "instructions",
+        title: "International wire transfer",
+        details: `${pub.instructions ?? "Contact billing for our SWIFT details."}\n\nAmount: ${intent.currency} ${(intent.amount / 100).toFixed(2)} — please choose "OUR" charges so the full amount arrives, and quote the reference below.`,
+        reference: intent.id.slice(-8).toUpperCase(),
+        needsReference: true,
+      },
+    };
+  },
+};
+
+// ───────────────────────── PayPal (Checkout Orders v2) ─────────────────────────
+const ppBase = (test: boolean) => (test ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com");
+const ppTokens = new Map<string, { token: string; exp: number }>();
+async function ppToken(cfg: GatewayConfig, test: boolean) {
+  const k = `${test}:${cfg.clientId}`;
+  const c = ppTokens.get(k);
+  if (c && c.exp > Date.now() + 60_000) return c.token;
+  const r = await httpJson<{ access_token: string; expires_in: number }>(`${ppBase(test)}/v1/oauth2/token`, {
+    method: "POST",
+    headers: { Authorization: "Basic " + Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=client_credentials",
+  });
+  ppTokens.set(k, { token: r.access_token, exp: Date.now() + r.expires_in * 1000 });
+  return r.access_token;
+}
+type PpCapture = { id: string; status: string; custom_id?: string; amount: { currency_code: string; value: string }; seller_receivable_breakdown?: { paypal_fee?: { value: string } }; supplementary_data?: { related_ids?: { order_id?: string } } };
+type PpOrder = { id: string; status: string; purchase_units: { custom_id?: string; payments?: { captures?: PpCapture[] } }[] };
+const ppMinor = (v: string) => Math.round(Number(v) * 100);
+function ppVerified(order: PpOrder): Verified {
+  const cap = order.purchase_units?.[0]?.payments?.captures?.[0];
+  return {
+    intentId: order.purchase_units?.[0]?.custom_id,
+    gatewayOrderId: order.id,
+    gatewayTxnId: cap?.id ?? order.id,
+    amount: cap ? ppMinor(cap.amount.value) : 0,
+    currency: cap?.amount.currency_code,
+    fee: cap?.seller_receivable_breakdown?.paypal_fee ? ppMinor(cap.seller_receivable_breakdown.paypal_fee.value) : undefined,
+    paid: cap?.status === "COMPLETED",
+    raw: order,
+  };
+}
+const paypal: Gateway = {
+  code: "paypal",
+  name: "PayPal (International)",
+  currencies: ["USD"],
+  async createPayment(intent, _payer, cfg, _pub, test, label) {
+    const token = await ppToken(cfg, test);
+    const order = await httpJson<{ id: string; links: { rel: string; href: string }[] }>(`${ppBase(test)}/v2/checkout/orders`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": `create-${intent.id}` },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [{ reference_id: intent.id, custom_id: intent.id, invoice_id: intent.id, description: label.slice(0, 127), amount: { currency_code: intent.currency, value: (intent.amount / 100).toFixed(2) } }],
+        payment_source: {
+          paypal: {
+            experience_context: {
+              brand_name: "Crapplet Cloud",
+              shipping_preference: "NO_SHIPPING",
+              user_action: "PAY_NOW",
+              return_url: `${config.appUrl}/client/invoices/${intent.invoiceId}?gateway=paypal`,
+              cancel_url: `${config.appUrl}/client/invoices/${intent.invoiceId}?cancelled=1`,
+            },
+          },
+        },
+      }),
+    });
+    const approve = order.links.find((l) => l.rel === "payer-action" || l.rel === "approve");
+    if (!approve) throw new HttpError(502, "PayPal did not return an approval link", "GATEWAY_ERROR");
+    return { gatewayOrderId: order.id, client: { type: "redirect", url: approve.href } };
+  },
+  /** The buyer returns with ?token=<orderId>; we capture server-side (idempotent via PayPal-Request-Id). */
+  async verifyReturn(body, cfg, test, intent) {
+    const orderId = String(body.token ?? body.session_id ?? "");
+    if (!orderId || orderId !== intent.gatewayOrderId) throw new HttpError(400, "Invalid PayPal order");
+    const token = await ppToken(cfg, test);
+    let order: PpOrder;
+    try {
+      order = await httpJson<PpOrder>(`${ppBase(test)}/v2/checkout/orders/${orderId}/capture`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": `capture-${intent.id}` },
+        body: "{}",
+      });
+    } catch {
+      // already captured (e.g. webhook won the race) or not approved yet → read the order instead
+      order = await httpJson<PpOrder>(`${ppBase(test)}/v2/checkout/orders/${orderId}`, { method: "GET", headers: { Authorization: `Bearer ${token}` } });
+    }
+    return ppVerified(order);
+  },
+  async parseWebhook(raw, headers, cfg, test) {
+    if (!cfg.webhookId) throw new HttpError(400, "PayPal webhook id not configured");
+    const evt = JSON.parse(raw.toString("utf8"));
+    const token = await ppToken(cfg, test);
+    const check = await httpJson<{ verification_status: string }>(`${ppBase(test)}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        auth_algo: h(headers, "paypal-auth-algo"),
+        cert_url: h(headers, "paypal-cert-url"),
+        transmission_id: h(headers, "paypal-transmission-id"),
+        transmission_sig: h(headers, "paypal-transmission-sig"),
+        transmission_time: h(headers, "paypal-transmission-time"),
+        webhook_id: cfg.webhookId,
+        webhook_event: evt,
+      }),
+    });
+    if (check.verification_status !== "SUCCESS") throw new HttpError(400, "Invalid PayPal webhook signature");
+    const payments: Verified[] = [];
+    if (evt.event_type === "PAYMENT.CAPTURE.COMPLETED") {
+      const c = evt.resource as PpCapture;
+      payments.push({
+        intentId: c.custom_id,
+        gatewayOrderId: c.supplementary_data?.related_ids?.order_id,
+        gatewayTxnId: c.id,
+        amount: ppMinor(c.amount.value),
+        currency: c.amount.currency_code,
+        fee: c.seller_receivable_breakdown?.paypal_fee ? ppMinor(c.seller_receivable_breakdown.paypal_fee.value) : undefined,
+        paid: c.status === "COMPLETED",
+        raw: c,
+      });
+    } else if (evt.event_type === "CHECKOUT.ORDER.APPROVED") {
+      // buyer approved but closed the tab before returning → capture now
+      const orderId = evt.resource?.id as string;
+      const order = await httpJson<PpOrder>(`${ppBase(test)}/v2/checkout/orders/${orderId}/capture`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": `capture-${evt.resource?.purchase_units?.[0]?.custom_id ?? orderId}` },
+        body: "{}",
+      }).catch(() => null);
+      if (order) payments.push(ppVerified(order));
+    }
+    return { eventId: String(evt.id), type: String(evt.event_type), payments };
+  },
+  async refund(txnId, amount, cfg, test) {
+    const token = await ppToken(cfg, test);
+    const cap = await httpJson<PpCapture>(`${ppBase(test)}/v2/payments/captures/${txnId}`, { method: "GET", headers: { Authorization: `Bearer ${token}` } });
+    const r = await httpJson<{ id: string }>(`${ppBase(test)}/v2/payments/captures/${txnId}/refund`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": `refund-${txnId}-${amount}` },
+      body: JSON.stringify({ amount: { value: (amount / 100).toFixed(2), currency_code: cap.amount.currency_code } }),
+    });
+    return { refundId: r.id };
   },
 };
 
@@ -300,6 +463,7 @@ const manual: Gateway = {
  */
 const custom: Gateway = {
   code: "custom",
+  currencies: ["INR", "USD"],
   name: "Custom payment gateway",
   async createPayment(intent, payer, cfg) {
     const params = new URLSearchParams({ intent: intent.id, amount: String(intent.amount), currency: intent.currency, email: payer.email, return: `${config.appUrl}/client/invoices/${intent.invoiceId}` });
@@ -314,7 +478,14 @@ const custom: Gateway = {
   },
 };
 
-export const GATEWAYS: Record<string, Gateway> = { razorpay, cashfree, payu, stripe, bank, upi, manual, custom };
+export const GATEWAYS: Record<string, Gateway> = { razorpay, cashfree, payu, stripe, paypal, bank, upi, wire, manual, custom };
+
+/** Currencies a configured gateway accepts: admin override (publicConfig.currencies) or the adapter default. */
+export function gatewayCurrencies(code: string, pub: unknown): string[] {
+  const o = (pub as { currencies?: unknown } | null)?.currencies;
+  if (Array.isArray(o) && o.length) return o.map((c) => String(c).toUpperCase());
+  return GATEWAYS[code]?.currencies ?? ["INR"];
+}
 
 /** Which secret fields each gateway needs (rendered in Admin → Payment Gateways). */
 export const GATEWAY_FIELDS: Record<string, { secret: string[]; public: string[] }> = {
@@ -322,6 +493,8 @@ export const GATEWAY_FIELDS: Record<string, { secret: string[]; public: string[]
   cashfree: { secret: ["appId", "secretKey"], public: [] },
   payu: { secret: ["key", "salt"], public: [] },
   stripe: { secret: ["secretKey", "webhookSecret"], public: [] },
+  paypal: { secret: ["clientId", "clientSecret", "webhookId"], public: [] },
+  wire: { secret: [], public: ["instructions"] },
   bank: { secret: [], public: ["instructions"] },
   upi: { secret: [], public: ["vpa", "payeeName"] },
   manual: { secret: [], public: ["instructions"] },

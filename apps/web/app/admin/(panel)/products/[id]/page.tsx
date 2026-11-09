@@ -7,6 +7,17 @@ import { Alert, Button, Card, Field, Input, Loading, PageHeader, Select, Textare
 const TYPES = ["SHARED", "RESELLER_HOSTING", "WORDPRESS", "VPS_LINUX", "VPS_WINDOWS", "VPS_FOREX", "TALLY", "VPS_N8N", "VPS_MINECRAFT", "VPS_GOLD", "DEDICATED", "GPU", "COLOCATION", "CUSTOM"];
 const CYC = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "BIENNIAL", "TRIENNIAL", "ONETIME"];
 
+/** Mirrors the API's conversion (lib/currency.ts) so the editor can preview auto-converted prices. */
+function makeConverter(rate: number | undefined, cfg: { autoConvert?: boolean; markupPct?: number; rounding?: string } | undefined) {
+  return (inrMajor: number | string | undefined | null): number | null => {
+    if (!rate || !cfg?.autoConvert || inrMajor === "" || inrMajor === null || inrMajor === undefined) return null;
+    const minor = Number(inrMajor) * 100 * rate * (1 + (cfg.markupPct || 0) / 100);
+    if (minor <= 0) return 0;
+    const r = cfg.rounding === "whole" ? Math.ceil(minor / 100) * 100 : cfg.rounding === "nice99" ? Math.max(99, Math.ceil(minor / 100) * 100 - 1) : Math.round(minor);
+    return r / 100;
+  };
+}
+
 export default function ProductEditor() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === "new";
@@ -16,17 +27,21 @@ export default function ProductEditor() {
   const servers = useApi("/admin/servers");
   const os = useApi("/admin/os-templates");
   const addons = useApi("/admin/addons");
+  const currencies = useApi("/admin/currencies");
+  const settings = useApi("/admin/settings");
+  const [cur, setCur] = useState<"INR" | "USD">("INR");
   const [p, setP] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
+    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, pricingUsd: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
     else if (prod.data) {
       const x = prod.data.product;
       setP({
         ...x,
         features: x.features.join("\n"),
-        pricing: Object.fromEntries(x.pricing.map((r: any) => [r.cycle, { price: r.price / 100, setupFee: r.setupFee / 100, enabled: r.enabled }])),
+        pricing: Object.fromEntries(x.pricing.filter((r: any) => r.currency === "INR").map((r: any) => [r.cycle, { price: r.price / 100, setupFee: r.setupFee / 100, enabled: r.enabled }])),
+        pricingUsd: Object.fromEntries(x.pricing.filter((r: any) => r.currency === "USD").map((r: any) => [r.cycle, { price: r.price / 100, setupFee: r.setupFee / 100, enabled: r.enabled }])),
         wholesale: Object.fromEntries(x.wholesalePricing.map((r: any) => [r.cycle, r.price / 100])),
         serverIds: x.servers.map((s: any) => s.serverId),
         osTemplateIds: x.osTemplates.map((o: any) => o.osTemplateId),
@@ -38,6 +53,11 @@ export default function ProductEditor() {
 
   if (!p) return <Loading />;
   const set = (patch: any) => setP({ ...p, ...patch });
+  const usdRate: number | undefined = currencies.data?.items?.find((c: any) => c.code === "USD")?.rate;
+  const curCfg = settings.data?.settings?.currency;
+  const toUsd = makeConverter(usdRate, curCfg);
+  const fillUsd = () =>
+    set({ pricingUsd: Object.fromEntries(CYC.filter((c) => p.pricing[c]?.price !== undefined && p.pricing[c]?.price !== "").map((c) => [c, { price: toUsd(p.pricing[c].price) ?? "", setupFee: toUsd(p.pricing[c].setupFee || 0) ?? 0 }])) });
   const mc = (mod: string, k: string, v: any) => set({ moduleConfig: { ...p.moduleConfig, [mod]: { ...p.moduleConfig[mod], [k]: v } } });
   const toggleIn = (key: string, v: string) => set({ [key]: p[key].includes(v) ? p[key].filter((x: string) => x !== v) : [...p[key], v] });
   const num = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
@@ -51,7 +71,11 @@ export default function ProductEditor() {
       ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname, hsnSac: p.hsnSac, taxable: p.taxable,
       stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
       resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId) } },
-      pricing: Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
+      pricing: [
+        ...Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
+        // USD rows only where staff typed a price; blank cycles fall back to auto-conversion
+        ...Object.entries(p.pricingUsd ?? {}).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined && v.price !== null).map(([cycle, v]: any) => ({ cycle, currency: "USD", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
+      ],
       wholesale: Object.entries(p.wholesale).filter(([, v]) => v !== "" && v !== undefined).map(([cycle, v]) => ({ cycle, price: Math.round(Number(v) * 100) })),
       serverIds: p.serverIds, osTemplateIds: p.osTemplateIds, addonIds: p.addonIds,
       configOptions: p.configOptions,
@@ -98,18 +122,57 @@ export default function ProductEditor() {
             </div>
           </div>
         </Card>
-        <Card title="Pricing (₹, excl. GST)">
-          <div className="space-y-2">
-            <div className="grid grid-cols-[120px_1fr_1fr_1fr] gap-2 text-xs font-bold uppercase text-mute"><span>Cycle</span><span>Price</span><span>Setup fee</span><span>Wholesale</span></div>
-            {CYC.map((c) => (
-              <div key={c} className="grid grid-cols-[120px_1fr_1fr_1fr] items-center gap-2">
-                <span className="text-sm font-semibold">{CYCLES[c]}</span>
-                <Input className="h-10" type="number" step="0.01" placeholder="off" value={p.pricing[c]?.price ?? ""} onChange={(e) => set({ pricing: { ...p.pricing, [c]: { ...p.pricing[c], price: e.target.value } } })} />
-                <Input className="h-10" type="number" step="0.01" value={p.pricing[c]?.setupFee ?? ""} onChange={(e) => set({ pricing: { ...p.pricing, [c]: { ...p.pricing[c], setupFee: e.target.value } } })} />
-                <Input className="h-10" type="number" step="0.01" disabled={!p.resellerEnabled} value={p.wholesale[c] ?? ""} onChange={(e) => set({ wholesale: { ...p.wholesale, [c]: e.target.value } })} />
+        <Card
+          title={cur === "INR" ? "Pricing (₹, excl. GST)" : "Pricing (US$, international)"}
+          action={
+            <div className="inline-flex rounded-full bg-slate-100 p-1" role="group" aria-label="Currency">
+              {(["INR", "USD"] as const).map((k) => (
+                <button key={k} type="button" onClick={() => setCur(k)} className={cx("rounded-full px-3 py-1 text-xs font-extrabold", cur === k ? "bg-white text-primary-dark shadow" : "text-slate-500")}>
+                  {k === "INR" ? "₹ INR" : "$ USD"}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {cur === "INR" ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-[120px_1fr_1fr_1fr] gap-2 text-xs font-bold uppercase text-mute"><span>Cycle</span><span>Price</span><span>Setup fee</span><span>Wholesale</span></div>
+              {CYC.map((c) => (
+                <div key={c} className="grid grid-cols-[120px_1fr_1fr_1fr] items-center gap-2">
+                  <span className="text-sm font-semibold">{CYCLES[c]}</span>
+                  <Input className="h-10" type="number" step="0.01" placeholder="off" value={p.pricing[c]?.price ?? ""} onChange={(e) => set({ pricing: { ...p.pricing, [c]: { ...p.pricing[c], price: e.target.value } } })} />
+                  <Input className="h-10" type="number" step="0.01" value={p.pricing[c]?.setupFee ?? ""} onChange={(e) => set({ pricing: { ...p.pricing, [c]: { ...p.pricing[c], setupFee: e.target.value } } })} />
+                  <Input className="h-10" type="number" step="0.01" disabled={!p.resellerEnabled} value={p.wholesale[c] ?? ""} onChange={(e) => set({ wholesale: { ...p.wholesale, [c]: e.target.value } })} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Alert className="mb-3">
+                {curCfg?.autoConvert
+                  ? <>Leave a cycle blank to auto-convert from INR at 1 USD = ₹{usdRate ? (1 / usdRate).toFixed(2) : "?"}{curCfg?.markupPct ? ` + ${curCfg.markupPct}% markup` : ""} (grey placeholder). Type a price to fix it.</>
+                  : <>Auto-conversion is off — only cycles with a USD price can be ordered in USD.</>}
+                {" "}Rates &amp; rounding: Settings → Currencies.
+              </Alert>
+              <div className="grid grid-cols-[120px_1fr_1fr] gap-2 text-xs font-bold uppercase text-mute"><span>Cycle</span><span>Price</span><span>Setup fee</span></div>
+              {CYC.map((c) => {
+                const inrOn = p.pricing[c]?.price !== undefined && p.pricing[c]?.price !== "";
+                const auto = inrOn ? toUsd(p.pricing[c].price) : null;
+                const autoSetup = inrOn ? toUsd(p.pricing[c].setupFee || 0) : null;
+                return (
+                  <div key={c} className="grid grid-cols-[120px_1fr_1fr] items-center gap-2">
+                    <span className="text-sm font-semibold">{CYCLES[c]}</span>
+                    <Input className="h-10" type="number" step="0.01" placeholder={auto !== null ? `auto ${auto.toFixed(2)}` : "off"} value={p.pricingUsd?.[c]?.price ?? ""} onChange={(e) => set({ pricingUsd: { ...p.pricingUsd, [c]: { ...p.pricingUsd?.[c], price: e.target.value } } })} />
+                    <Input className="h-10" type="number" step="0.01" placeholder={autoSetup !== null ? `auto ${autoSetup.toFixed(2)}` : ""} value={p.pricingUsd?.[c]?.setupFee ?? ""} onChange={(e) => set({ pricingUsd: { ...p.pricingUsd, [c]: { ...p.pricingUsd?.[c], setupFee: e.target.value } } })} />
+                  </div>
+                );
+              })}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button size="sm" variant="outline" icon="currency_exchange" onClick={fillUsd} disabled={!usdRate}>Fill from INR</Button>
+                <Button size="sm" variant="ghost" icon="backspace" onClick={() => set({ pricingUsd: {} })}>Clear (use auto)</Button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="SAC code"><Input value={p.hsnSac} onChange={(e) => set({ hsnSac: e.target.value })} /></Field>
             <div className="flex items-end pb-2"><Toggle checked={p.taxable} onChange={(v) => set({ taxable: v })} label="Charge GST" /></div>
@@ -167,13 +230,30 @@ export default function ProductEditor() {
         <Card title="Configurable options" className="xl:col-span-2">
           <p className="mb-3 text-sm text-mute">Monthly prices are multiplied by the billing cycle. Keys <code>extra_ipv4</code> and <code>extra_ram_gb</code> are applied automatically by the Proxmox module.</p>
           {p.configOptions.map((o: any, i: number) => (
-            <div key={i} className="mb-2 grid items-center gap-2 rounded-xl border border-line p-3 md:grid-cols-[150px_1fr_130px_90px_90px_120px_auto]">
+            <div key={i} className="mb-2 grid items-center gap-2 rounded-xl border border-line p-3 md:grid-cols-[140px_1fr_120px_80px_80px_110px_120px_auto]">
               <Input className="h-9" placeholder="key" value={o.key} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, key: e.target.value } : x)) })} />
               <Input className="h-9" placeholder="Label" value={o.label} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, label: e.target.value } : x)) })} />
               <Select className="h-9" value={o.type} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, type: e.target.value } : x)) })}><option value="QUANTITY">Quantity</option><option value="YESNO">Yes / No</option><option value="SELECT">Dropdown</option></Select>
               <Input className="h-9" type="number" placeholder="min" value={o.minQty} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, minQty: Number(e.target.value) } : x)) })} />
               <Input className="h-9" type="number" placeholder="max" value={o.maxQty} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, maxQty: Number(e.target.value) } : x)) })} />
-              <Input className="h-9" type="number" placeholder="₹/unit/mo" value={o.unitMonthly / 100} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, unitMonthly: Math.round(Number(e.target.value) * 100) } : x)) })} />
+              <Input className="h-9" type="number" placeholder="₹/unit/mo" title="₹ per unit per month" value={o.unitMonthly / 100} onChange={(e) => set({ configOptions: p.configOptions.map((x: any, j: number) => (j === i ? { ...x, unitMonthly: Math.round(Number(e.target.value) * 100) } : x)) })} />
+              <Input
+                className="h-9"
+                type="number"
+                step="0.01"
+                title="US$ per unit per month (blank = auto-convert)"
+                placeholder={(() => { const a = toUsd(o.unitMonthly / 100); return a !== null ? `$ auto ${a.toFixed(2)}` : "$/unit/mo"; })()}
+                value={o.unitPrices?.USD !== undefined ? o.unitPrices.USD / 100 : ""}
+                onChange={(e) =>
+                  set({
+                    configOptions: p.configOptions.map((x: any, j: number) => {
+                      if (j !== i) return x;
+                      const { USD: _drop, ...rest } = x.unitPrices ?? {};
+                      return { ...x, unitPrices: e.target.value === "" ? rest : { ...rest, USD: Math.round(Number(e.target.value) * 100) } };
+                    }),
+                  })
+                }
+              />
               <button className="text-sm font-bold text-rose-600" onClick={() => set({ configOptions: p.configOptions.filter((_: any, j: number) => j !== i) })}>Remove</button>
             </div>
           ))}

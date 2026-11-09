@@ -7,10 +7,12 @@ import { useSession } from "@/lib/session";
 import { readCart, toApiCart, writeCart, type Cart } from "@/lib/cart";
 import { Alert, Button, Card, Empty, Icon, Input, Loading, toast } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
+import { CurrencySwitch, readCurrency, useCurrency } from "@/lib/currency";
 
 export default function CartPage() {
   const router = useRouter();
   const { me, loading: sessionLoading } = useSession();
+  const { currency, locked } = useCurrency();
   const [cart, setCart] = useState<Cart | null>(null);
   const [quote, setQuote] = useState<any>(null);
   const [qErr, setQErr] = useState<string | null>(null);
@@ -29,12 +31,15 @@ export default function CartPage() {
 
   useEffect(() => {
     if (!cart || (!cart.items.length && !cart.domains.length)) return setQuote(null);
-    api("/catalog/cart/quote", { body: toApiCart(cart) })
+    api("/catalog/cart/quote", { body: toApiCart(cart, currency) })
       .then((q) => { setQuote(q); setQErr(null); })
       .catch((e) => { setQErr(e.message); if (cart.promoCode && /promo/i.test(e.message)) { const c = { ...cart, promoCode: undefined }; writeCart(c); setCart(c); } });
-  }, [cart, me?.id]);
+  }, [cart, me?.id, currency]);
 
   if (!cart) return <Loading />;
+  // the server decides: signed-in clients always pay in their account currency
+  const qc: string = quote?.currency ?? currency;
+  const cm = (v: number) => money(v, qc);
   const update = (c: Cart) => { writeCart(c); setCart(c); };
   const empty = !cart.items.length && !cart.domains.length;
   const expired = cart.items.some((i) => i.ipExpiresAt && new Date(i.ipExpiresAt) < new Date());
@@ -43,7 +48,7 @@ export default function CartPage() {
     if (!me || me.type !== "CLIENT") return router.push(`/client/login?next=/order/cart`);
     setBusy(true);
     try {
-      const r = await api("/catalog/cart/checkout", { body: { ...toApiCart(cart!), acceptTos: tos, useCredit: true } });
+      const r = await api("/catalog/cart/checkout", { body: { ...toApiCart(cart!, currency), acceptTos: tos, useCredit: true } });
       writeCart({ items: [], domains: [] });
       router.push(r.paid ? `/client/services?ordered=1` : `/client/invoices/${r.invoiceId}`);
     } catch (e: any) {
@@ -55,7 +60,13 @@ export default function CartPage() {
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-10 sm:px-6">
       <OrderSteps step={3} />
-      <h1 className="mb-6 text-3xl font-extrabold tracking-tight text-ink">Review your order</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink">Review your order</h1>
+        <CurrencySwitch />
+      </div>
+      {locked && readCurrency() !== qc && (
+        <Alert className="mb-5">Your account is billed in <b>{qc}</b>, so this order is priced in {qc}.</Alert>
+      )}
       {empty ? (
         <Card><Empty icon="shopping_cart" title="Your cart is empty"><Button href="/order" className="mt-4">Browse plans</Button></Empty></Card>
       ) : (
@@ -103,20 +114,21 @@ export default function CartPage() {
               {!quote ? <Loading /> : (
                 <dl className="space-y-2 text-sm">
                   {quote.lines.map((l: any, idx: number) => (
-                    <div key={idx} className="flex justify-between gap-3"><dt className="text-mute">{l.description.split("\n")[0]}</dt><dd className={l.amount < 0 ? "font-semibold text-emerald-600" : "font-semibold"}>{l.amount < 0 ? "−" : ""}{money(Math.abs(l.amount))}</dd></div>
+                    <div key={idx} className="flex justify-between gap-3"><dt className="text-mute">{l.description.split("\n")[0]}</dt><dd className={l.amount < 0 ? "font-semibold text-emerald-600" : "font-semibold"}>{l.amount < 0 ? "−" : ""}{cm(Math.abs(l.amount))}</dd></div>
                   ))}
-                  {quote.totals.cgst > 0 && <div className="flex justify-between"><dt className="text-mute">CGST 9%</dt><dd className="font-semibold">{money(quote.totals.cgst)}</dd></div>}
-                  {quote.totals.sgst > 0 && <div className="flex justify-between"><dt className="text-mute">SGST 9%</dt><dd className="font-semibold">{money(quote.totals.sgst)}</dd></div>}
-                  {quote.totals.igst > 0 && <div className="flex justify-between"><dt className="text-mute">IGST 18%</dt><dd className="font-semibold">{money(quote.totals.igst)}</dd></div>}
-                  <div className="flex justify-between border-t border-line pt-3 text-lg"><dt className="font-extrabold text-ink">Total</dt><dd className="font-extrabold text-ink">{money(quote.totals.total)}</dd></div>
-                  {!me && <p className="text-xs text-mute">GST shown for Madhya Pradesh; it is recalculated for your billing state after sign-in.</p>}
+                  {quote.totals.cgst > 0 && <div className="flex justify-between"><dt className="text-mute">CGST 9%</dt><dd className="font-semibold">{cm(quote.totals.cgst)}</dd></div>}
+                  {quote.totals.sgst > 0 && <div className="flex justify-between"><dt className="text-mute">SGST 9%</dt><dd className="font-semibold">{cm(quote.totals.sgst)}</dd></div>}
+                  {quote.totals.igst > 0 && <div className="flex justify-between"><dt className="text-mute">IGST 18%</dt><dd className="font-semibold">{cm(quote.totals.igst)}</dd></div>}
+                  <div className="flex justify-between border-t border-line pt-3 text-lg"><dt className="font-extrabold text-ink">Total</dt><dd className="font-extrabold text-ink">{cm(quote.totals.total)}</dd></div>
+                  {!me && qc === "INR" && <p className="text-xs text-mute">GST shown for Madhya Pradesh; it is recalculated for your billing state after sign-in.</p>}
+                  {qc !== "INR" && !quote.totals.taxTotal && <p className="text-xs text-mute">No Indian GST — export of services to customers outside India.</p>}
                 </dl>
               )}
               <form className="mt-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); update({ ...cart, promoCode: promo.trim().toUpperCase() || undefined }); }}>
                 <Input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Promo code" className="h-10" />
                 <Button size="sm" variant="secondary" type="submit" className="h-10">Apply</Button>
               </form>
-              {quote?.promo && <p className="mt-2 text-xs font-bold text-emerald-600">{quote.promo.code} applied — you save {money(quote.promo.discount)}</p>}
+              {quote?.promo && <p className="mt-2 text-xs font-bold text-emerald-600">{quote.promo.code} applied — you save {cm(quote.promo.discount)}</p>}
             </Card>
             {!sessionLoading && (!me || me.type !== "CLIENT") ? (
               <Card>

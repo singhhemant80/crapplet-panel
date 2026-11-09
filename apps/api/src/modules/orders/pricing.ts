@@ -4,6 +4,9 @@ import { badRequest } from "../../lib/http";
 import { CYCLE_LABEL, CYCLE_MONTHS } from "../../lib/money";
 import { getSettings } from "../../lib/settings";
 import { computeGst } from "../billing/gst";
+import { BASE_CURRENCY, jsonPrice, priceResolver } from "../../lib/currency";
+
+type Resolver = Awaited<ReturnType<typeof priceResolver>>;
 
 export const cartItemSchema = z.object({
   productId: z.string(),
@@ -68,24 +71,26 @@ export async function loadProductForCart(db: Db, productId: string) {
 }
 
 /** Monthly price of selected configurable options. */
-function configMonthly(p: Awaited<ReturnType<typeof loadProductForCart>>, cfg: Record<string, unknown>) {
+function configMonthly(p: Awaited<ReturnType<typeof loadProductForCart>>, cfg: Record<string, unknown>, r: Resolver) {
+  const code = r.currency.code;
   let monthly = 0;
   const desc: string[] = [];
   for (const opt of p.configOptions) {
     const v = cfg[opt.key];
     if (v === undefined || v === null || v === "") continue;
     if (opt.type === "SELECT") {
-      const choice = (opt.choices as { value: string; label: string; monthly: number }[]).find((c) => c.value === String(v));
+      const choice = (opt.choices as { value: string; label: string; monthly: number; prices?: Record<string, number> }[]).find((c) => c.value === String(v));
       if (!choice) throw badRequest(`Invalid choice for ${opt.label}`);
-      monthly += choice.monthly;
-      if (choice.monthly) desc.push(`${opt.label}: ${choice.label}`);
+      const m = r.must(choice.monthly, jsonPrice(choice.prices, code), `${opt.label}: ${choice.label}`);
+      monthly += m;
+      if (m) desc.push(`${opt.label}: ${choice.label}`);
     } else if (opt.type === "QUANTITY") {
       const q = Number(v);
       if (!Number.isInteger(q) || q < opt.minQty || q > opt.maxQty) throw badRequest(`${opt.label} must be between ${opt.minQty} and ${opt.maxQty}`);
-      monthly += q * opt.unitMonthly;
+      monthly += q * r.must(opt.unitMonthly, jsonPrice(opt.unitPrices, code), opt.label);
       if (q) desc.push(`${opt.label}: ${q}`);
     } else if (opt.type === "YESNO" && (v === true || v === "1" || v === "true" || v === 1)) {
-      monthly += opt.unitMonthly;
+      monthly += r.must(opt.unitMonthly, jsonPrice(opt.unitPrices, code), opt.label);
       desc.push(opt.label);
     }
   }
@@ -98,19 +103,33 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
   const lines: PricedLine[] = [];
   const products: Awaited<ReturnType<typeof loadProductForCart>>[] = [];
 
+  // A signed-in customer always pays in their account currency; guests choose on the order page.
+  let currencyCode = (cart.currency || BASE_CURRENCY).toUpperCase();
+  let profile: { country: string; stateCode: string | null; gstin: string | null; currency: string } | null = null;
+  if (opts.userId) {
+    profile = await db.clientProfile.findUnique({ where: { userId: opts.userId }, select: { country: true, stateCode: true, gstin: true, currency: true } });
+    if (profile?.currency) currencyCode = profile.currency;
+  }
+  const r = await priceResolver(currencyCode, db);
+  const code = r.currency.code;
+  if (opts.wholesale && code !== BASE_CURRENCY) throw badRequest("Reseller orders are billed in INR");
+
   for (const [idx, item] of cart.items.entries()) {
     const p = await loadProductForCart(db, item.productId);
     products.push(p);
-    let price = p.pricing.find((x) => x.cycle === item.cycle && x.currency === cart.currency && x.enabled);
-    if (!price) throw badRequest(`${p.name} is not available for ${CYCLE_LABEL[item.cycle]} billing`);
+    const base = p.pricing.find((x) => x.cycle === item.cycle && x.currency === BASE_CURRENCY && x.enabled);
+    const own = code === BASE_CURRENCY ? undefined : p.pricing.find((x) => x.cycle === item.cycle && x.currency === code);
+    const amount = own && !own.enabled ? null : r.price(base?.price, own?.price);
+    if (amount === null) throw badRequest(`${p.name} is not available for ${CYCLE_LABEL[item.cycle]} billing${code !== BASE_CURRENCY ? ` in ${code}` : ""}`);
+    let price = { price: amount, setupFee: r.price(base?.setupFee ?? 0, own?.setupFee) ?? 0 };
     if (opts.wholesale) {
       if (!p.resellerEnabled) throw badRequest(`${p.name} is not available to resellers`);
       const ws = await db.wholesalePrice.findUnique({ where: { productId_cycle: { productId: p.id, cycle: item.cycle } } });
-      const base = ws?.price ?? price.price;
-      price = { ...price, price: Math.round((base * (100 - opts.wholesale.discountPct)) / 100), setupFee: 0 };
+      const wsBase = ws?.price ?? price.price;
+      price = { ...price, price: Math.round((wsBase * (100 - opts.wholesale.discountPct)) / 100), setupFee: 0 };
     }
     const months = Math.max(1, CYCLE_MONTHS[item.cycle]);
-    const cfg = configMonthly(p, item.config);
+    const cfg = configMonthly(p, item.config, r);
     const recurring = (price.price + cfg.monthly * months) * item.quantity;
     lines.push({
       kind: "product",
@@ -127,8 +146,9 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
     for (const addonId of item.addonIds) {
       const a = p.addons.find((x) => x.addonId === addonId)?.addon;
       if (!a || !a.enabled) throw badRequest("Invalid add-on selected");
-      const amt = a.monthly * months * item.quantity;
-      lines.push({ kind: "addon", description: `${a.name} (add-on for ${p.name})`, addonId: a.id, itemIndex: idx, amount: amt + a.setupFee, recurring: amt, taxable: a.taxable, cycle: item.cycle });
+      const amt = r.must(a.monthly, jsonPrice(a.prices, code, "monthly"), a.name) * months * item.quantity;
+      const setup = r.price(a.setupFee, jsonPrice(a.prices, code, "setupFee")) ?? 0;
+      lines.push({ kind: "addon", description: `${a.name} (add-on for ${p.name})`, addonId: a.id, itemIndex: idx, amount: amt + setup, recurring: amt, taxable: a.taxable, cycle: item.cycle });
     }
     if (item.osTemplateId && !p.osTemplates.some((o) => o.osTemplateId === item.osTemplateId)) throw badRequest(`Selected OS is not available for ${p.name}`);
   }
@@ -137,8 +157,9 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
     const tld = "." + d.name.split(".").slice(1).join(".");
     const pr = await db.domainPricing.findUnique({ where: { tld } });
     if (!pr || !pr.enabled) throw badRequest(`We don't sell ${tld} domains yet`);
-    const unit = d.action === "register" ? pr.register : pr.transfer;
-    lines.push({ kind: "domain", description: `Domain ${d.action === "register" ? "registration" : "transfer"} — ${d.name} (${d.years} yr)`, domainIndex: idx, amount: unit * d.years, recurring: pr.renew, taxable: true, hsnSac: settings.tax.domainSac });
+    const unit = r.must(d.action === "register" ? pr.register : pr.transfer, jsonPrice(pr.prices, code, d.action), `${tld} domains`);
+    const renew = r.must(pr.renew, jsonPrice(pr.prices, code, "renew"), `${tld} renewals`);
+    lines.push({ kind: "domain", description: `Domain ${d.action === "register" ? "registration" : "transfer"} — ${d.name} (${d.years} yr)`, domainIndex: idx, amount: unit * d.years, recurring: renew, taxable: true, hsnSac: settings.tax.domainSac });
   }
 
   // promo code
@@ -153,26 +174,25 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
       if (prior) throw badRequest("This promo code is only for new customers");
     }
     let discount = 0;
+    const fixed = pc.type === "FIXED" ? r.must(pc.value, jsonPrice(pc.fixedAmounts, code), `Promo code ${pc.code}`) : 0;
     for (const l of lines) {
       if (l.kind !== "product" || !l.productId) continue;
       if (pc.productIds.length && !pc.productIds.includes(l.productId)) continue;
       if (pc.cycles.length && l.cycle && !pc.cycles.includes(l.cycle)) continue;
-      discount += pc.type === "PERCENT" ? Math.round((l.amount * pc.value) / 100) : Math.min(pc.value, l.amount);
-      if (pc.recurring && l.recurring) l.recurring -= pc.type === "PERCENT" ? Math.round((l.recurring * pc.value) / 100) : Math.min(pc.value, l.recurring);
+      discount += pc.type === "PERCENT" ? Math.round((l.amount * pc.value) / 100) : Math.min(fixed, l.amount);
+      if (pc.recurring && l.recurring) l.recurring -= pc.type === "PERCENT" ? Math.round((l.recurring * pc.value) / 100) : Math.min(fixed, l.recurring);
     }
     if (!discount) throw badRequest("This promo code doesn't apply to the items in your cart");
     promo = { code: pc.code, discount, recurring: pc.recurring };
     lines.push({ kind: "promo", description: `Promo code ${pc.code}`, amount: -discount, recurring: 0, taxable: true });
   }
 
-  let customer = { country: "IN", stateCode: null as string | null, gstin: null as string | null };
-  if (opts.userId) {
-    const prof = await db.clientProfile.findUnique({ where: { userId: opts.userId } });
-    if (prof) customer = { country: prof.country, stateCode: prof.stateCode, gstin: prof.gstin };
-  }
+  // guests paying in a foreign currency are treated as overseas until they sign in (GST is recomputed at checkout)
+  let customer = { country: code === BASE_CURRENCY ? "IN" : "US", stateCode: null as string | null, gstin: null as string | null };
+  if (profile) customer = { country: profile.country, stateCode: profile.stateCode, gstin: profile.gstin };
   const tax = computeGst(
     lines.map((l) => ({ amount: l.amount, taxable: l.taxable })),
     { enabled: settings.tax.enabled, rate: settings.tax.gstRate, inclusive: settings.tax.pricesIncludeTax, companyStateCode: settings.company.stateCode, applyToForeign: settings.tax.applyToForeign, customer },
   );
-  return { lines, products, promo, tax, currency: cart.currency };
+  return { lines, products, promo, tax, currency: code, exchangeRate: r.exchangeRate };
 }

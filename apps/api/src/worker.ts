@@ -9,6 +9,8 @@ import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
 import { runBillingCycle } from "./jobs/billing";
 import { checkAllServers } from "./jobs/health";
+import { refreshExchangeRates } from "./lib/currency";
+import { getSettings } from "./lib/settings";
 import { prisma } from "./db";
 import { executeMigrationRun } from "./modules/migration/service";
 
@@ -42,6 +44,10 @@ const maintenance = new Worker(
         return checkAllServers();
       case "daily-billing":
         return runBillingCycle();
+      case "fx-rates": {
+        if (!(await getSettings()).currency.autoUpdateRates) return { skipped: "auto-update off" };
+        return refreshExchangeRates();
+      }
     }
   },
   { connection, concurrency: 1 },
@@ -57,6 +63,8 @@ async function schedule() {
   await q.upsertJobScheduler("expire-ip-reservations", { every: 60_000 }, { name: "expire-ip-reservations" });
   await q.upsertJobScheduler("server-health", { every: 5 * 60_000 }, { name: "server-health" });
   await q.upsertJobScheduler("daily-billing", { pattern: "0 9 * * *", tz: "Asia/Kolkata" }, { name: "daily-billing" });
+  // before billing runs, so renewal invoices use today's rate
+  await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), billing (09:00 IST)");
 }
 

@@ -23,8 +23,8 @@ export default function Transactions() {
                   <Td className="font-semibold uppercase">{t.gateway}</Td>
                   <Td className="max-w-[200px] truncate font-mono text-xs">{t.gatewayTxnId}</Td>
                   <Td className="text-xs">{t.type}</Td>
-                  <Td className={t.type === "REFUND" ? "font-bold text-rose-600" : "font-bold"}>{money(t.amount)}</Td>
-                  <Td className="text-xs text-mute">{money(t.fee)}</Td>
+                  <Td className={t.type === "REFUND" ? "font-bold text-rose-600" : "font-bold"}>{money(t.amount, t.currency)}</Td>
+                  <Td className="text-xs text-mute">{money(t.fee, t.currency)}</Td>
                   <Td>{t.invoice && <Link className="text-xs font-bold text-primary-dark" href={`/admin/invoices/${t.invoice.id}`}>{invNo(t.invoice)}</Link>}</Td>
                   <Td>{t.type === "PAYMENT" && <button className="text-xs font-bold text-rose-600" onClick={() => setRefund({ ...t, amountStr: String(t.amount / 100), reason: "", toCredit: true })}>Refund</button>}</Td>
                 </tr>
