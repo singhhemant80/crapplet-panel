@@ -3,6 +3,7 @@
  * Docs: https://www.virtualizor.com/docs/admin-api/
  * Auth: adminapikey + adminapipass, JSON responses (api=json).
  */
+import { createHash, randomBytes } from "node:crypto";
 import { Agent, request } from "undici";
 import { explainNetError } from "../../lib/net-errors";
 
@@ -28,7 +29,11 @@ export class VirtualizorClient {
 
   private url(act: string, query: Record<string, string | number | undefined> = {}) {
     const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const q = new URLSearchParams({ act, api: "json", adminapikey: this.creds.apiKey.trim(), adminapipass: this.creds.apiPass.trim() });
+    // same auth as Virtualizor's own admin SDK: key + pass, plus apikey = rand8 + md5(pass + rand8)
+    const pass = this.creds.apiPass.trim();
+    const rand = randomBytes(6).toString("base64url").replace(/[^a-zA-Z0-9]/g, "x").slice(0, 8).toLowerCase();
+    const apikey = rand + createHash("md5").update(pass + rand).digest("hex");
+    const q = new URLSearchParams({ act, api: "json", adminapikey: this.creds.apiKey.trim(), adminapipass: pass, apikey });
     for (const [k, v] of Object.entries(query)) if (v !== undefined) q.set(k, String(v));
     return `https://${host}:${this.creds.port}/index.php?${q.toString()}`;
   }
