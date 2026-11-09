@@ -4,6 +4,7 @@
  * Auth: adminapikey + adminapipass, JSON responses (api=json).
  */
 import { Agent, request } from "undici";
+import { explainNetError } from "../../lib/net-errors";
 
 export interface VirtualizorCreds {
   host: string;
@@ -22,7 +23,7 @@ export class VirtualizorError extends Error {
 export class VirtualizorClient {
   private agent: Agent;
   constructor(private creds: VirtualizorCreds) {
-    this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls }, headersTimeout: 120_000, bodyTimeout: 300_000 });
+    this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: 120_000, bodyTimeout: 300_000 });
   }
 
   private url(act: string, query: Record<string, string | number | undefined> = {}) {
@@ -43,18 +44,24 @@ export class VirtualizorClient {
       }
       body = form.toString();
     }
+    const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const res = await request(this.url(act, query), {
       method: post ? "POST" : "GET",
       dispatcher: this.agent,
       headers: post ? { "Content-Type": "application/x-www-form-urlencoded" } : undefined,
       body,
+    }).catch((e) => {
+      throw explainNetError(e, host, this.creds.port, "Virtualizor");
     });
     const text = await res.body.text();
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(text);
     } catch {
-      throw new VirtualizorError(`Virtualizor ${act}: invalid response (HTTP ${res.statusCode})`, text.slice(0, 300));
+      throw new VirtualizorError(
+        `Virtualizor ${act}: the panel answered (HTTP ${res.statusCode}) but not with API data. Check the Admin API key and password, and that this panel's IP is allowed under Virtualizor Admin → Configuration → API Credentials. Use the master's admin port (4085, https).`,
+        text.slice(0, 300),
+      );
     }
     if (json.error && (Array.isArray(json.error) ? json.error.length : Object.keys(json.error as object).length)) {
       throw new VirtualizorError(`Virtualizor ${act}: ${JSON.stringify(json.error)}`, json);

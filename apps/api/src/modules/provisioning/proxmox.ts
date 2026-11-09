@@ -3,6 +3,7 @@
  * Docs: https://pve.proxmox.com/pve-docs/api-viewer/
  */
 import { Agent, request } from "undici";
+import { explainNetError } from "../../lib/net-errors";
 
 export interface ProxmoxCreds {
   host: string;
@@ -35,7 +36,7 @@ export class ProxmoxClient {
   private base: string;
 
   constructor(private creds: ProxmoxCreds) {
-    this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls }, headersTimeout: 60_000, bodyTimeout: 120_000 });
+    this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: 60_000, bodyTimeout: 120_000 });
     const scheme = creds.host.startsWith("http://") ? "" : "https://";
     this.base = `${scheme}${creds.host.replace(/\/$/, "")}:${creds.port}/api2/json`;
     if (creds.host.startsWith("http")) this.base = `${creds.host.replace(/\/$/, "")}/api2/json`;
@@ -58,6 +59,8 @@ export class ProxmoxClient {
         ...(body !== undefined ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
       },
       body,
+    }).catch((e) => {
+      throw explainNetError(e, this.creds.host.replace(/^https?:\/\//, "").replace(/[:/].*$/, ""), this.creds.port, "Proxmox");
     });
     const text = await res.body.text();
     let json: { data?: T; errors?: unknown; message?: string } = {};
