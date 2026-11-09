@@ -20,7 +20,7 @@ export default function Payments() {
             <Table head={["Date", "Method", "Reference", "Type", "Amount", "Invoice"]}>
               {data.transactions.map((t: any) => (
                 <tr key={t.id}>
-                  <Td className="text-mute">{date(t.createdAt, true)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(t.createdAt, true)}</Td>
                   <Td className="font-semibold uppercase">{t.gateway}</Td>
                   <Td className="max-w-[220px] truncate font-mono text-xs">{t.gatewayTxnId}</Td>
                   <Td>

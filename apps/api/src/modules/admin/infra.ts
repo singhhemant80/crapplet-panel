@@ -214,6 +214,41 @@ adminInfra.get(
   }),
 );
 
+/**
+ * Plans defined in Virtualizor, for the product editor's plan picker.
+ * ?serverIds=a,b limits to those servers; default = every enabled Virtualizor server.
+ */
+adminInfra.get(
+  "/virtualizor/plans",
+  requireStaff("products.manage"),
+  ah(async (req, res) => {
+    const ids = String(req.query.serverIds ?? "").split(",").filter(Boolean);
+    const servers = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", ...(ids.length ? { id: { in: ids } } : { enabled: true }) }, orderBy: { name: "asc" } });
+    const num = (v: unknown) => (v === undefined || v === null || v === "" ? null : Number(v));
+    const out = await Promise.all(
+      servers.map(async (s) => {
+        try {
+          const r = await virtualizorFor(s).plans();
+          const plans = Object.values(r.plans ?? {}).map((p: any) => ({
+            plid: Number(p.plid),
+            name: String(p.plan_name ?? `Plan ${p.plid}`),
+            virt: String(p.virt ?? "kvm"),
+            ramMb: num(p.ram),
+            diskGb: num(p.space),
+            cores: num(p.cores),
+            bandwidthGb: num(p.bandwidth),
+            ips: num(p.ips),
+          }));
+          return { serverId: s.id, serverName: s.name, plans, error: null as string | null };
+        } catch (e: any) {
+          return { serverId: s.id, serverName: s.name, plans: [], error: String(e?.message ?? e) };
+        }
+      }),
+    );
+    res.json({ servers: out });
+  }),
+);
+
 /** Import an existing Virtualizor / Proxmox guest into billing by linking it to a client service. */
 adminInfra.post(
   "/servers/:serverId/import-guest",

@@ -77,7 +77,7 @@ export default function AdminDashboard() {
               <Td className="font-semibold">{money(o.total)}</Td>
               <Td>{o.paid ? <Badge status="PAID" /> : <Badge status="UNPAID" />}</Td>
               <Td><Badge status={o.status} /></Td>
-              <Td className="text-mute">{date(o.createdAt, true)}</Td>
+              <Td className="whitespace-nowrap text-mute">{date(o.createdAt, true)}</Td>
             </tr>
           ))}
         </Table>

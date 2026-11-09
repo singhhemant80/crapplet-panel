@@ -72,7 +72,7 @@ function Dashboard() {
                   <Td>{v.plan}</Td>
                   <Td className="font-mono text-xs">{v.ip ?? "—"}</Td>
                   <Td><Badge status={v.status} /></Td>
-                  <Td className="text-mute">{date(v.nextDueDate)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(v.nextDueDate)}</Td>
                   <Td>{money(v.wholesaleAmount)} / {v.retailAmount != null ? money(v.retailAmount) : "—"}</Td>
                   <Td className="whitespace-nowrap text-right">
                     {["reboot", v.status === "SUSPENDED" ? "unsuspend" : "suspend"].map((a) => (
@@ -92,7 +92,7 @@ function Dashboard() {
           {newKey && <Alert tone="success" className="mb-4"><div className="font-bold">Copy your key now — it won't be shown again.</div><div className="mt-1 flex items-center gap-2 break-all font-mono text-xs">{newKey}<Copy text={newKey} /></div></Alert>}
           <Table head={["Name", "Prefix", "Last used", ""]}>
             {keys.data?.keys.map((k: any) => (
-              <tr key={k.id}><Td className="font-semibold">{k.name}</Td><Td className="font-mono text-xs">ck_{k.keyPrefix}_…</Td><Td className="text-mute">{date(k.lastUsedAt, true)}</Td><Td className="text-right"><button className="text-xs font-bold text-rose-600" onClick={() => api(`/auth/api-keys/${k.id}`, { method: "DELETE" }).then(keys.reload)}>Revoke</button></Td></tr>
+              <tr key={k.id}><Td className="font-semibold">{k.name}</Td><Td className="font-mono text-xs">ck_{k.keyPrefix}_…</Td><Td className="whitespace-nowrap text-mute">{date(k.lastUsedAt, true)}</Td><Td className="text-right"><button className="text-xs font-bold text-rose-600" onClick={() => api(`/auth/api-keys/${k.id}`, { method: "DELETE" }).then(keys.reload)}>Revoke</button></Td></tr>
             ))}
           </Table>
           <Button className="mt-4" icon="key" onClick={() => { const name = prompt("Key name", "automation"); if (name) api("/auth/api-keys", { body: { name, scopes: ["reseller"] } }).then((r) => { setNewKey(r.key); keys.reload(); }).catch((e) => toast.error(e.message)); }}>Create API key</Button>
@@ -153,7 +153,7 @@ function Customers({ list, reload }: { list: any[]; reload: () => void }) {
       </div>
       {!list.length ? <Empty icon="groups" title="No customers yet" /> : (
         <Table head={["Name", "Email", "Company", "Added"]}>
-          {list.map((c) => <tr key={c.id}><Td className="font-semibold">{c.firstName} {c.lastName}</Td><Td>{c.email}</Td><Td className="text-mute">{c.profile?.companyName ?? "—"}</Td><Td className="text-mute">{date(c.createdAt)}</Td></tr>)}
+          {list.map((c) => <tr key={c.id}><Td className="font-semibold">{c.firstName} {c.lastName}</Td><Td>{c.email}</Td><Td className="text-mute">{c.profile?.companyName ?? "—"}</Td><Td className="whitespace-nowrap text-mute">{date(c.createdAt)}</Td></tr>)}
         </Table>
       )}
     </Card>

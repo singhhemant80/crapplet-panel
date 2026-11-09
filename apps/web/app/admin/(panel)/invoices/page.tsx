@@ -30,7 +30,7 @@ function Invoices() {
                 <tr key={i.id} className="hover:bg-primary-tint">
                   <Td><Link href={`/admin/invoices/${i.id}`} className="font-bold text-ink hover:text-primary-dark">{invNo(i)}</Link>{i.isWalletTopup && <div className="text-xs text-mute">wallet top-up</div>}</Td>
                   <Td className="text-xs">{i.user.firstName} {i.user.lastName}<div className="text-mute">{i.user.email}</div></Td>
-                  <Td className="text-mute">{date(i.issueDate)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(i.issueDate)}</Td>
                   <Td className={i.status === "UNPAID" && new Date(i.dueDate) < new Date() ? "font-bold text-rose-600" : "text-mute"}>{date(i.dueDate)}</Td>
                   <Td className="font-semibold">{money(i.total)}</Td>
                   <Td className="text-xs text-mute">{money(i.taxTotal)}</Td>

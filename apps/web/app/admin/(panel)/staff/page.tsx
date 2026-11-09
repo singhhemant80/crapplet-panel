@@ -18,7 +18,7 @@ export default function Staff() {
                 <Td className="font-bold">{s.firstName} {s.lastName}</Td><Td>{s.email}</Td>
                 <Td><Select className="h-9 w-48" value={s.role?.id ?? ""} onChange={(e) => api(`/admin/staff/${s.id}`, { method: "PUT", body: { roleId: e.target.value } }).then(() => { toast.success("Role updated"); reload(); })}>{roles.data?.items?.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select></Td>
                 <Td>{s.totpEnabled ? <Badge status="ACTIVE">on</Badge> : <Badge>off</Badge>}</Td>
-                <Td><Badge status={s.status} /></Td><Td className="text-mute">{date(s.createdAt)}</Td>
+                <Td><Badge status={s.status} /></Td><Td className="whitespace-nowrap text-mute">{date(s.createdAt)}</Td>
                 <Td className="text-right"><button className="text-xs font-bold text-rose-600" onClick={() => api(`/admin/staff/${s.id}`, { method: "PUT", body: { status: s.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" } }).then(reload).catch((e) => toast.error(e.message))}>{s.status === "ACTIVE" ? "Deactivate" : "Activate"}</button></Td>
               </tr>
             ))}

@@ -24,7 +24,7 @@ export default function Orders() {
                   <Td className="font-semibold">{money(o.total)}</Td>
                   <Td>{o.invoice && <Link href={`/admin/invoices/${o.invoice.id}`}><Badge status={o.invoice.status} /></Link>}</Td>
                   <Td><Badge status={o.status} /></Td>
-                  <Td className="text-mute">{date(o.createdAt, true)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(o.createdAt, true)}</Td>
                   <Td className="whitespace-nowrap text-right">
                     {o.status === "PENDING" && <>
                       <Button size="sm" variant="secondary" onClick={() => confirm(o.invoice?.status !== "PAID" ? "Invoice is unpaid. Accept and provision anyway?" : "Accept and provision this order?") && act(o.id, "accept")}>Accept</Button>

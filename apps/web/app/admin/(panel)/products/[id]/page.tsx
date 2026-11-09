@@ -2,7 +2,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, CYCLES } from "@/lib/api";
-import { Alert, Button, Card, Field, Input, Loading, PageHeader, Select, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Loading, PageHeader, Select, Textarea, Toggle, Icon, cx, toast, useApi } from "@/components/ui";
 
 const TYPES = ["SHARED", "RESELLER_HOSTING", "WORDPRESS", "VPS_LINUX", "VPS_WINDOWS", "VPS_FOREX", "TALLY", "VPS_N8N", "VPS_MINECRAFT", "VPS_GOLD", "DEDICATED", "GPU", "COLOCATION", "CUSTOM"];
 const CYC = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "BIENNIAL", "TRIENNIAL", "ONETIME"];
@@ -120,9 +120,9 @@ export default function ProductEditor() {
         <Card title="Provisioning">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Module"><Select value={p.provisioner} onChange={(e) => set({ provisioner: e.target.value })}><option value="PROXMOX">Proxmox VE</option><option value="VIRTUALIZOR">Virtualizor</option><option value="MANUAL">Manual provisioning</option><option value="NONE">None</option></Select></Field>
-            <Field label="Automation"><Select value={p.autoSetup} onChange={(e) => set({ autoSetup: e.target.value })}><option value="ON_PAYMENT">Provision when payment is verified</option><option value="ON_ORDER">Provision on order (trials)</option><option value="MANUAL">Wait for staff to accept</option></Select></Field>
+            <Field label="Auto-setup"><Select value={p.autoSetup} onChange={(e) => set({ autoSetup: e.target.value })}><option value="ON_PAYMENT">After payment</option><option value="ON_ORDER">On order (trials)</option><option value="MANUAL">When staff accepts</option></Select></Field>
             {isVps && <>
-              <Field label="Virtualization"><Select value={p.virtType} onChange={(e) => set({ virtType: e.target.value })}><option value="KVM">KVM virtual machine</option><option value="LXC">LXC container</option></Select></Field>
+              {p.provisioner === "PROXMOX" && <Field label="Virtualization"><Select value={p.virtType} onChange={(e) => set({ virtType: e.target.value })}><option value="KVM">KVM virtual machine</option><option value="LXC">LXC container</option></Select></Field>}
               <Field label="vCPU cores"><Input type="number" value={p.cpuCores ?? ""} onChange={(e) => set({ cpuCores: e.target.value })} /></Field>
               <Field label="RAM (MB)"><Input type="number" value={p.ramMb ?? ""} onChange={(e) => set({ ramMb: e.target.value })} /></Field>
               <Field label="Disk (GB)"><Input type="number" value={p.diskGb ?? ""} onChange={(e) => set({ diskGb: e.target.value })} /></Field>
@@ -139,8 +139,19 @@ export default function ProductEditor() {
                 <Field label="Boot disk (KVM)"><Input value={p.moduleConfig.proxmox?.disk ?? "scsi0"} onChange={(e) => mc("proxmox", "disk", e.target.value)} /></Field>
                 <Field label="Port speed (Mbps)"><Input type="number" value={p.moduleConfig.proxmox?.rateMbps ?? ""} onChange={(e) => mc("proxmox", "rateMbps", e.target.value)} placeholder="unlimited" /></Field>
               </> : <>
-                <Field label="Virtualizor plan id"><Input type="number" value={p.moduleConfig.virtualizor?.planId ?? ""} onChange={(e) => mc("virtualizor", "planId", e.target.value)} /></Field>
-                <Field label="Virtualizor virt type"><Input value={p.moduleConfig.virtualizor?.virt ?? "kvm"} onChange={(e) => mc("virtualizor", "virt", e.target.value)} /></Field>
+                <VirtualizorPlanPicker
+                  serverIds={p.serverIds}
+                  planId={p.moduleConfig.virtualizor?.planId ?? ""}
+                  virt={p.moduleConfig.virtualizor?.virt ?? "kvm"}
+                  onPick={(plan, virt, specs) =>
+                    setP((cur: any) => ({
+                      ...cur,
+                      ...(specs ? { cpuCores: specs.cores ?? cur.cpuCores, ramMb: specs.ramMb ?? cur.ramMb, diskGb: specs.diskGb ?? cur.diskGb, bandwidthGb: specs.bandwidthGb || cur.bandwidthGb } : {}),
+                      virtType: /lxc|proxl|openvz|vzo/.test(virt) ? "LXC" : "KVM",
+                      moduleConfig: { ...cur.moduleConfig, virtualizor: { ...cur.moduleConfig.virtualizor, planId: plan, virt } },
+                    }))
+                  }
+                />
               </>}
             </>}
           </div>
@@ -169,6 +180,69 @@ export default function ProductEditor() {
           <Button size="sm" variant="ghost" icon="add" onClick={() => set({ configOptions: [...p.configOptions, { key: "extra_ipv4", label: "Additional IPv4", type: "QUANTITY", minQty: 0, maxQty: 4, unitMonthly: 0, choices: [], sortOrder: p.configOptions.length }] })}>Add option</Button>
         </Card>
       </div>
+    </>
+  );
+}
+
+const VIRT_TYPES: [string, string][] = [["kvm", "KVM"], ["xen", "Xen PV"], ["xenhvm", "Xen HVM"], ["openvz", "OpenVZ"], ["vzk", "Virtuozzo KVM"], ["vzo", "Virtuozzo OpenVZ"], ["proxk", "Proxmox KVM"], ["proxl", "Proxmox LXC"], ["lxc", "LXC"]];
+
+type VPlan = { plid: number; name: string; virt: string; ramMb: number | null; diskGb: number | null; cores: number | null; bandwidthGb: number | null; ips: number | null };
+
+/** Lists the plans configured in Virtualizor so staff pick one instead of typing an id; picking also fills CPU/RAM/disk. */
+function VirtualizorPlanPicker({ serverIds, planId, virt, onPick }: { serverIds: string[]; planId: string | number; virt: string; onPick: (planId: number | "", virt: string, specs?: Partial<VPlan>) => void }) {
+  const q = serverIds.length ? `?serverIds=${serverIds.join(",")}` : "";
+  const { data, loading, reload, error } = useApi(`/admin/virtualizor/plans${q}`);
+  const groups: { serverId: string; serverName: string; plans: VPlan[]; error: string | null }[] = data?.servers ?? [];
+  const all = groups.flatMap((g) => g.plans);
+  const errors = groups.filter((g) => g.error);
+  const current = all.find((x) => String(x.plid) === String(planId));
+  const [manual, setManual] = useState(false);
+  const showManual = manual || (!loading && !all.length) || (planId !== "" && planId !== null && !current && !loading);
+  return (
+    <>
+      <Field
+        label={<span className="flex items-center justify-between">Virtualizor plan <button type="button" onClick={reload} className="inline-flex items-center gap-1 text-xs font-bold text-primary-dark hover:underline"><Icon name="refresh" className="text-[15px]" />Refresh</button></span>}
+        hint={current ? `${current.cores ?? "?"} vCPU · ${current.ramMb ?? "?"} MB RAM · ${current.diskGb ?? "?"} GB disk · ${current.bandwidthGb ? `${current.bandwidthGb} GB` : "unmetered"} bandwidth` : undefined}
+        className="sm:col-span-2"
+      >
+        {showManual ? (
+          <div className="flex gap-2">
+            <Input type="number" placeholder="Plan id" value={planId ?? ""} onChange={(e) => onPick(e.target.value === "" ? "" : Number(e.target.value), virt)} />
+            {all.length > 0 && <Button type="button" variant="outline" onClick={() => setManual(false)}>Choose from list</Button>}
+          </div>
+        ) : (
+          <Select
+            value={current ? String(current.plid) : ""}
+            disabled={loading}
+            onChange={(e) => {
+              if (e.target.value === "__manual") return setManual(true);
+              const pl = all.find((x) => String(x.plid) === e.target.value);
+              if (pl) onPick(pl.plid, pl.virt, pl);
+              else onPick("", virt);
+            }}
+          >
+            <option value="">{loading ? "Loading plans from Virtualizor…" : "Select a plan…"}</option>
+            {groups.filter((g) => g.plans.length).map((g) => (
+              <optgroup key={g.serverId} label={g.serverName}>
+                {g.plans.map((pl) => (
+                  <option key={`${g.serverId}-${pl.plid}`} value={pl.plid}>
+                    {pl.name} — {pl.virt.toUpperCase()} · {pl.cores ?? "?"} vCPU · {pl.ramMb ? (pl.ramMb >= 1024 ? `${+(pl.ramMb / 1024).toFixed(1)} GB` : `${pl.ramMb} MB`) : "?"} RAM · {pl.diskGb ?? "?"} GB (id {pl.plid})
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            <option value="__manual">Enter a plan id manually…</option>
+          </Select>
+        )}
+      </Field>
+      {error && <Alert tone="error" className="sm:col-span-2">{error}</Alert>}
+      {!loading && !error && !groups.length && <Alert tone="warn" className="sm:col-span-2">Add a Virtualizor server under Infrastructure → Servers to load its plans here.</Alert>}
+      {errors.map((g) => <Alert key={g.serverId} tone="error" className="sm:col-span-2">Couldn't load plans from {g.serverName}: {g.error}</Alert>)}
+      <Field label="Virtualizor virt type">
+        <Select value={virt} onChange={(e) => onPick(planId === "" ? "" : Number(planId), e.target.value)}>
+          {VIRT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </Select>
+      </Field>
     </>
   );
 }

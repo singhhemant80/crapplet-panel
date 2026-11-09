@@ -18,7 +18,7 @@ export default function Transactions() {
             <Table head={["Date", "Customer", "Gateway", "Reference", "Type", "Amount", "Fee", "Invoice", ""]}>
               {data.transactions.map((t: any) => (
                 <tr key={t.id}>
-                  <Td className="text-xs text-mute">{date(t.createdAt, true)}</Td>
+                  <Td className="whitespace-nowrap text-xs text-mute">{date(t.createdAt, true)}</Td>
                   <Td className="text-xs"><Link className="text-primary-dark" href={`/admin/clients/${t.user.id}`}>{t.user.email}</Link></Td>
                   <Td className="font-semibold uppercase">{t.gateway}</Td>
                   <Td className="max-w-[200px] truncate font-mono text-xs">{t.gatewayTxnId}</Td>

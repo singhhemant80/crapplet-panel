@@ -29,7 +29,7 @@ function Clients() {
                   <Td>{c._count.services}</Td>
                   <Td>{money(c.profile?.creditBalance)}</Td>
                   <Td><Badge status={c.status} />{c.ownerResellerId && <span className="ml-1 text-xs text-mute">reseller customer</span>}</Td>
-                  <Td className="text-mute">{date(c.createdAt)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(c.createdAt)}</Td>
                 </tr>
               ))}
             </Table>

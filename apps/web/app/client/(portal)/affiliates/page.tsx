@@ -36,7 +36,7 @@ export default function Affiliates() {
         {!a.referrals.length ? <Empty icon="group_add" title="No referrals yet" /> : (
           <Table head={["Customer", "Joined", "Commission", "Status"]}>
             {a.referrals.map((r: any) => (
-              <tr key={r.id}><Td className="font-semibold">{r.referredUser.firstName}</Td><Td className="text-mute">{date(r.createdAt)}</Td><Td className="font-bold">{money(r.amount)}</Td><Td><Badge status={r.status} /></Td></tr>
+              <tr key={r.id}><Td className="font-semibold">{r.referredUser.firstName}</Td><Td className="whitespace-nowrap text-mute">{date(r.createdAt)}</Td><Td className="font-bold">{money(r.amount)}</Td><Td><Badge status={r.status} /></Td></tr>
             ))}
           </Table>
         )}

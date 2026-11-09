@@ -51,7 +51,7 @@ export default function Wallet() {
           <Table head={["Date", "Description", "Amount", "Balance"]}>
             {data.ledger.map((l: any) => (
               <tr key={l.id}>
-                <Td className="text-mute">{date(l.createdAt, true)}</Td>
+                <Td className="whitespace-nowrap text-mute">{date(l.createdAt, true)}</Td>
                 <Td className="font-semibold text-ink">{l.description}</Td>
                 <Td className={l.amount < 0 ? "font-bold text-rose-600" : "font-bold text-emerald-600"}>
                   {l.amount < 0 ? "−" : "+"}

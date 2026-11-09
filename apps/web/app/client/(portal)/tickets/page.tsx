@@ -19,7 +19,7 @@ export default function Tickets() {
                 <Td><Link href={`/client/tickets/${t.id}`} className="font-bold text-ink hover:text-primary-dark">{t.subject}</Link></Td>
                 <Td className="text-mute">{t.department}</Td>
                 <Td><Badge status={t.status} /></Td>
-                <Td className="text-mute">{date(t.lastReplyAt, true)}</Td>
+                <Td className="whitespace-nowrap text-mute">{date(t.lastReplyAt, true)}</Td>
               </tr>
             ))}
           </Table>

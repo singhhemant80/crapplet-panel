@@ -17,7 +17,7 @@ export default function Reviews() {
           <Table head={["Submitted", "Customer", "Invoice", "Method", "UTR / reference", "Amount", ""]}>
             {data.intents.map((p: any) => (
               <tr key={p.id}>
-                <Td className="text-xs text-mute">{date(p.updatedAt, true)}</Td>
+                <Td className="whitespace-nowrap text-xs text-mute">{date(p.updatedAt, true)}</Td>
                 <Td className="text-sm">{p.user.firstName} {p.user.lastName}<div className="text-xs text-mute">{p.user.email}</div></Td>
                 <Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${p.invoice.id}`}>{invNo(p.invoice)}</Link></Td>
                 <Td className="uppercase">{p.gateway}</Td>

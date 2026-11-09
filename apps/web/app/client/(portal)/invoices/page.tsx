@@ -34,8 +34,8 @@ function Invoices() {
                     {invNo(i)}
                     {i.isWalletTopup && <span className="ml-2 text-xs font-semibold text-mute">wallet</span>}
                   </Td>
-                  <Td className="text-mute">{date(i.issueDate)}</Td>
-                  <Td className="text-mute">{date(i.dueDate)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(i.issueDate)}</Td>
+                  <Td className="whitespace-nowrap text-mute">{date(i.dueDate)}</Td>
                   <Td className="font-semibold">{money(i.total, i.currency)}</Td>
                   <Td>
                     <Badge status={i.status} />

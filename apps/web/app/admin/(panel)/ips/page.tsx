@@ -118,7 +118,7 @@ export default function Ips() {
       </Modal>
       <Modal open={!!hist} onClose={() => setHist(null)} title="Allocation history" wide>
         <Table head={["When", "Action", "From → to", "Note"]}>
-          {hist?.map((h) => <tr key={h.id}><Td className="text-xs">{date(h.createdAt, true)}</Td><Td className="font-semibold">{h.action}</Td><Td className="text-xs">{h.fromStatus ?? "—"} → {h.toStatus ?? "—"}</Td><Td className="text-xs text-mute">{h.note}{h.serviceId && <> · <Link className="text-primary-dark" href={`/admin/services/${h.serviceId}`}>service</Link></>}</Td></tr>)}
+          {hist?.map((h) => <tr key={h.id}><Td className="whitespace-nowrap text-xs">{date(h.createdAt, true)}</Td><Td className="font-semibold">{h.action}</Td><Td className="text-xs">{h.fromStatus ?? "—"} → {h.toStatus ?? "—"}</Td><Td className="text-xs text-mute">{h.note}{h.serviceId && <> · <Link className="text-primary-dark" href={`/admin/services/${h.serviceId}`}>service</Link></>}</Td></tr>)}
         </Table>
       </Modal>
     </>

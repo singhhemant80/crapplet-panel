@@ -21,8 +21,8 @@ export default function Domains() {
               <tr key={d.id} className="hover:bg-primary-tint">
                 <Td className="font-bold text-ink">{d.name}</Td>
                 <Td><Badge status={d.status} /></Td>
-                <Td className="text-mute">{date(d.registrationDate)}</Td>
-                <Td className="text-mute">{date(d.expiryDate)}</Td>
+                <Td className="whitespace-nowrap text-mute">{date(d.registrationDate)}</Td>
+                <Td className="whitespace-nowrap text-mute">{date(d.expiryDate)}</Td>
                 <Td>{d.autoRenew ? "On" : "Off"}</Td>
                 <Td className="text-right"><Link href={`/client/domains/${d.id}`} className="font-bold text-primary-dark hover:underline">Manage</Link></Td>
               </tr>

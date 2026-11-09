@@ -21,7 +21,7 @@ export default function Resellers() {
                 <Td>{r._count.customers}</Td>
                 <Td><Input className="h-9 w-20" type="number" defaultValue={r.discountPct} onBlur={(e) => Number(e.target.value) !== r.discountPct && upd(r.id, { discountPct: Number(e.target.value) })} /></Td>
                 <Td><Select className="h-9 w-36" value={r.status} onChange={(e) => upd(r.id, { status: e.target.value })}>{["PENDING", "APPROVED", "REJECTED", "SUSPENDED"].map((s) => <option key={s}>{s}</option>)}</Select></Td>
-                <Td className="text-mute">{date(r.createdAt)}</Td>
+                <Td className="whitespace-nowrap text-mute">{date(r.createdAt)}</Td>
               </tr>
             ))}
           </Table>
