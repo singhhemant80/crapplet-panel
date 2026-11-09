@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png" /><title>n8n VPS Hosting - Workflow Automation Servers | Crapplet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode:"class",
+  theme:{
+    extend:{
+      colors:{
+        "primary":"#a358de",
+        "n8n":"#a365fe",
+        "n8n-light":"#ff6a1f",
+        "background-light":"#ffffff",
+        "background-dark":"#101922",
+      },
+      fontFamily:{"display":["Inter","sans-serif"]},
+      borderRadius:{"DEFAULT":"0.5rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},
+    },
+  },
+}
+</script>
+<style>
+body{font-family:'Inter',sans-serif;}
+.nav-dropdown:hover .dropdown-menu{display:block;}
+
+#cursor-glow{
+  position:fixed;width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle,#a365fe20 0%,transparent 70%);
+  pointer-events:none;z-index:9999;transform:translate(-50%,-50%);
+  transition:left .1s ease,top .1s ease;
+}
+
+/* Scrollbar width */
+::-webkit-scrollbar {
+    width: 10px;   /* vertical scrollbar */
+    height: 10px;  /* horizontal scrollbar */
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+    background: #f1f5f9;   /* light background */
+    border-radius: 10px;
+}
+
+/* Thumb (scroll handle) */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a365fe, #7c3aed);
+    border-radius: 10px;
+    border: 2px solid #f1f5f9;
+}
+
+/* Hover effect */
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #7c3aed, #a365fe);
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+.load{animation:fadeInUp .75s cubic-bezier(.22,1,.36,1) both;}
+.ld1{animation-delay:.07s}.ld2{animation-delay:.17s}.ld3{animation-delay:.27s}
+.ld4{animation-delay:.37s}.ld5{animation-delay:.47s}.ld6{animation-delay:.57s}
+
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.rv1{transition-delay:.05s}.rv2{transition-delay:.15s}.rv3{transition-delay:.25s}
+.rv4{transition-delay:.35s}.rv5{transition-delay:.45s}
+.reveal-left{opacity:0;transform:translateX(-36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-left.visible{opacity:1;transform:translateX(0);}
+.reveal-right{opacity:0;transform:translateX(36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-right.visible{opacity:1;transform:translateX(0);}
+
+ @keyframes shimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+    .shimmer-n8n{
+        background:linear-gradient(90deg, #a365fe, #a66aff, #6d4e9c, #a365fe);
+        background-size:200% auto;
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+        background-clip:text;animation:shimmer 3s linear infinite;
+    }
+
+@keyframes orb1{0%,100%{transform:translate(0,0) scale(1);}40%{transform:translate(35px,-28px) scale(1.1);}70%{transform:translate(-18px,20px) scale(.93);}}
+@keyframes orb2{0%,100%{transform:translate(0,0);}50%{transform:translate(-45px,38px) scale(1.08);}}
+.orb1{animation:orb1 11s ease-in-out infinite;}
+.orb2{animation:orb2 15s ease-in-out infinite;}
+
+@keyframes floatCard{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+.float-card{animation:floatCard 5s ease-in-out infinite;}
+
+@keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 #a365fe50;}50%{box-shadow:0 0 0 8px rgba(234,75,0,0);}}
+.badge-pulse{animation:pulseBadge 2.5s ease-in-out infinite;}
+
+@keyframes badgePop{0%,100%{transform:translateX(-50%) scale(1);}50%{transform:translateX(-50%) scale(1.07);}}
+.popular-badge{animation:badgePop 2.5s ease-in-out infinite;}
+
+/* Node graph animation */
+@keyframes nodeFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-6px) scale(1.03);}}
+@keyframes edgeDash{0%{stroke-dashoffset:200;}100%{stroke-dashoffset:0;}}
+.node-float{animation:nodeFloat 4s ease-in-out infinite;}
+.node-float-2{animation:nodeFloat 4s ease-in-out infinite;animation-delay:1.2s;}
+.node-float-3{animation:nodeFloat 4s ease-in-out infinite;animation-delay:2.4s;}
+.edge-anim{stroke-dasharray:8 4;animation:edgeDash 3s linear infinite;}
+
+@keyframes statusPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.6);}}
+.status-dot{animation:statusPulse 1.6s ease-in-out infinite;}
+
+/* n8n node-editor card */
+.n8n-card{
+  background:linear-gradient(135deg,#0f001a 0%,#12002a 40%,#07051a 100%);
+  border:1px solid rgba(90, 0, 234, 0.25);
+}
+
+nav a{position:relative;}
+nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:#a365fe;border-radius:2px;transition:width 0.3s ease;}
+nav a:hover::after{width:100%;}
+
+/* Plan cards */
+.plan-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.plan-card:hover{transform:translateY(-8px);box-shadow:0 20px 48px -12px rgba(0,0,0,.12);border-color:rgba(234,75,0,.4);}
+.plan-featured{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s;}
+.plan-featured:hover{transform:translateY(-10px) scale(1.02);box-shadow:0 28px 56px -12px rgba(234,75,0,.35);}
+
+.select-btn{transition:background .25s,color .25s,transform .2s,box-shadow .2s;}
+.select-btn:hover{background:#a365fe;color:#fff;transform:translateY(-2px);box-shadow:0 6px 18px rgba(234,75,0,.45);}
+.select-primary{transition:filter .2s,transform .2s,box-shadow .2s;}
+.select-primary:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 8px 22px rgba(234,75,0,.45);}
+
+@keyframes specIn{from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:translateX(0);}}
+.spec-row{opacity:0;}
+.plan-card.visible .spec-row,.plan-featured.visible .spec-row{animation:specIn .45s cubic-bezier(.22,1,.36,1) both;}
+.spec-row:nth-child(1){animation-delay:.1s}.spec-row:nth-child(2){animation-delay:.2s}
+.spec-row:nth-child(3){animation-delay:.3s}.spec-row:nth-child(4){animation-delay:.4s}
+.spec-row:nth-child(5){animation-delay:.5s}.spec-row:nth-child(6){animation-delay:.6s}
+
+/* Feature cards */
+.feat-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.feat-card:hover{transform:translateY(-6px);box-shadow:0 16px 36px -8px rgba(0,0,0,.1);border-color:rgba(234,75,0,.3);}
+.feat-icon{transition:transform .3s ease,color .2s;}
+.feat-card:hover .feat-icon{transform:scale(1.2) rotate(6deg);color:#a365fe;}
+
+/* Use-case chips */
+.usecase-chip{transition:transform .25s,box-shadow .25s,border-color .25s,background .2s;}
+.usecase-chip:hover{transform:translateY(-4px);box-shadow:0 12px 28px -6px rgba(234,75,0,.2);border-color:rgba(234,75,0,.4);background:#fff7f2;}
+
+/* Workflow node card */
+.wf-node{transition:transform .3s,box-shadow .3s,border-color .3s;}
+.wf-node:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 12px 30px -6px rgba(234,75,0,.25);border-color:rgba(234,75,0,.5);}
+
+/* CTA */
+@keyframes dotMoveN8n{0%{background-position:0 0;}100%{background-position:30px 30px;}}
+.cta-section{
+  background-image:radial-gradient(circle,rgba(234,75,0,.07) 1px,transparent 0);
+  background-size:30px 30px;animation:dotMoveN8n 6s linear infinite;
+}
+
+.glow-input{transition:box-shadow .3s,border-color .3s;}
+.glow-input:focus{outline:none;box-shadow:0 0 0 3px rgba(234,75,0,.2);border-color:#a365fe;}
+
+.deploy-btn{position:relative;overflow:hidden;transition:filter .2s,transform .2s,box-shadow .2s;}
+.deploy-btn:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 8px 22px rgba(78, 0, 234, 0.4);}
+
+.footer-link{transition:color .2s,padding-left .2s;display:inline-block;}
+.footer-link:hover{color:#a365fe;padding-left:5px;}
+.social-icon{transition:color .2s,transform .3s ease;}
+.social-icon:hover{color:#a365fe;transform:rotate(15deg) scale(1.2);}
+
+header{transition:box-shadow .3s;}
+header.scrolled{box-shadow:0 4px 20px rgba(0,0,0,.07);}
+
+/* FAQ */
+.faq-item{border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;transition:border-color .25s,box-shadow .25s;}
+.faq-item:hover{border-color:#5600d7a6;box-shadow:0 8px 24px -6px rgba(234,75,0,.12);}
+.faq-item.open{border-color:#a365fe;box-shadow:0 12px 32px -8px rgba(234,75,0,.18);}
+.faq-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 22px;background:transparent;border:none;cursor:pointer;text-align:left;transition:background .2s;}
+.faq-trigger:hover{background:rgba(234,75,0,.04);}
+.faq-item.open .faq-trigger{background:rgba(234,75,0,.06);}
+.faq-icon{width:30px;height:30px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s,transform .3s;}
+.faq-item.open .faq-icon{background:#a365fe;transform:rotate(45deg);}
+.faq-sym{font-size:17px;color:#64748b;transition:color .2s;}
+.faq-item.open .faq-sym{color:#fff;}
+.faq-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.22,1,.36,1);}
+.faq-body.open{max-height:300px;}
+.faq-inner{padding:0 22px 18px;color:#475569;font-size:14px;line-height:1.75;border-top:1px solid rgba(234,75,0,.1);}
+
+/* Stats counter */
+@keyframes countUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.counter-val{animation:countUp .8s cubic-bezier(.22,1,.36,1) both;}
+
+/* Integration chip */
+.int-chip{transition:border-color .2s,background .2s,transform .2s;}
+.int-chip:hover{border-color:#a365fe;background:rgba(234,75,0,.06);transform:translateY(-3px);}
+
+/* ══ MOBILE DRAWER ══ */
+#menu-toggle{position:relative;width:40px;height:40px;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;z-index:60;}
+#menu-toggle .bar{display:block;height:2px;border-radius:2px;background:#1e293b;transition:all .35s cubic-bezier(.22,1,.36,1);}
+#menu-toggle .bar-top{width:22px;}
+#menu-toggle .bar-mid{width:16px;transform-origin:right center;}
+#menu-toggle .bar-bot{width:22px;}
+#menu-toggle.open .bar-top{transform:translateY(7px) rotate(45deg);width:22px;}
+#menu-toggle.open .bar-mid{width:0;opacity:0;}
+#menu-toggle.open .bar-bot{transform:translateY(-7px) rotate(-45deg);width:22px;}
+
+#mobile-overlay{position:fixed;inset:0;background:rgba(10,5,25,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:49;opacity:0;pointer-events:none;transition:opacity .35s ease;}
+#mobile-overlay.show{opacity:1;pointer-events:all;}
+
+#mobile-drawer{position:fixed;top:0;right:0;bottom:0;width:min(88vw,360px);background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);z-index:50;overflow-y:auto;overflow-x:hidden;transform:translateX(100%);transition:transform .4s cubic-bezier(.22,1,.36,1);box-shadow:-20px 0 60px rgba(0,0,0,.5);}
+#mobile-drawer.open{transform:translateX(0);}
+#mobile-drawer::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.18;}
+#mobile-drawer::after{content:'';position:absolute;top:-80px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,#a365fe44 0%,transparent 70%);pointer-events:none;z-index:0;border-radius:50%;}
+.drawer-glow-bottom{position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;background:radial-gradient(circle,#6633cc33 0%,transparent 70%);border-radius:50%;pointer-events:none;z-index:0;}
+.drawer-inner{position:relative;z-index:1;}
+.drawer-header{padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;}
+.mob-nav-item{display:flex;align-items:center;gap:12px;padding:11px 24px;cursor:pointer;color:rgba(255,255,255,.8);font-size:14px;font-weight:600;position:relative;transition:background .2s ease,color .2s ease,padding-left .2s ease;text-decoration:none;}
+.mob-nav-item:hover{background:rgba(163,101,254,.12);color:#fff;padding-left:30px;}
+.mob-nav-item .item-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:transform .25s ease;}
+.mob-nav-item:hover .item-icon{transform:scale(1.15) rotate(-5deg);}
+.mob-nav-item .item-arrow{margin-left:auto;opacity:.4;font-size:16px;transition:transform .2s ease,opacity .2s ease;}
+.mob-nav-item:hover .item-arrow{transform:translateX(4px);opacity:.8;}
+.mob-submenu{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1);background:rgba(0,0,0,.2);}
+.mob-submenu.open{max-height:500px;}
+.mob-submenu-item{display:flex;align-items:center;gap:10px;padding:10px 24px 10px 56px;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:color .2s,padding-left .2s;text-decoration:none;}
+.mob-submenu-item:hover{color:#a365fe;padding-left:62px;}
+.mob-submenu-item::before{content:'';width:5px;height:5px;border-radius:50%;background:#a365fe;opacity:.5;flex-shrink:0;transition:opacity .2s,transform .2s;}
+.mob-submenu-item:hover::before{opacity:1;transform:scale(1.4);}
+.mob-nav-item .chevron{transition:transform .3s ease;}
+.mob-nav-item.sub-open .chevron{transform:rotate(180deg);}
+.drawer-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 24px;}
+.drawer-cta{padding:20px 24px;display:flex;flex-direction:column;gap:10px;margin-top:auto;}
+.drawer-btn-support{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;border:1px solid rgba(163,101,254,.35);color:rgba(255,255,255,.85);font-weight:700;font-size:14px;transition:background .2s,border-color .2s;}
+.drawer-btn-support:hover{background:rgba(163,101,254,.12);border-color:#a365fe;}
+.drawer-btn-login{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:12px;background:linear-gradient(135deg,#a365fe,#7c3aed);color:#fff;font-weight:800;font-size:14px;box-shadow:0 6px 24px rgba(163,101,254,.4);transition:filter .2s,transform .2s,box-shadow .2s;}
+.drawer-btn-login:hover{filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 10px 30px rgba(163,101,254,.55);}
+@keyframes slideInRight{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);}}
+#mobile-drawer.open .drawer-inner>*{animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;}
+#mobile-drawer.open .drawer-inner>*:nth-child(1){animation-delay:.05s}
+#mobile-drawer.open .drawer-inner>*:nth-child(2){animation-delay:.10s}
+#mobile-drawer.open .drawer-inner>*:nth-child(3){animation-delay:.15s}
+#mobile-drawer.open .drawer-inner>*:nth-child(4){animation-delay:.20s}
+#mobile-drawer.open .drawer-inner>*:nth-child(5){animation-delay:.25s}
+#mobile-drawer.open .drawer-inner>*:nth-child(6){animation-delay:.30s}
+#mobile-drawer.open .drawer-inner>*:nth-child(7){animation-delay:.35s}
+#mobile-drawer.open .drawer-inner>*:nth-child(8){animation-delay:.40s}
+.drawer-social{display:flex;gap:10px;padding:0 24px 24px;}
+.drawer-social a{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:14px;transition:background .2s,color .2s,transform .2s;}
+.drawer-social a:hover{background:rgba(163,101,254,.25);color:#a365fe;transform:translateY(-3px);}
+body.nav-open{overflow:hidden;}
+
+/* Ticker */
+@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.ticker-inner{display:flex;width:max-content;animation:ticker 22s linear infinite;}
+.ticker-inner:hover{animation-play-state:paused;}
+
+/* Comparison table */
+.cmp-row{transition:background .2s;}
+.cmp-row:hover{background:#eee3fd;}
+.cmp-yes-n8n{color:#a365fe;font-variation-settings:'FILL' 1,'wght' 600,'GRAD' 0,'opsz' 24;}
+.cmp-no{color:#cbd5e1;}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/n8n-vps-hosting.html">
+</head>
+<body class="bg-white font-display text-slate-900">
+
+<div id="cursor-glow"></div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+    <div class="drawer-header">
+     <a href="/index.html">
+      <img alt="Crapplet" src="/Crapplet_logo.png"
+           class="h-10 w-auto"
+           onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
+      /></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+   <a href="/ddos-protection.html" class="mob-nav-item">
+            <span class="item-icon bg-pink-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+            DDos Protection
+            <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+        </a>
+   
+    <div class="drawer-divider"></div>
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black" style="color:#a365fe">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">10 Gbps</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Network</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">24/7</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+<a href="/contact.html" >
+      <button class="drawer-btn-support w-full">
+                <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+                Support
+            </button></a>      
+                  <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+    </div>
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+  </div>
+</div>
+
+<div class="relative flex min-h-screen flex-col">
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li is-current" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-grow">
+
+<!-- ══════════════════════════════════════════
+  SECTION 1 — HERO
+══════════════════════════════════════════ -->
+<section class="relative py-14 overflow-hidden bg-slate-950">
+  <!-- Glow orbs -->
+ <div class="absolute inset-0 pointer-events-none -z-0">
+                <div class="orb1 absolute -top-20 -left-20 w-72 h-72 rounded-full bg-primary/8 blur-3xl"></div>
+                <div class="orb2 absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-pink-200/20 blur-3xl"></div>
+            </div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-14 relative z-10">
+
+    <!-- Left text -->
+    <div class="flex-1 space-y-7 text-center lg:text-left">
+       <div class="load ld1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider badge-pulse">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background:#a365fe"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2" style="background:#a365fe"></span>
+        </span>
+        n8n Workflow Automation VPS
+      </div>
+
+      <h1 class="load ld2 text-2xl lg:text-4xl font-black tracking-tight leading-[1.1] text-white">
+        Deploy <span class="shimmer-n8n">n8n</span> on a<br/>Dedicated Cloud VPS.
+      </h1>
+      <p class="load ld3 text-slate-400 max-w-xl text-lg leading-relaxed">
+        Run n8n — the powerful open-source workflow automation tool — on blazing-fast NVMe VPS infrastructure. Full root access, persistent storage, always-on execution, and zero vendor lock-in.
+      </p>
+
+      <div class="load ld3 flex flex-wrap justify-center lg:justify-start gap-3">
+        <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:rgba(234,75,0,.12);border:1px solid rgba(103, 5, 215, 0.562);color:#94a3b8">⚙️ n8n Self-Hosted</span>
+        <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#94a3b8">🐧 Ubuntu 22.04 LTS</span>
+        <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#94a3b8">🐳 Docker Ready</span>
+        <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#94a3b8">🔒 SSL Included</span>
+      </div>
+
+      <div class="load ld4 flex flex-wrap justify-center lg:justify-start gap-4">
+        <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})"
+          class="bg-[#a365fe] text-white px-8 py-2 rounded-xl font-bold text-lg hover:shadow-2xl hover:shadow-[#a365fe] hover:-translate-y-1 transition-all"
+          >
+          View n8n Plans
+        </button>
+        <button class="border border-slate-700 px-8 py-3 rounded-xl font-bold text-base text-slate-300 hover:bg-slate-800 hover:-translate-y-1 transition-all" onclick="location.href='#plans'">
+          How It Works
+        </button>
+      </div>
+    </div>
+
+    <!-- Right — n8n node-graph card -->
+    <div class="flex-1 w-full max-w-lg load ld5 float-card">
+      <div class="n8n-card rounded-2xl overflow-hidden shadow-2xl" style="box-shadow:0 0 60px rgba(133, 0, 234, 0.2)">
+        <!-- Title bar -->
+        <div class="flex items-center gap-2 px-4 py-3 border-b" style="background:rgba(117, 0, 234, 0.12);border-color:rgba(117, 0, 234, 0.2)">
+          <div class="w-3 h-3 rounded-full bg-red-500 opacity-80"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-400 opacity-80"></div>
+          <div class="w-3 h-3 rounded-full bg-green-400 opacity-80"></div>
+          <span class="text-xs font-bold ml-2" style="color:#8b1fff">n8n — Workflow Editor · crapplet-n8n.yourdomain.com</span>
+          <span class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(34,197,94,.15);color:#4ade80">● Active</span>
+        </div>
+
+        <!-- Workflow canvas -->
+        <div class="p-5 min-h-[300px] relative overflow-hidden" style="background:#0d0500">
+          <svg class="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg" style="opacity:.5">
+            <defs>
+              <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="1" fill="rgba(234,75,0,.25)"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dots)"/>
+          </svg>
+
+          <!-- SVG edges -->
+          <svg class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 100 80 Q 165 80 165 140" fill="none" stroke="#a365fe" stroke-width="2" class="edge-anim" opacity=".7"/>
+            <path d="M 100 80 Q 165 80 165 210" fill="none" stroke="#a365fe" stroke-width="2" class="edge-anim" opacity=".5" style="animation-delay:.5s"/>
+            <path d="M 235 140 Q 290 140 290 80" fill="none" stroke="#ff6a1f" stroke-width="2" class="edge-anim" opacity=".6" style="animation-delay:1s"/>
+            <path d="M 235 210 Q 290 210 290 260" fill="none" stroke="#ff6a1f" stroke-width="2" class="edge-anim" opacity=".5" style="animation-delay:1.5s"/>
+          </svg>
+
+          <!-- Nodes -->
+          <div class="relative z-10 flex flex-col gap-3">
+            <div class="flex items-center gap-4">
+              <!-- Trigger node -->
+              <div class="node-float flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(234,75,0,.2);border:1.5px solid rgba(234,75,0,.5);color:#ff6a1f;min-width:90px">
+                <span class="text-base">⚡</span> Webhook Trigger
+              </div>
+              <div class="h-px flex-1" style="background:rgba(234,75,0,.3)"></div>
+              <!-- HTTP node -->
+              <div class="node-float-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);color:#cbd5e1;min-width:90px">
+                <span class="text-base">🌐</span> HTTP Request
+              </div>
+            </div>
+            <div class="flex items-center gap-4 ml-10">
+              <!-- Condition -->
+              <div class="node-float-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(99,102,241,.18);border:1.5px solid rgba(99,102,241,.4);color:#a5b4fc;min-width:90px">
+                <span class="text-base">🔀</span> IF Condition
+              </div>
+            </div>
+            <div class="flex items-center gap-4 ml-5">
+              <!-- Gmail -->
+              <div class="node-float flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(34,197,94,.1);border:1.5px solid rgba(34,197,94,.3);color:#4ade80;min-width:90px">
+                <span class="text-base">📧</span> Gmail
+              </div>
+              <div class="h-px w-6" style="background:rgba(234,75,0,.3)"></div>
+              <!-- Slack -->
+              <div class="node-float-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(59,130,246,.1);border:1.5px solid rgba(59,130,246,.3);color:#93c5fd;min-width:90px">
+                <span class="text-base">💬</span> Slack
+              </div>
+            </div>
+            <div class="flex items-center gap-4 ml-16">
+              <!-- Database -->
+              <div class="node-float-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold" style="background:rgba(168,85,247,.12);border:1.5px solid rgba(168,85,247,.35);color:#d8b4fe;min-width:90px">
+                <span class="text-base">🗄️</span> PostgreSQL
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom status bar -->
+          <div class="absolute bottom-0 left-0 right-0 px-4 py-2 flex items-center gap-3 text-[10px]" style="background:rgba(0,0,0,.5);border-top:1px solid rgba(234,75,0,.15)">
+            <span class="flex items-center gap-1.5" style="color:#4ade80">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-400 status-dot"></span> 12 workflows active
+            </span>
+            <span style="color:#64748b">·</span>
+            <span style="color:#ff6a1f">847 executions today</span>
+            <span class="ml-auto" style="color:#475569">Node v20 · npm 10</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="border-y border-orange-100 py-3 overflow-hidden" style="background:#fff7f2">
+  <div class="ticker-inner text-xs font-semibold uppercase tracking-widest" style="color:#a365fe">
+    <span class="mx-10">⚡ n8n Pre-Installed & Ready</span>
+    <span class="mx-10">🔒 Free SSL Certificate</span>
+    <span class="mx-10">🚀 NVMe SSD Storage</span>
+    <span class="mx-10">🐳 Docker & Docker Compose</span>
+    <span class="mx-10">📦 500+ Integrations Supported</span>
+    <span class="mx-10">🛡 DDoS Protection Included</span>
+    <span class="mx-10">⚡ n8n Pre-Installed & Ready</span>
+    <span class="mx-10">🔒 Free SSL Certificate</span>
+    <span class="mx-10">🚀 NVMe SSD Storage</span>
+    <span class="mx-10">🐳 Docker & Docker Compose</span>
+    <span class="mx-10">📦 500+ Integrations Supported</span>
+    <span class="mx-10">🛡 DDoS Protection Included</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  SECTION 2 — STATS BAR
+══════════════════════════════════════════ -->
+<section class="py-10 border-b border-slate-100 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center reveal rv1">
+      <div class="p-6 rounded-2xl bg-orange-50 border border-orange-100 hover:-translate-y-1 transition-transform">
+        <div class="text-3xl font-black" style="color:#a365fe">99.99%</div>
+        <div class="text-sm text-slate-500 font-medium mt-1">Network Uptime SLA</div>
+      </div>
+      <div class="p-6 rounded-2xl bg-orange-50 border border-orange-100 hover:-translate-y-1 transition-transform">
+        <div class="text-3xl font-black" style="color:#a365fe">&lt; 60s</div>
+        <div class="text-sm text-slate-500 font-medium mt-1">n8n Provisioning</div>
+      </div>
+      <div class="p-6 rounded-2xl bg-orange-50 border border-orange-100 hover:-translate-y-1 transition-transform">
+        <div class="text-3xl font-black" style="color:#a365fe">500+</div>
+        <div class="text-sm text-slate-500 font-medium mt-1">Supported Integrations</div>
+      </div>
+      <div class="p-6 rounded-2xl bg-orange-50 border border-orange-100 hover:-translate-y-1 transition-transform">
+        <div class="text-3xl font-black" style="color:#a365fe">24/7</div>
+        <div class="text-sm text-slate-500 font-medium mt-1">Expert Support</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 3 — WHY HOST n8n ON VPS
+══════════════════════════════════════════ -->
+<section class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4" style="background:rgba(234,75,0,.1);border:1px solid rgba(234,75,0,.2);color:#a365fe">Why Self-Host</span>
+      <h2 class="text-3xl font-black text-slate-900">Why Host <span class="shimmer-n8n">n8n on VPS</span>?</h2>
+      <p class="text-slate-500 mt-3 max-w-xl mx-auto">n8n Cloud limits execution minutes and charges per active workflow. A dedicated VPS gives you unlimited power at a fraction of the cost.</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="feat-card reveal rv1 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style="background:rgba(234,75,0,.1)">
+          <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">all_inclusive</span>
+        </div>
+        <h4 class="font-bold mb-2 text-slate-900">Unlimited Executions</h4>
+        <p class="text-sm text-slate-500">No execution caps, no throttling. Run thousands of workflows 24/7 without extra fees.</p>
+      </div>
+      <div class="feat-card reveal rv2 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style="background:rgba(234,75,0,.1)">
+          <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">lock</span>
+        </div>
+        <h4 class="font-bold mb-2 text-slate-900">Full Data Privacy</h4>
+        <p class="text-sm text-slate-500">Your data never leaves your server. GDPR-compliant with complete control over data storage.</p>
+      </div>
+      <div class="feat-card reveal rv3 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style="background:rgba(234,75,0,.1)">
+          <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">savings</span>
+        </div>
+        <h4 class="font-bold mb-2 text-slate-900">10x Cost Savings</h4>
+        <p class="text-sm text-slate-500">n8n Cloud starts at $20/mo for 5 active workflows. Our VPS starts at <span class="price-amount" data-inr="699">₹699</span>/mo — unlimited.</p>
+      </div>
+      <div class="feat-card reveal rv4 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style="background:rgba(234,75,0,.1)">
+          <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">extension</span>
+        </div>
+        <h4 class="font-bold mb-2 text-slate-900">Custom Nodes & Plugins</h4>
+        <p class="text-sm text-slate-500">Install custom community nodes, private packages, and internal tools not available on cloud.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 4 — HOSTING PLANS
+══════════════════════════════════════════ -->
+<section id="plans" class="py-16 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <h2 class="text-3xl font-bold tracking-tight text-slate-900">n8n VPS <span class="shimmer-n8n">Hosting Plans</span></h2>
+      <p class="text-slate-500 max-w-2xl mx-auto mt-3">All plans include n8n pre-installed, Docker, SSL certificate, and root access. Scale freely as your workflows grow.</p>
+    </div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+  <!-- Starter -->
+  <div class="plan-card visible flex flex-col p-8 rounded-2xl bg-white border border-slate-200 shadow-sm">
+    <div class="mb-2">
+      <span class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mb-3">⚙️ n8n Starter</span>
+    </div>
+
+    <div class="mb-8">
+      <h3 class="text-lg font-bold mb-2">VPS N1</h3>
+      <div class="flex items-baseline gap-1">
+        <span class="text-4xl font-black"><span class="price-amount" data-inr="699">₹699</span></span>
+        <span class="text-slate-500 font-medium">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Solo automators & hobby projects</p>
+    </div>
+
+    <div class="space-y-4 mb-8 flex-grow">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">developer_board</span>2 vCPU Cores</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">memory</span>2 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">database</span>40 GB NVMe SSD</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">speed</span>1 TB Bandwidth</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">check_circle</span>n8n Pre-installed</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">lock</span>Free SSL + Domain</div>
+    </div>
+
+    <button disabled class="w-full py-3 rounded-xl font-bold opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+  </div>
+
+  <!-- Pro -->
+  <div class="plan-featured visible flex flex-col p-8 rounded-2xl bg-white border-2 relative shadow-xl"
+    style="border-color:#a365fe;box-shadow:0 20px 48px -12px rgba(234,75,0,.2)">
+    
+    <div class="popular-badge absolute -top-4 left-1/2 -translate-x-1/2 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full whitespace-nowrap"
+      style="background:#a365fe">Most Popular</div>
+
+    <div class="mb-2">
+      <span class="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full mb-3"
+        style="color:#a365fe;background:rgba(234,75,0,.1)">⚙️ n8n Pro</span>
+    </div>
+
+    <div class="mb-8">
+      <h3 class="text-lg font-bold mb-2">VPS N2</h3>
+      <div class="flex items-baseline gap-1">
+        <span class="text-4xl font-black" style="color:#a365fe"><span class="price-amount" data-inr="1,399">₹1,399</span></span>
+        <span class="text-slate-500 font-medium">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Small teams & business automations</p>
+    </div>
+
+    <div class="space-y-4 mb-8 flex-grow">
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">developer_board</span>4 vCPU Cores</div>
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">memory</span>4 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">database</span>80 GB NVMe SSD</div>
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">speed</span>3 TB Bandwidth</div>
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">check_circle</span>n8n + PostgreSQL</div>
+      <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-xl" style="color:#a365fe">security</span>Dedicated IPv4 + IPv6</div>
+    </div>
+
+    <button disabled class="w-full py-3 rounded-xl font-bold opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+  </div>
+
+  <!-- Enterprise -->
+  <div class="plan-card visible flex flex-col p-8 rounded-2xl bg-white border border-slate-200 shadow-sm">
+    <div class="mb-2">
+      <span class="inline-flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mb-3">⚙️ n8n Enterprise</span>
+    </div>
+
+    <div class="mb-8">
+      <h3 class="text-lg font-bold mb-2">VPS N3</h3>
+      <div class="flex items-baseline gap-1">
+        <span class="text-4xl font-black"><span class="price-amount" data-inr="2,799">₹2,799</span></span>
+        <span class="text-slate-500 font-medium">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">High-volume & production workloads</p>
+    </div>
+
+    <div class="space-y-4 mb-8 flex-grow">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">developer_board</span>8 vCPU Cores</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">memory</span>8 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">database</span>160 GB NVMe SSD</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">speed</span>6 TB Bandwidth</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">check_circle</span>n8n Queue Mode</div>
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-xl" style="color:#a365fe">support_agent</span>24/7 Priority Support</div>
+    </div>
+
+    <button disabled class="w-full py-3 rounded-xl font-bold opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+  </div>
+
+</div>
+    <p class="text-center text-sm text-slate-500 mt-8 reveal rv5">Need a custom high-memory config for large workflow queues? <a href="/contact.html" class="font-bold hover:underline" style="color:#a365fe">Contact us →</a></p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 5 — FEATURES / HOW IT WORKS
+══════════════════════════════════════════ -->
+<section class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+      <!-- Left: feature cards -->
+      <div class="order-2 lg:order-1">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="feat-card reveal rv1 p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-3">
+            <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">rocket_launch</span>
+            <h4 class="font-bold text-slate-900">1-Click n8n Deploy</h4>
+            <p class="text-sm text-slate-500">n8n installed and running via Docker in under 60 seconds. No manual setup needed.</p>
+          </div>
+          <div class="feat-card reveal rv2 p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-3">
+            <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">backup</span>
+            <h4 class="font-bold text-slate-900">Auto Backups</h4>
+            <p class="text-sm text-slate-500">Daily encrypted snapshots of your workflows, credentials, and execution history.</p>
+          </div>
+          <div class="feat-card reveal rv3 p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-3">
+            <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">update</span>
+            <h4 class="font-bold text-slate-900">Easy n8n Updates</h4>
+            <p class="text-sm text-slate-500">One-command Docker pull to upgrade n8n versions — zero downtime deployment.</p>
+          </div>
+          <div class="feat-card reveal rv4 p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-3">
+            <span class="material-symbols-outlined feat-icon text-2xl" style="color:#a365fe">shield</span>
+            <h4 class="font-bold text-slate-900">Secure by Default</h4>
+            <p class="text-sm text-slate-500">UFW firewall, fail2ban, and DDoS protection active out of the box. Your automations are safe.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: text -->
+      <div class="order-1 lg:order-2 space-y-6 reveal-right">
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider" style="background:rgba(234,75,0,.1);border:1px solid rgba(234,75,0,.2);color:#a365fe">Infrastructure</span>
+        <h2 class="text-4xl font-black tracking-tight leading-tight text-slate-900">Built for <span class="shimmer-n8n">Serious Automation</span>.</h2>
+        <p class="text-slate-500 text-base leading-relaxed">Our n8n VPS plans are optimised for continuous workflow execution. Running on KVM hypervisors with NVMe Gen4 storage, your n8n instance handles thousands of daily executions without missing a beat — even while you sleep.</p>
+        <ul class="space-y-4">
+          <li class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-green-500">check_circle</span>
+            <span class="font-semibold text-slate-700">Docker Compose stack — n8n + PostgreSQL + Redis</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-green-500">check_circle</span>
+            <span class="font-semibold text-slate-700">Nginx reverse proxy with Let's Encrypt SSL auto-renewal</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-green-500">check_circle</span>
+            <span class="font-semibold text-slate-700">Queue mode support for parallel execution scaling</span>
+          </li>
+          <li class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-green-500">check_circle</span>
+            <span class="font-semibold text-slate-700">Full SSH root access — install any Node.js package</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 6 — USE CASES / INTEGRATIONS
+══════════════════════════════════════════ -->
+<section class="py-16 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <h2 class="text-3xl font-black text-slate-900">What Can You <span class="shimmer-n8n">Automate?</span></h2>
+      <p class="text-slate-500 mt-3 max-w-xl mx-auto">From lead generation to DevOps pipelines — n8n connects 500+ services so your business runs itself.</p>
+    </div>
+
+    <!-- Use-case grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 reveal rv2">
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">📧</div>
+        <div class="text-xs font-bold text-slate-700">Email Automation</div>
+        <div class="text-[10px] text-slate-400 mt-1">Gmail · Outlook · SMTP</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">💬</div>
+        <div class="text-xs font-bold text-slate-700">Team Notifications</div>
+        <div class="text-[10px] text-slate-400 mt-1">Slack · Teams · Discord</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">🛒</div>
+        <div class="text-xs font-bold text-slate-700">eCommerce Ops</div>
+        <div class="text-[10px] text-slate-400 mt-1">Shopify · WooCommerce</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">📊</div>
+        <div class="text-xs font-bold text-slate-700">CRM & Sales</div>
+        <div class="text-[10px] text-slate-400 mt-1">HubSpot · Salesforce</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">🗃️</div>
+        <div class="text-xs font-bold text-slate-700">Data Pipelines</div>
+        <div class="text-[10px] text-slate-400 mt-1">PostgreSQL · MySQL · Redis</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">🤖</div>
+        <div class="text-xs font-bold text-slate-700">AI Workflows</div>
+        <div class="text-[10px] text-slate-400 mt-1">OpenAI · Anthropic · Groq</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">📁</div>
+        <div class="text-xs font-bold text-slate-700">File Processing</div>
+        <div class="text-[10px] text-slate-400 mt-1">Google Drive · Dropbox · S3</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">🔧</div>
+        <div class="text-xs font-bold text-slate-700">DevOps Triggers</div>
+        <div class="text-[10px] text-slate-400 mt-1">GitHub · GitLab · Jenkins</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">📅</div>
+        <div class="text-xs font-bold text-slate-700">Calendar & Tasks</div>
+        <div class="text-[10px] text-slate-400 mt-1">Google Cal · Notion · Asana</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">💳</div>
+        <div class="text-xs font-bold text-slate-700">Payments & Finance</div>
+        <div class="text-[10px] text-slate-400 mt-1">Stripe · Razorpay · PayPal</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">📱</div>
+        <div class="text-xs font-bold text-slate-700">SMS & WhatsApp</div>
+        <div class="text-[10px] text-slate-400 mt-1">Twilio · WATI · MessageBird</div>
+      </div>
+      <div class="usecase-chip p-4 rounded-xl bg-white border border-slate-200 text-center cursor-default">
+        <div class="text-2xl mb-2">🌐</div>
+        <div class="text-xs font-bold text-slate-700">Web Scraping</div>
+        <div class="text-[10px] text-slate-400 mt-1">HTTP Request · Cheerio</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 7 — COMPARISON (VPS vs n8n Cloud)
+══════════════════════════════════════════ -->
+<section class="py-16 bg-white">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <h2 class="text-3xl font-black text-slate-900">Crapplet VPS <span class="shimmer-n8n">vs n8n Cloud</span></h2>
+      <p class="text-slate-500 mt-3 max-w-lg mx-auto">See exactly why thousands of power users choose self-hosted n8n over the managed cloud plan.</p>
+    </div>
+
+    <div class="reveal rv2 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+      <!-- Header row -->
+      <div class="grid grid-cols-3 text-xs font-black uppercase tracking-widest" style="background:#a365fe">
+        <div class="px-6 py-4 text-white">Feature</div>
+        <div class="px-6 py-4 text-white text-center">Crapplet n8n VPS</div>
+        <div class="px-6 py-4 text-orange-200 text-center">n8n Cloud</div>
+      </div>
+      <!-- Rows -->
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Workflow executions</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">all_inclusive</span><div class="text-xs font-bold mt-0.5" style="color:#a365fe">Unlimited</div></div>
+        <div class="px-6 py-4 text-center text-xs text-slate-500 font-medium">2,500–50,000/mo</div>
+      </div>
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Active workflows</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">all_inclusive</span><div class="text-xs font-bold mt-0.5" style="color:#a365fe">Unlimited</div></div>
+        <div class="px-6 py-4 text-center text-xs text-slate-500 font-medium">5–unlimited (paid)</div>
+      </div>
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Data privacy</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">check_circle</span><div class="text-xs font-bold mt-0.5" style="color:#a365fe">Your server only</div></div>
+        <div class="px-6 py-4 text-center text-xs text-slate-500 font-medium">n8n servers</div>
+      </div>
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Custom nodes / npm</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">check_circle</span></div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-no text-lg">cancel</span></div>
+      </div>
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Root / SSH access</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">check_circle</span></div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-no text-lg">cancel</span></div>
+      </div>
+      <div class="cmp-row grid grid-cols-3 border-b border-slate-100">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Queue mode (Redis)</div>
+        <div class="px-6 py-4 text-center"><span class="material-symbols-outlined cmp-yes-n8n text-lg">check_circle</span></div>
+        <div class="px-6 py-4 text-center text-xs text-slate-500 font-medium">Enterprise only</div>
+      </div>
+      <div class="cmp-row grid grid-cols-3">
+        <div class="px-6 py-4 text-sm font-semibold text-slate-700">Monthly cost</div>
+        <div class="px-6 py-4 text-center text-xl font-black" style="color:#a365fe">From <span class="price-amount" data-inr="699">₹699</span></div>
+        <div class="px-6 py-4 text-center text-sm font-semibold text-slate-500">$20 – $150+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 8 — HOW TO GET STARTED (Steps)
+══════════════════════════════════════════ -->
+<section class="py-16 bg-slate-50 overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4" style="background:rgba(234,75,0,.1);border:1px solid rgba(234,75,0,.2);color:#a365fe">Quick Setup</span>
+      <h2 class="text-3xl font-black text-slate-900">Up &amp; Running in <span class="shimmer-n8n">4 Simple Steps</span></h2>
+      <p class="text-slate-500 mt-3 max-w-xl mx-auto">From order to your first automated workflow in under 5 minutes — no DevOps knowledge needed.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+      <!-- Connector line -->
+      <div class="hidden md:block absolute top-12 left-[12.5%] right-[12.5%] h-0.5" style="background:linear-gradient(to right,rgba(234,75,0,.2),rgba(234,75,0,.7),rgba(234,75,0,.2));z-index:0;"></div>
+
+      <div class="reveal rv1 relative z-10 bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm hover:-translate-y-2 hover:border-orange-300 transition-all">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(234,75,0,.1);border:1px solid rgba(234,75,0,.2)">
+          <span class="material-symbols-outlined text-2xl" style="color:#a365fe">shopping_cart</span>
+        </div>
+        <div class="text-4xl font-black mb-2" style="-webkit-background-clip:text;-webkit-text-fill-color:transparent;background:linear-gradient(135deg,#a365fe,#ff6a1f);background-clip:text">01</div>
+        <h4 class="font-bold text-slate-900 mb-2">Choose a Plan</h4>
+        <p class="text-sm text-slate-500">Pick the n8n VPS plan that fits your workflow volume and team size.</p>
+      </div>
+
+      <div class="reveal rv2 relative z-10 bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm hover:-translate-y-2 hover:border-orange-300 transition-all">
+        <div class="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-blue-500 text-2xl">credit_card</span>
+        </div>
+        <div class="text-4xl font-black mb-2" style="-webkit-background-clip:text;-webkit-text-fill-color:transparent;background:linear-gradient(135deg,#a365fe,#ff6a1f);background-clip:text">02</div>
+        <h4 class="font-bold text-slate-900 mb-2">Place Your Order</h4>
+        <p class="text-sm text-slate-500">Pay via UPI, card, or net banking. Your server provisions automatically.</p>
+      </div>
+
+      <div class="reveal rv3 relative z-10 bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm hover:-translate-y-2 hover:border-orange-300 transition-all">
+        <div class="w-14 h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-green-600 text-2xl">terminal</span>
+        </div>
+        <div class="text-4xl font-black mb-2" style="-webkit-background-clip:text;-webkit-text-fill-color:transparent;background:linear-gradient(135deg,#a365fe,#ff6a1f);background-clip:text">03</div>
+        <h4 class="font-bold text-slate-900 mb-2">n8n Auto-Deploys</h4>
+        <p class="text-sm text-slate-500">n8n launches in Docker with SSL, reverse proxy, and PostgreSQL — all configured.</p>
+      </div>
+
+      <div class="reveal rv4 relative z-10 bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm hover:-translate-y-2 hover:border-orange-300 transition-all">
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-amber-600 text-2xl">auto_awesome</span>
+        </div>
+        <div class="text-4xl font-black mb-2" style="-webkit-background-clip:text;-webkit-text-fill-color:transparent;background:linear-gradient(135deg,#a365fe,#ff6a1f);background-clip:text">04</div>
+        <h4 class="font-bold text-slate-900 mb-2">Start Automating</h4>
+        <p class="text-sm text-slate-500">Open your n8n editor URL and build your first workflow. That's it!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 9 — FAQ
+══════════════════════════════════════════ -->
+<section class="py-24 bg-white relative overflow-hidden">
+  <div class="absolute inset-0 opacity-[0.02]" style="background-image:radial-gradient(circle at 1px 1px,#a365fe 1px,transparent 0);background-size:28px 28px;pointer-events:none;"></div>
+  <div class="absolute -bottom-20 -left-20 w-96 h-96 rounded-full blur-3xl pointer-events-none" style="background:rgba(234,75,0,.05)"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="flex flex-col lg:flex-row gap-16 items-start">
+
+      <!-- Left: heading + support card -->
+      <div class="lg:w-80 flex-shrink-0 reveal rv1">
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-5" style="background:rgba(234,75,0,.1);border:1px solid rgba(234,75,0,.2);color:#a365fe">FAQ</span>
+        <h2 class="text-3xl font-black text-slate-900 leading-tight mb-5">Frequently Asked <span class="shimmer-n8n">Questions</span></h2>
+        <p class="text-slate-500 text-sm leading-relaxed mb-8">Everything you need to know about n8n VPS hosting on Crapplet. Still stuck? Our team is online right now.</p>
+
+        <div class="rounded-2xl p-5 space-y-4" style="background:linear-gradient(135deg,rgba(234,75,0,.07),rgba(255,106,31,.05));border:1px solid rgba(234,75,0,.15)">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#a365fe">
+              <span class="material-symbols-outlined text-white text-lg">support_agent</span>
+            </div>
+            <div>
+              <div class="font-bold text-slate-900 text-sm">Still have questions?</div>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-xs text-green-600 font-semibold">Support online now</span>
+              </div>
+            </div>
+          </div>
+          <a href="/contact.html" class="w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-bold hover:brightness-110 hover:-translate-y-0.5 transition-all shadow-md" style="background:#a365fe">
+            <span class="material-symbols-outlined text-sm">chat</span> Chat with Us
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: accordion -->
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+
+        <div class="faq-item reveal rv1">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Is n8n already installed on the VPS?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Yes. All n8n VPS plans come with <strong>n8n pre-installed via Docker</strong> with Nginx reverse proxy, Let's Encrypt SSL, and PostgreSQL database — fully configured and accessible at your subdomain within 60 seconds of provisioning.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv2">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I use my own domain with n8n?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Absolutely. Point your domain's A record to your VPS IP, then update the Nginx config (we provide a ready-made template). Let's Encrypt SSL will auto-issue a certificate for your custom domain in minutes.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv3">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">How do I update n8n to a newer version?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">SSH into your server and run <code class="bg-slate-100 px-1 rounded text-xs">docker compose pull && docker compose up -d</code>. The new n8n image pulls and restarts with zero data loss. We also provide a one-click update script in our knowledge base.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv4">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I install custom community nodes?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Yes — this is one of the biggest advantages of self-hosting. Enable community nodes in n8n settings and install any npm package. You can also SSH in and install system-level dependencies required by custom nodes.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv5">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">What database does n8n use on the VPS?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Our Pro and Enterprise plans use <strong>PostgreSQL</strong> (the recommended production database for n8n) which stores all workflows, credentials, and execution history. The Starter plan uses SQLite by default, suitable for lighter workloads.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv1">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Does the VPS support n8n queue mode?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Yes. Our Enterprise VPS plan (N3) includes a pre-configured <strong>Redis + n8n Queue Mode</strong> setup, allowing parallel execution of workflows by multiple worker processes — ideal for high-volume automation pipelines.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv2">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">How are my workflows backed up?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Daily automated snapshots are taken of the entire VPS, including your n8n data volume, PostgreSQL database, and configuration files. Snapshots are stored off-site and can be restored with one click from the portal.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv3">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I upgrade my plan later?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Yes. Scale CPU and RAM upward from the client portal with one click. A brief ~60 second reboot applies the changes. All your n8n workflows, credentials, and execution history are preserved.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv4">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Is there a limit on webhook triggers?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">No limits at all. You get a dedicated IP with a 10 Gbps port, so your n8n webhooks can handle thousands of concurrent requests. No rate-limiting or execution throttling from our side.</div></div>
+        </div>
+
+        <div class="faq-item reveal rv5">
+          <button class="faq-trigger">
+            <span class="text-sm font-bold text-slate-800 flex-1 text-left">Do you offer managed n8n support?</span>
+            <div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div>
+          </button>
+          <div class="faq-body"><div class="faq-inner">Our support team helps with server-level issues (networking, OS, Docker, SSL). For n8n workflow-level questions, we point you to the excellent n8n community forum. Enterprise plan customers get priority ticket support with guaranteed response times.</div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  CTA — DEPLOY
+══════════════════════════════════════════ -->
+<section class="cta-section py-16 border-t" style="border-color:rgba(86, 0, 234, 0.15)">
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 reveal rv1">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider" style="background:rgba(74, 0, 234, 0.1);border:1px solid rgba(27, 0, 234, 0.2);color:#a365fe">
+      <span class="w-2 h-2 rounded-full animate-pulse" style="background:#a365fe"></span>
+      Servers provisioning in &lt; 60s
+    </div>
+    <h2 class="text-3xl lg:text-4xl font-black text-slate-900">Ready to Run n8n on <span class="shimmer-n8n">Your Own Server?</span></h2>
+    <p class="text-slate-500 text-lg">Join thousands of automation builders who've ditched n8n Cloud limits. Enter your email and deploy in under a minute.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <input id="ctaEmail" class="glow-input w-full sm:w-80 px-4 py-3 rounded-xl border border-slate-300 bg-white text-sm" placeholder="Enter your email address" type="email"/>
+      <button id="deployBtn" class="deploy-btn w-full sm:w-auto px-8 py-3 text-white font-bold rounded-xl shadow-lg text-sm" style="background:linear-gradient(135deg,#a365fe,#3d1fff);box-shadow:0 6px 20px rgba(234,75,0,.35)">
+        Deploy n8n VPS Now
+      </button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Hosting</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Company</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Support</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* Cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => {
+  glow.style.left = e.clientX + 'px';
+  glow.style.top  = e.clientY + 'px';
+});
+
+/* Header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+/* Scroll reveal */
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .plan-card, .plan-featured, .feat-card, .faq-item').forEach(el => obs.observe(el));
+
+/* Select button feedback */
+document.querySelectorAll('.select-btn, .select-primary').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const orig = this.textContent;
+    const origBg = this.style.background;
+    this.textContent = '✓ Added to Cart';
+    this.style.background = '#16a34a';
+    this.style.color = '#fff';
+    this.style.border = 'none';
+    setTimeout(() => {
+      this.textContent = orig;
+      this.style.background = origBg;
+      this.style.color = '';
+      this.style.border = '';
+    }, 2000);
+  });
+});
+
+/* Deploy CTA */
+const deployBtn = document.getElementById('deployBtn');
+const ctaEmail  = document.getElementById('ctaEmail');
+deployBtn.addEventListener('click', () => {
+  if (ctaEmail.value.trim()) {
+    deployBtn.textContent = '✓ Deploying…';
+    deployBtn.style.background = '#16a34a';
+    setTimeout(() => {
+      deployBtn.textContent = 'Deploy n8n VPS Now';
+      deployBtn.style.background = 'linear-gradient(135deg,#a365fe,#ff6a1f)';
+      ctaEmail.value = '';
+    }, 2200);
+  } else {
+    ctaEmail.style.borderColor = '#ef4444';
+    ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+    setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+  }
+});
+
+/* FAQ accordion */
+document.querySelectorAll('.faq-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const item = btn.closest('.faq-item');
+    const body = item.querySelector('.faq-body');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => {
+      i.classList.remove('open');
+      i.querySelector('.faq-body').classList.remove('open');
+      i.querySelector('.faq-sym').textContent = 'add';
+    });
+    if (!isOpen) {
+      item.classList.add('open');
+      body.classList.add('open');
+      btn.querySelector('.faq-sym').textContent = 'close';
+    }
+  });
+});
+
+/* ══ MOBILE DRAWER ══ */
+const toggle   = document.getElementById('menu-toggle');
+const drawer   = document.getElementById('mobile-drawer');
+const overlay  = document.getElementById('mobile-overlay');
+const closeBtn = document.getElementById('close-drawer');
+
+function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+overlay.addEventListener('click', closeDrawer);
+if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+
+/* Submenu accordions */
+document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+  trigger.addEventListener('click', function () {
+    const subId = 'sub-' + this.id.replace('acc-', '');
+    const sub   = document.getElementById(subId);
+    if (!sub) return;
+    const isOpen = sub.classList.contains('open');
+    document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+    document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+    if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+  });
+});
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

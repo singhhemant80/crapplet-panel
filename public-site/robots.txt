@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /clientarea/
+
+Sitemap: https://crapplet.co.in/sitemap.xml

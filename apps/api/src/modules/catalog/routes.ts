@@ -1,0 +1,176 @@
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../../db";
+import { ah, badRequest, clientIp, notFound, parse } from "../../lib/http";
+import { requireAuth, requireClient } from "../../middleware/auth";
+import { listAvailableIps, releaseIpReservation, reserveIp } from "../ipam/service";
+import { cartSchema, priceCart } from "../orders/pricing";
+import { checkout } from "../orders/checkout";
+import { checkDomain } from "../domains/service";
+
+export const catalogRouter = Router();
+
+const productInclude = {
+  pricing: { where: { enabled: true }, orderBy: { price: "asc" as const } },
+  configOptions: { orderBy: { sortOrder: "asc" as const } },
+  osTemplates: { include: { osTemplate: true } },
+  addons: { include: { addon: true } },
+};
+
+function publicProduct(p: Awaited<ReturnType<typeof findProduct>>) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    legacyPid: p.legacyPid,
+    name: p.name,
+    slug: p.slug,
+    type: p.type,
+    tagline: p.tagline,
+    description: p.description,
+    features: p.features,
+    imageUrl: p.imageUrl,
+    group: p.group ? { name: p.group.name, slug: p.group.slug } : undefined,
+    specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4Count: p.ipv4Count, ipv6: p.ipv6Enabled, virtType: p.virtType },
+    isVps: p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR",
+    allowIpSelection: p.allowIpSelection,
+    requireHostname: p.requireHostname,
+    featured: p.featured,
+    outOfStock: p.stockControl && p.stockQty <= 0,
+    pricing: p.pricing.map((x) => ({ cycle: x.cycle, currency: x.currency, price: x.price, setupFee: x.setupFee })),
+    configOptions: p.configOptions.map((o) => ({ key: o.key, label: o.label, type: o.type, minQty: o.minQty, maxQty: o.maxQty, choices: o.choices, unitMonthly: o.unitMonthly })),
+    osTemplates: p.osTemplates.filter((o) => o.osTemplate.enabled).map((o) => ({ id: o.osTemplate.id, name: o.osTemplate.name, family: o.osTemplate.family })),
+    addons: p.addons.filter((a) => a.addon.enabled).map((a) => ({ id: a.addon.id, name: a.addon.name, description: a.addon.description, monthly: a.addon.monthly, setupFee: a.addon.setupFee })),
+  };
+}
+
+const findProduct = (key: string) =>
+  prisma.product.findFirst({
+    where: { enabled: true, OR: [{ id: key }, { slug: key }, ...(/^\d+$/.test(key) ? [{ legacyPid: Number(key) }] : [])] },
+    include: { ...productInclude, group: true },
+  });
+
+catalogRouter.get(
+  "/groups",
+  ah(async (_req, res) => {
+    const groups = await prisma.productGroup.findMany({
+      where: { hidden: false },
+      orderBy: { sortOrder: "asc" },
+      include: { products: { where: { enabled: true, hidden: false }, orderBy: { sortOrder: "asc" }, include: { ...productInclude, group: true } } },
+    });
+    res.json({ groups: groups.map((g) => ({ id: g.id, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map(publicProduct) })) });
+  }),
+);
+
+catalogRouter.get(
+  "/products/:key",
+  ah(async (req, res) => {
+    const p = await findProduct(req.params.key);
+    if (!p) throw notFound("Product not found");
+    res.json({ product: publicProduct(p) });
+  }),
+);
+
+/** Locations offering a product, with the number of free IPv4 addresses at each. */
+catalogRouter.get(
+  "/products/:key/locations",
+  ah(async (req, res) => {
+    const p = await prisma.product.findFirst({ where: { enabled: true, OR: [{ id: req.params.key }, { slug: req.params.key }] }, include: { servers: { include: { server: { include: { location: true } } } } } });
+    if (!p) throw notFound("Product not found");
+    const out = [];
+    for (const { server } of p.servers.filter((s) => s.server.enabled)) {
+      const free = await prisma.ipAddress.count({ where: { serverId: server.id, version: 4, serviceId: null, OR: [{ status: "AVAILABLE" }, { status: "RESERVED", reservedUntil: { lt: new Date() } }] } });
+      out.push({ serverId: server.id, name: server.location?.name ?? server.name, code: server.location?.code ?? null, country: server.location?.country ?? "IN", freeIps: free });
+    }
+    res.json({ locations: out });
+  }),
+);
+
+catalogRouter.get(
+  "/products/:key/ips",
+  ah(async (req, res) => {
+    const q = parse(z.object({ serverId: z.string().optional(), search: z.string().max(40).optional() }), req.query);
+    const p = await prisma.product.findFirst({ where: { enabled: true, OR: [{ id: req.params.key }, { slug: req.params.key }] }, include: { servers: true } });
+    if (!p) throw notFound("Product not found");
+    if (!p.allowIpSelection) throw badRequest("This plan assigns IPs automatically");
+    const allowed = p.servers.map((s) => s.serverId);
+    const serverIds = q.serverId ? allowed.filter((id) => id === q.serverId) : allowed;
+    const ips = await listAvailableIps({ serverIds, search: q.search, limit: 256 });
+    res.json({ ips });
+  }),
+);
+
+catalogRouter.post(
+  "/ips/:ipId/reserve",
+  requireClient,
+  ah(async (req, res) => {
+    const { productId } = parse(z.object({ productId: z.string() }), req.body);
+    const p = await prisma.product.findFirst({ where: { OR: [{ id: productId }, { slug: productId }], enabled: true }, include: { servers: true } });
+    if (!p || !p.allowIpSelection) throw badRequest("This plan does not support IP selection");
+    const ip = await reserveIp({ ipId: req.params.ipId, userId: req.user!.id, serverIds: p.servers.map((s) => s.serverId) });
+    res.json({ reservation: { ipId: ip.id, address: ip.address, serverId: ip.serverId, expiresAt: ip.reservedUntil } });
+  }),
+);
+
+catalogRouter.delete(
+  "/ips/:ipId/reserve",
+  requireClient,
+  ah(async (req, res) => {
+    res.json({ released: await releaseIpReservation(req.params.ipId, req.user!.id) });
+  }),
+);
+
+catalogRouter.get(
+  "/domains/check",
+  ah(async (req, res) => {
+    const { name } = parse(z.object({ name: z.string().trim().toLowerCase().regex(/^[a-z0-9-]{1,63}(\.[a-z0-9-]{2,63})+$/, "Enter a domain like example.in") }), req.query);
+    res.json(await checkDomain(name));
+  }),
+);
+
+catalogRouter.get(
+  "/domains/pricing",
+  ah(async (_req, res) => {
+    res.json({ tlds: await prisma.domainPricing.findMany({ where: { enabled: true }, orderBy: { register: "asc" } }) });
+  }),
+);
+
+catalogRouter.get(
+  "/currencies",
+  ah(async (_req, res) => {
+    res.json({ currencies: await prisma.currency.findMany() });
+  }),
+);
+
+catalogRouter.get(
+  "/os-templates",
+  ah(async (_req, res) => {
+    res.json({ osTemplates: await prisma.osTemplate.findMany({ where: { enabled: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, family: true } }) });
+  }),
+);
+
+// ── Cart ──
+catalogRouter.post(
+  "/cart/quote",
+  ah(async (req, res) => {
+    const cart = parse(cartSchema, req.body);
+    const r = await priceCart(cart, { userId: req.user?.type === "CLIENT" ? req.user.id : null });
+    res.json({ lines: r.lines, promo: r.promo, totals: r.tax, currency: r.currency });
+  }),
+);
+
+catalogRouter.post(
+  "/cart/checkout",
+  requireClient,
+  ah(async (req, res) => {
+    const body = parse(cartSchema.extend({ notes: z.string().max(1000).optional(), useCredit: z.boolean().default(true), acceptTos: z.literal(true, { errorMap: () => ({ message: "Please accept the terms of service" }) }) }), req.body);
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id }, include: { profile: true } });
+    const { getSettings } = await import("../../lib/settings");
+    const s = await getSettings();
+    if (s.orders.requireEmailVerification && !u.emailVerifiedAt) throw badRequest("Please verify your email address before ordering");
+    if (!u.profile?.address1) throw badRequest("Please complete your billing address before ordering");
+    const r = await checkout({ userId: u.id, cart: body, ip: clientIp(req), notes: body.notes, useCredit: body.useCredit });
+    res.status(201).json(r);
+  }),
+);
+
+export { requireAuth };

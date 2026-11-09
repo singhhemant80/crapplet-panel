@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png" /><title>Enterprise Dedicated Hosting | Crapplet Infotech</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#a365fe",
+          "background-light": "#ffffff",
+          "background-dark": "#101922",
+        },
+        fontFamily: { "display": ["Inter"] },
+        borderRadius: { "DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+      },
+    },
+  }
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .nav-dropdown:hover .dropdown-menu { display: block; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #a365fe, #7c3aed); border-radius: 10px; border: 2px solid #f1f5f9; }
+  ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #7c3aed, #a365fe); }
+
+  /* ── Cursor glow ── */
+  #cursor-glow {
+    position: fixed; width: 340px; height: 340px; border-radius: 50%;
+    background: radial-gradient(circle, #8949ea29 0%, transparent 70%);
+    pointer-events: none; z-index: 9999; transform: translate(-50%, -50%);
+    transition: left .1s ease, top .1s ease;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+  .load { animation: fadeInUp .75s cubic-bezier(.22,1,.36,1) both; }
+  .ld1 { animation-delay: .07s } .ld2 { animation-delay: .17s } .ld3 { animation-delay: .27s }
+  .ld4 { animation-delay: .37s } .ld5 { animation-delay: .47s }
+
+  .reveal { opacity: 0; transform: translateY(32px); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .rv1 { transition-delay: .05s } .rv2 { transition-delay: .15s } .rv3 { transition-delay: .25s }
+  .rv4 { transition-delay: .35s } .rv5 { transition-delay: .45s }
+  .reveal-left { opacity: 0; transform: translateX(-36px); transition: opacity .75s cubic-bezier(.22,1,.36,1), transform .75s cubic-bezier(.22,1,.36,1); }
+  .reveal-left.visible { opacity: 1; transform: translateX(0); }
+  .reveal-right { opacity: 0; transform: translateX(36px); transition: opacity .75s cubic-bezier(.22,1,.36,1), transform .75s cubic-bezier(.22,1,.36,1); }
+  .reveal-right.visible { opacity: 1; transform: translateX(0); }
+
+  @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+  .shimmer-text {
+    background: linear-gradient(90deg, #a365fe, #c084fc, #7c3aed, #a365fe);
+    background-size: 200% auto;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; animation: shimmer 3s linear infinite;
+  }
+
+  @keyframes orb1 { 0%,100% { transform: translate(0,0) scale(1); } 40% { transform: translate(35px,-28px) scale(1.1); } 70% { transform: translate(-18px,20px) scale(.93); } }
+  @keyframes orb2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-45px,38px) scale(1.08); } }
+  .orb1 { animation: orb1 11s ease-in-out infinite; }
+  .orb2 { animation: orb2 15s ease-in-out infinite; }
+
+  @keyframes pulseBadge { 0%,100% { box-shadow: 0 0 0 0 rgba(163,101,254,.5); } 50% { box-shadow: 0 0 0 8px rgba(163,101,254,0); } }
+  .badge-pulse { animation: pulseBadge 2.5s ease-in-out infinite; }
+
+  /* ── Ticker ── */
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-inner { display: flex; width: max-content; animation: ticker 22s linear infinite; }
+  .ticker-inner:hover { animation-play-state: paused; }
+
+  /* ── Plan cards ── */
+  .plan-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, border-color .3s; }
+  .plan-card:hover { transform: translateY(-8px); box-shadow: 0 20px 48px -12px rgba(0,0,0,.12); border-color: rgba(163,101,254,.4); }
+  .plan-featured { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s; }
+  .plan-featured:hover { transform: translateY(-10px) scale(1.02); box-shadow: 0 28px 56px -12px rgba(163,101,254,.35); }
+
+  @keyframes specIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+  .spec-row { opacity: 0; }
+  .plan-card.visible .spec-row, .plan-featured.visible .spec-row { animation: specIn .45s cubic-bezier(.22,1,.36,1) both; }
+  .spec-row:nth-child(1) { animation-delay: .1s } .spec-row:nth-child(2) { animation-delay: .2s }
+  .spec-row:nth-child(3) { animation-delay: .3s } .spec-row:nth-child(4) { animation-delay: .4s }
+
+  /* ── Deploy buttons ── */
+  .deploy-btn { transition: background .25s, color .25s, transform .2s, box-shadow .2s; }
+  .deploy-btn:hover { background: #a365fe; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(163,101,254,.45); }
+  .deploy-primary { transition: filter .2s, transform .2s, box-shadow .2s; }
+  .deploy-primary:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(163,101,254,.55); }
+
+  /* ── Feature cards ── */
+  .feat-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, border-color .3s; }
+  .feat-card:hover { transform: translateY(-6px); box-shadow: 0 16px 36px -8px rgba(0,0,0,.1); border-color: rgba(163,101,254,.35); }
+  .feat-icon-wrap { transition: transform .3s ease, background .2s; }
+  .feat-card:hover .feat-icon-wrap { transform: scale(1.15) rotate(6deg); background: #a365fe !important; }
+  .feat-card:hover .feat-icon-wrap .material-symbols-outlined { color: #fff !important; }
+
+  /* ── Terminal ── */
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+  .cursor-blink { animation: blink 1s step-start infinite; }
+
+  /* ── CTA section ── */
+  @keyframes dotMove { 0% { background-position: 0 0; } 100% { background-position: 30px 30px; } }
+  .cta-section {
+    background-image: radial-gradient(circle, rgba(163,101,254,.08) 1px, transparent 0);
+    background-size: 30px 30px; animation: dotMove 6s linear infinite;
+  }
+
+  .glow-input { transition: box-shadow .3s, border-color .3s; }
+  .glow-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(163,101,254,.2); border-color: #a365fe; }
+
+  /* ── Footer ── */
+  .footer-link { transition: color .2s, padding-left .2s; display: inline-block; }
+  .footer-link:hover { color: #a365fe; padding-left: 5px; }
+  .social-icon { transition: color .2s, transform .3s ease; }
+  .social-icon:hover { color: #a365fe; transform: rotate(15deg) scale(1.2); }
+
+  /* ── Header ── */
+  header { transition: box-shadow .3s; }
+  header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
+  nav a { position: relative; }
+  nav a::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: #a365fe; border-radius: 2px; transition: width .3s ease; }
+  nav a:hover::after { width: 100%; }
+
+  /* ── FAQ ── */
+  .faq-item { transition: border-color .3s, box-shadow .3s; }
+  .faq-content { transition: max-height .35s ease; }
+  .faq-icon { transition: transform .3s ease, background .2s; }
+  .faq-item.open .faq-icon { transform: rotate(45deg); background: #a365fe; }
+  .faq-item.open .faq-icon .material-symbols-outlined { color: #fff; }
+
+  /* ── Comparison table ── */
+  .cmp-row { transition: background .2s; }
+  .cmp-row:hover { background: #faf5ff; }
+
+  /* ══════════════════════════════════════════
+     MOBILE DRAWER
+  ══════════════════════════════════════════ */
+  #menu-toggle { position: relative; width: 40px; height: 40px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; z-index: 60; }
+  #menu-toggle .bar { display: block; height: 2px; border-radius: 2px; background: #1e293b; transition: all .35s cubic-bezier(.22,1,.36,1); }
+  #menu-toggle .bar-top { width: 22px; }
+  #menu-toggle .bar-mid { width: 16px; transform-origin: right center; }
+  #menu-toggle .bar-bot { width: 22px; }
+  #menu-toggle.open .bar-top { transform: translateY(7px) rotate(45deg); width: 22px; }
+  #menu-toggle.open .bar-mid { width: 0; opacity: 0; }
+  #menu-toggle.open .bar-bot { transform: translateY(-7px) rotate(-45deg); width: 22px; }
+
+  #mobile-overlay { position: fixed; inset: 0; background: rgba(10,5,25,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 49; opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+  #mobile-overlay.show { opacity: 1; pointer-events: all; }
+
+  #mobile-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(88vw,360px); background: linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%); z-index: 50; overflow-y: auto; overflow-x: hidden; transform: translateX(100%); transition: transform .4s cubic-bezier(.22,1,.36,1); box-shadow: -20px 0 60px rgba(0,0,0,.5); }
+  #mobile-drawer.open { transform: translateX(0); }
+  #mobile-drawer::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); opacity: .18; }
+  #mobile-drawer::after { content: ''; position: absolute; top: -80px; right: -60px; width: 260px; height: 260px; background: radial-gradient(circle, #a365fe44 0%, transparent 70%); pointer-events: none; z-index: 0; border-radius: 50%; }
+  .drawer-glow-bottom { position: absolute; bottom: -60px; left: -40px; width: 200px; height: 200px; background: radial-gradient(circle, #6633cc33 0%, transparent 70%); border-radius: 50%; pointer-events: none; z-index: 0; }
+  .drawer-inner { position: relative; z-index: 1; }
+  .drawer-header { padding: 20px 24px 16px; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; align-items: center; justify-content: space-between; }
+  .mob-nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 24px; cursor: pointer; color: rgba(255,255,255,.8); font-size: 14px; font-weight: 600; position: relative; transition: background .2s ease, color .2s ease, padding-left .2s ease; text-decoration: none; }
+  .mob-nav-item:hover { background: rgba(163,101,254,.12); color: #fff; padding-left: 30px; }
+  .mob-nav-item .item-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; transition: transform .25s ease; }
+  .mob-nav-item:hover .item-icon { transform: scale(1.15) rotate(-5deg); }
+  .mob-nav-item .item-arrow { margin-left: auto; opacity: .4; font-size: 16px; transition: transform .2s ease, opacity .2s ease; }
+  .mob-nav-item:hover .item-arrow { transform: translateX(4px); opacity: .8; }
+  .mob-submenu { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.22,1,.36,1); background: rgba(0,0,0,.2); }
+  .mob-submenu.open { max-height: 500px; }
+  .mob-submenu-item { display: flex; align-items: center; gap: 10px; padding: 10px 24px 10px 56px; color: rgba(255,255,255,.6); font-size: 13px; font-weight: 500; transition: color .2s, padding-left .2s; text-decoration: none; }
+  .mob-submenu-item:hover { color: #a365fe; padding-left: 62px; }
+  .mob-submenu-item::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: #a365fe; opacity: .5; flex-shrink: 0; transition: opacity .2s, transform .2s; }
+  .mob-submenu-item:hover::before { opacity: 1; transform: scale(1.4); }
+  .mob-nav-item .chevron { transition: transform .3s ease; }
+  .mob-nav-item.sub-open .chevron { transform: rotate(180deg); }
+  .drawer-divider { height: 1px; background: rgba(255,255,255,.06); margin: 8px 24px; }
+  .drawer-cta { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .drawer-btn-support { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(163,101,254,.35); color: rgba(255,255,255,.85); font-weight: 700; font-size: 14px; transition: background .2s, border-color .2s; }
+  .drawer-btn-support:hover { background: rgba(163,101,254,.12); border-color: #a365fe; }
+  .drawer-btn-login { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: 12px; background: linear-gradient(135deg,#a365fe,#7c3aed); color: #fff; font-weight: 800; font-size: 14px; box-shadow: 0 6px 24px rgba(163,101,254,.4); transition: filter .2s, transform .2s, box-shadow .2s; }
+  .drawer-btn-login:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(163,101,254,.55); }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+  #mobile-drawer.open .drawer-inner > * { animation: slideInRight .4s cubic-bezier(.22,1,.36,1) both; }
+  #mobile-drawer.open .drawer-inner > *:nth-child(1) { animation-delay: .05s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(2) { animation-delay: .10s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(3) { animation-delay: .15s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(4) { animation-delay: .20s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(5) { animation-delay: .25s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(6) { animation-delay: .30s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(7) { animation-delay: .35s }
+  #mobile-drawer.open .drawer-inner > *:nth-child(8) { animation-delay: .40s }
+  .drawer-social { display: flex; gap: 10px; padding: 0 24px 24px; }
+  .drawer-social a { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.5); font-size: 14px; transition: background .2s, color .2s, transform .2s; }
+  .drawer-social a:hover { background: rgba(163,101,254,.25); color: #a365fe; transform: translateY(-3px); }
+  body.nav-open { overflow: hidden; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/dedicated-hosting.html">
+</head>
+<body class="bg-background-light font-display text-slate-900 antialiased overflow-x-hidden">
+
+<div id="cursor-glow"></div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+
+    <div class="drawer-header">
+     <a href="/index.html">
+      <img alt="Crapplet" src="/Crapplet_logo.png"
+           class="h-10 w-auto"
+           onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
+      /></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a> 
+
+    <div class="drawer-divider"></div>
+
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">25+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">DCs</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">24/7</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+      <a href="/contact.html"><button class="drawer-btn-support w-full">
+        <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+        Support
+      </button>
+                  <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+
+    </div>
+
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+
+<div class="relative flex h-auto min-screen w-full flex-col">
+<div class="layout-container flex h-full grow flex-col">
+
+<!-- ── HEADER ── -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li is-current" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-1">
+
+<!-- ══════════════════════════════════════════
+  HERO
+══════════════════════════════════════════ -->
+<section class="relative overflow-hidden bg-slate-50/50 py-16 md:py-16">
+  <!-- Orbs -->
+  <div class="absolute inset-0 pointer-events-none -z-0">
+    <div class="orb1 absolute -top-24 -left-24 w-80 h-80 rounded-full bg-primary/8 blur-3xl"></div>
+    <div class="orb2 absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-purple-200/20 blur-3xl"></div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+      <!-- Left text -->
+      <div class="flex flex-col gap-6">
+        <div class="load ld1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider w-fit badge-pulse">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          </span>
+          Enterprise Infrastructure
+        </div>
+
+        <h1 class="load ld2 text-2xl md:text-4xl lg:text-4xl font-black leading-[1.1] tracking-tight text-slate-900">
+          Dedicated Server Hosting  </br><span class="shimmer-text">for Scale</span>
+        </h1>
+
+        <p class="load ld3 text-slate-600 text-lg leading-relaxed max-w-xl">
+          High-performance, single-tenant infrastructure designed for mission-critical applications. Experience raw power and ultimate control with 100% dedicated resources.
+        </p>
+
+        <!-- Mini spec badges -->
+        <div class="load ld3 flex flex-wrap gap-3">
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">memory</span> Intel Xeon &amp; AMD EPYC
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">hard_drive</span> PCIe Gen 4 NVMe
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">settings_ethernet</span> 100 Gbps Network
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">shield_person</span> 10 Tbps DDoS Shield
+          </span>
+        </div>
+
+        <div class="load ld4 flex flex-wrap gap-4 pt-2">
+          <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})"
+            class="bg-[#a365fe] text-white px-8 py-3 rounded-xl font-bold text-base hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-1 transition-all">
+            View Configurations
+          </button>
+          <button class="bg-white border border-slate-200 px-8 py-3 rounded-xl font-bold text-base hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md" onclick="location.href='/contact.html'">
+            Talk to Expert
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: server room image + floating card -->
+      <div class="load ld5 relative group">
+        <div class="absolute -inset-1 rounded-2xl blur opacity-20 group-hover:opacity-35 transition duration-700" style="background:linear-gradient(135deg,#a365fe,#7c3aed)"></div>
+        <div class="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-cover bg-center"
+             style="background-image:url('https://lh3.googleusercontent.com/aida-public/AB6AXuAQkImJv_xq7QPYRqiFhxcFLpk8r5l3vvzdMjM5_TyPgm5JOYGF20ohHAq9U1dkzMYHyWohQ4QBfUaos5Cq6MbMRnY_x0dp-feQMoQsL2dmyJlwa1iyjIt3crGNRACJ_oAipHjayYX9XtZnW4XwAVQOaqZ5C_ih7zNwm3V4Xy8xeEDIfghJY41cuH5X6QWx21VU2L_PxttGzfBJ_pZS5rRQdBQggwiVkAMTpZ4ZFG3i5fH5f6MD_Si6zri_4co3ngPMHysCBk_xwA')">
+          <!-- Overlay -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+          <!-- Floating status card -->
+          <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between px-4 py-3 rounded-xl backdrop-blur-md bg-white/10 border border-white/20">
+            <div class="flex items-center gap-2">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+              </span>
+              <span class="text-white text-xs font-bold">All Systems Operational</span>
+            </div>
+            <span class="text-white/70 text-xs font-mono">Uptime: <span class="text-green-400 font-bold">99.99%</span></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="bg-primary/5 border-y border-primary/10 py-3 overflow-hidden">
+  <div class="ticker-inner text-xs font-semibold text-primary uppercase tracking-widest">
+    <span class="mx-10">⚡ 99.99% Network Uptime SLA</span>
+    <span class="mx-10">🌍 25+ Global Data Centers</span>
+    <span class="mx-10">🛡 10 Tbps+ DDoS Protection</span>
+    <span class="mx-10">🚀 PCIe Gen 4 NVMe Storage</span>
+    <span class="mx-10">🔒 Full Root Access</span>
+    <span class="mx-10">💬 24/7/365 Expert Support</span>
+    <span class="mx-10">⚡ 99.99% Network Uptime SLA</span>
+    <span class="mx-10">🌍 25+ Global Data Centers</span>
+    <span class="mx-10">🛡 10 Tbps+ DDoS Protection</span>
+    <span class="mx-10">🚀 PCIe Gen 4 NVMe Storage</span>
+    <span class="mx-10">🔒 Full Root Access</span>
+    <span class="mx-10">💬 24/7/365 Expert Support</span>
+  </div>
+</div>
+
+<!-- ══ STATS BAR ══ -->
+<section class="bg-white border-b border-slate-100 py-12">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 reveal rv1">
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">timer</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">Network Uptime</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">99.99%</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">public</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">Data Centers</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">25+</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">shield_person</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">DDoS Protection</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">10Tbps+</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">support_agent</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">Tech Support</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">24/7/365</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  PLANS
+══════════════════════════════════════════ -->
+<section id="plans" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+  <div class="text-center mb-16 reveal rv1">
+    <h2 class="text-3xl md:text-5xl font-black text-slate-900 tracking-tight">Performance <span class="shimmer-text">Tiers</span></h2>
+    <p class="text-slate-600 text-lg max-w-2xl mx-auto mt-4">Choose the raw power your enterprise requires. All plans include full root access and 24/7 priority support.</p>
+  </div>
+
+ <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+
+  <!-- Standard -->
+  <div class="plan-card visible flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm reveal-left">
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-slate-900 text-xl font-bold">Standard</h3>
+        <span class="bg-slate-100 text-slate-600 text-[10px] font-bold uppercase px-2.5 py-1 rounded-full">Balanced</span>
+      </div>
+      <div class="flex items-baseline gap-1 mt-1">
+        <span class="text-slate-900 text-5xl font-black tracking-tighter"><span class="price-amount" data-usd="189">$189</span></span>
+        <span class="text-slate-500 text-sm font-bold">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400">Best for growing applications & dev environments</p>
+    </div>
+
+    <!-- Disabled Button -->
+    <button disabled class="w-full h-12 rounded-xl font-bold text-sm opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+
+    <hr class="border-slate-100"/>
+
+    <div class="flex flex-col gap-4 flex-grow">
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">memory</span> Intel Xeon-E 2288G</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">memory_alt</span> 32 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">database</span> 2 × 480 GB SSD</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">speed</span> 10 TB Bandwidth</div>
+    </div>
+  </div>
+
+  <!-- Turbo -->
+  <div class="plan-featured visible flex flex-col gap-6 rounded-2xl border-2 border-primary bg-white p-8 shadow-xl relative">
+    <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black uppercase px-5 py-1.5 rounded-full tracking-widest whitespace-nowrap">
+      Most Popular
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-slate-900 text-xl font-bold">Turbo</h3>
+        <span class="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2.5 py-1 rounded-full">High Speed</span>
+      </div>
+      <div class="flex items-baseline gap-1 mt-1">
+        <span class="text-5xl font-black tracking-tighter text-primary"><span class="price-amount" data-usd="349">$349</span></span>
+        <span class="text-slate-500 text-sm font-bold">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400">Perfect for high-traffic apps & databases</p>
+    </div>
+
+    <!-- Disabled Button -->
+    <button disabled class="w-full h-12 rounded-xl font-bold text-sm opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+
+    <hr class="border-primary/20"/>
+
+    <div class="flex flex-col gap-4 flex-grow">
+      <div class="flex items-center gap-3 text-sm text-slate-700 font-semibold"><span class="material-symbols-outlined text-primary text-xl">memory</span> Dual Intel Xeon Gold</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">memory_alt</span> 64 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">rocket_launch</span> 2 × 960 GB NVMe</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">speed</span> 20 TB Bandwidth</div>
+    </div>
+  </div>
+
+  <!-- Elite -->
+  <div class="plan-card visible flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm reveal-right">
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-slate-900 text-xl font-bold">Elite</h3>
+        <span class="bg-primary/10 text-primary text-[10px] font-bold uppercase px-2.5 py-1 rounded-full">Extreme</span>
+      </div>
+      <div class="flex items-baseline gap-1 mt-1">
+        <span class="text-slate-900 text-5xl font-black tracking-tighter"><span class="price-amount" data-usd="599">$599</span></span>
+        <span class="text-slate-500 text-sm font-bold">/mo</span>
+      </div>
+      <p class="text-xs text-slate-400">For enterprise workloads & AI / ML pipelines</p>
+    </div>
+
+    <!-- Disabled Button -->
+    <button disabled class="w-full h-12 rounded-xl font-bold text-sm opacity-60 cursor-not-allowed"
+      style="background:#f1f5f9;color:#64748b;border:2px solid #e2e8f0">
+      Coming Soon
+    </button>
+
+    <hr class="border-slate-100"/>
+
+    <div class="flex flex-col gap-4 flex-grow">
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">memory</span> Quad Intel Xeon Platinum</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">memory_alt</span> 256 GB DDR4 RAM</div>
+      <div class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-primary text-xl">database</span> 4 × 2 TB NVMe</div>
+      <div class="flex items-center gap-3 text-sm font-bold text-primary"><span class="material-symbols-outlined text-xl">all_inclusive</span> Unmetered Bandwidth</div>
+    </div>
+  </div>
+
+</div>
+  <p class="text-center text-sm text-slate-500 mt-8 reveal rv5">Need a custom configuration? <a href="/contact.html" class="text-primary font-bold hover:underline">Talk to our team →</a></p>
+</section>
+
+<!-- ══════════════════════════════════════════
+  HARDWARE HIGHLIGHT
+══════════════════════════════════════════ -->
+<section class="bg-slate-50 py-24">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+      <!-- Left: text -->
+      <div class="flex flex-col gap-8 reveal-left">
+        <h2 class="text-4xl font-black tracking-tight leading-tight text-slate-900">
+          Hardware Designed for <span class="shimmer-text">Performance</span>
+        </h2>
+        <div class="space-y-6">
+
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">location_chip</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">Latest Gen Processors</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">Choose from Intel Xeon or AMD EPYC processors with up to 128 cores per server for massive parallel processing.</p>
+            </div>
+          </div>
+
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">settings_ethernet</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">100 Gbps Network Fabric</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">Our data centers are connected via a redundant low-latency network ensuring your data travels at the speed of light.</p>
+            </div>
+          </div>
+
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">hard_drive</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">PCIe Gen 4 NVMe Storage</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">Get up to 1.2M IOPS with enterprise-grade NVMe drives configured in RAID for both speed and reliability.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: terminal -->
+      <div class="reveal-right">
+        <div class="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xl">
+          <div class="bg-slate-900 rounded-xl p-8 font-mono text-sm leading-relaxed overflow-hidden">
+            <div class="flex gap-2 mb-5">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <span class="ml-3 text-slate-500 text-xs">crapplet — server-dc-01</span>
+            </div>
+            <div class="space-y-2 text-blue-400">
+              <p><span class="text-slate-500">$</span> fetch system_specs --dedicated</p>
+              <p class="text-white">Connecting to server-dc-01...</p>
+              <p class="text-green-400">[SUCCESS] Connection Established</p>
+              <p class="text-slate-600">——————————————————————————————</p>
+              <p>CPU: <span class="text-white">2x AMD EPYC 7742 (128 Cores)</span></p>
+              <p>RAM: <span class="text-white">512 GB DDR4-3200 ECC</span></p>
+              <p>DISK: <span class="text-white">8x 3.84 TB NVMe SSD RAID-10</span></p>
+              <p>NET: <span class="text-white">2x 25 Gbps SFP28 Bonded</span></p>
+              <p>OS: <span class="text-white">Ubuntu 22.04 LTS (HWE Kernel)</span></p>
+              <p class="text-slate-600">——————————————————————————————</p>
+              <p><span class="text-yellow-400">Status: </span><span class="text-green-400">READY — 0% Load</span></p>
+              <p class="text-primary cursor-blink">█</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  WHY DEDICATED
+══════════════════════════════════════════ -->
+<section class="py-24 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <h2 class="text-3xl md:text-4xl font-black text-slate-900">Why Choose <span class="shimmer-text">Dedicated?</span></h2>
+      <p class="text-slate-600 mt-3 max-w-xl mx-auto">Single-tenant hardware means no shared resources, no noisy neighbours — just raw, guaranteed performance.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="feat-card reveal rv1 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+          <span class="material-symbols-outlined text-primary text-2xl">lock</span>
+        </div>
+        <h4 class="font-bold text-slate-900">100% Isolated</h4>
+        <p class="text-sm text-slate-500">Your server, your resources — fully isolated hardware with no virtualisation overhead.</p>
+      </div>
+      <div class="feat-card reveal rv2 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+          <span class="material-symbols-outlined text-primary text-2xl">bolt</span>
+        </div>
+        <h4 class="font-bold text-slate-900">Bare-Metal Speed</h4>
+        <p class="text-sm text-slate-500">Direct hardware access for maximum CPU performance — no hypervisor, no overhead.</p>
+      </div>
+      <div class="feat-card reveal rv3 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+          <span class="material-symbols-outlined text-primary text-2xl">security</span>
+        </div>
+        <h4 class="font-bold text-slate-900">Enterprise Security</h4>
+        <p class="text-sm text-slate-500">Physical isolation and 10 Tbps+ DDoS protection keeps your data and services safe.</p>
+      </div>
+      <div class="feat-card reveal rv4 p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
+          <span class="material-symbols-outlined text-primary text-2xl">tune</span>
+        </div>
+        <h4 class="font-bold text-slate-900">Full Customisation</h4>
+        <p class="text-sm text-slate-500">Choose your OS, RAID config, network speed, and add-ons — we build to your spec.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  OS / ADD-ONS
+══════════════════════════════════════════ -->
+<section class="py-16 bg-primary/5 border-y border-primary/10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div class="reveal-left space-y-6">
+        <h2 class="text-3xl font-black text-slate-900">Your OS. <span class="shimmer-text">Your Rules.</span></h2>
+        <p class="text-slate-600 leading-relaxed">Deploy any operating system — from Ubuntu and Debian to CentOS, Rocky Linux, or Windows Server. Bring your own ISO or use our pre-configured images for instant provisioning.</p>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">🐧</span> Ubuntu 22.04
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">🔴</span> CentOS Stream
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">🪨</span> Rocky Linux
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">🪟</span> Windows Server
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">🌀</span> Debian 12
+          </div>
+          <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 shadow-sm hover:border-primary/40 hover:-translate-y-0.5 transition-all">
+            <span class="text-xl">📀</span> Custom ISO
+          </div>
+        </div>
+      </div>
+      <div class="reveal-right space-y-4">
+        <h3 class="text-xl font-black text-slate-900 mb-2">Available Add-ons</h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">backup</span><span class="text-sm font-semibold text-slate-700">Automated Daily Backups</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">+<span class="price-amount" data-usd="29">$29</span>/mo</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">manage_accounts</span><span class="text-sm font-semibold text-slate-700">Fully Managed Services</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">+<span class="price-amount" data-usd="79">$79</span>/mo</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">monitor_heart</span><span class="text-sm font-semibold text-slate-700">24/7 Proactive Monitoring</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">+<span class="price-amount" data-usd="19">$19</span>/mo</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">dns</span><span class="text-sm font-semibold text-slate-700">Additional IPv4 Block (/29)</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">+<span class="price-amount" data-usd="15">$15</span>/mo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  FAQ
+══════════════════════════════════════════ -->
+<section class="py-24">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <h2 class="text-3xl font-black text-slate-900">Frequently Asked <span class="shimmer-text">Questions</span></h2>
+      <p class="text-slate-600 mt-3 max-w-xl mx-auto">Everything you need to know about our dedicated server hosting.</p>
+    </div>
+
+    <div class="space-y-3 reveal rv2">
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">What is the setup time for a dedicated server?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Standard configurations are typically provisioned within 4–12 hours. Custom enterprise hardware builds may take up to 48 hours depending on parts availability in specific data center regions.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Can I customize my hardware configuration?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Yes, our Enterprise solutions allow for complete customisation. You can specify CPU core counts, exact RAM quantities, storage types (NVMe/SSD/HDD), and network card speeds up to 100 Gbps.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Do you offer managed services?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">By default, servers are unmanaged with full root access. However, we offer comprehensive Management Add-ons that include 24/7 monitoring, security patching, and automated backups.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Is DDoS protection included on all plans?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Yes. Every dedicated server includes always-on Layer 3/4 DDoS mitigation with up to 10 Tbps+ scrubbing capacity at the network edge — at no extra cost on all plans.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Can I upgrade hardware after deployment?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">RAM and storage upgrades are available with a scheduled maintenance window. CPU upgrades require a server migration, which our team handles with minimal downtime during off-peak hours.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">What payment methods do you accept?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">We accept UPI, Net Banking, Debit/Credit Cards (Visa, Mastercard, RuPay) for Indian customers, and Visa, Mastercard, Amex, and PayPal for international customers. GST-compliant invoices are generated automatically.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA ══ -->
+<section class="cta-section py-16 border-t border-primary/10">
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 reveal rv1">
+    <h2 class="text-3xl font-bold text-slate-900">Ready for <span class="shimmer-text">Bare-Metal Power?</span></h2>
+    <p class="text-slate-600 text-lg">Join enterprises worldwide running mission-critical workloads on Crapplet's dedicated infrastructure.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <input id="ctaEmail" class="glow-input w-full sm:w-80 px-4 py-3 rounded-xl border border-slate-300 bg-white text-sm" placeholder="Enter your email address" type="email"/>
+      <button id="ctaBtn" class="w-full sm:w-auto px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all" style="box-shadow:0 6px 20px rgba(163,101,254,.35)">
+        Request a Quote
+      </button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Hosting</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Company</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Support</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+</div>
+
+<script>
+  /* Cursor glow */
+  const glow = document.getElementById('cursor-glow');
+  document.addEventListener('mousemove', e => { glow.style.left = e.clientX + 'px'; glow.style.top = e.clientY + 'px'; });
+
+  /* Header shadow */
+  const hdr = document.getElementById('site-header');
+  window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+  /* Scroll reveal */
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .plan-card, .plan-featured').forEach(el => obs.observe(el));
+
+  /* Deploy button feedback */
+  document.querySelectorAll('.deploy-btn, .deploy-primary').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const orig = this.textContent;
+      const origStyle = this.getAttribute('style') || '';
+      this.textContent = '✓ Request Sent';
+      this.style.background = '#16a34a';
+      this.style.color = '#fff';
+      this.style.border = 'none';
+      setTimeout(() => { this.textContent = orig; this.setAttribute('style', origStyle); }, 2200);
+    });
+  });
+
+  /* CTA button */
+  const ctaBtn = document.getElementById('ctaBtn');
+  const ctaEmail = document.getElementById('ctaEmail');
+  ctaBtn.addEventListener('click', () => {
+    if (ctaEmail.value.trim()) {
+      ctaBtn.textContent = '✓ Sent!';
+      ctaBtn.style.background = '#16a34a';
+      setTimeout(() => { ctaBtn.textContent = 'Request a Quote'; ctaBtn.style.background = ''; ctaEmail.value = ''; }, 2200);
+    } else {
+      ctaEmail.style.borderColor = '#ef4444';
+      ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+      setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+    }
+  });
+
+  /* FAQ accordion */
+  document.querySelectorAll('.faq-trigger').forEach(trigger => {
+    trigger.addEventListener('click', () => {
+      const item = trigger.closest('.faq-item');
+      const content = trigger.nextElementSibling;
+      const icon = trigger.querySelector('.faq-icon .material-symbols-outlined');
+      const isOpen = item.classList.contains('open');
+
+      /* close all */
+      document.querySelectorAll('.faq-item').forEach(i => {
+        i.classList.remove('open');
+        i.querySelector('.faq-content').style.maxHeight = '0px';
+        const ic = i.querySelector('.faq-icon .material-symbols-outlined');
+        if (ic) { ic.textContent = 'add'; ic.style.color = '#64748b'; }
+        i.querySelector('.faq-icon').style.background = '#f1f5f9';
+      });
+
+      if (!isOpen) {
+        item.classList.add('open');
+        content.style.maxHeight = content.scrollHeight + 'px';
+        icon.textContent = 'close';
+        icon.style.color = '#fff';
+        trigger.querySelector('.faq-icon').style.background = '#a365fe';
+      }
+    });
+  });
+
+  /* ══ MOBILE DRAWER ══ */
+  const toggle = document.getElementById('menu-toggle');
+  const drawer = document.getElementById('mobile-drawer');
+  const overlay = document.getElementById('mobile-overlay');
+  const closeBtn = document.getElementById('close-drawer');
+
+  function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+  function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+  toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+  overlay.addEventListener('click', closeDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+
+  /* Submenu accordions */
+  document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+    trigger.addEventListener('click', function () {
+      const subId = 'sub-' + this.id.replace('acc-', '');
+      const sub = document.getElementById(subId);
+      if (!sub) return;
+      const isOpen = sub.classList.contains('open');
+      document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+      document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+      if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+    });
+  });
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

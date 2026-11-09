@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png"/>
+<title>Crapplet - Find Your Online Identity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#a365fe",
+          "background-light": "#ffffff",
+          "background-dark": "#101922",
+        },
+        fontFamily: { "display": ["Inter"] },
+        borderRadius: { "DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+      },
+    },
+  }
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; }
+  .nav-dropdown:hover .dropdown-menu { display: block; }
+
+  /* Cursor glow */
+  #cursor-glow {
+    position: fixed; width: 340px; height: 340px; border-radius: 50%;
+    background: radial-gradient(circle, #8949ea29 0%, transparent 70%);
+    pointer-events: none; z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: left .1s ease, top .1s ease;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #a365fe, #7c3aed); border-radius: 10px; border: 2px solid #f1f5f9; }
+  ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #7c3aed, #a365fe); }
+
+  /* Page load */
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+  .load-anim { animation: fadeInUp .75s cubic-bezier(.22,1,.36,1) both; }
+  .load-d1{animation-delay:.08s} .load-d2{animation-delay:.18s} .load-d3{animation-delay:.28s}
+  .load-d4{animation-delay:.38s} .load-d5{animation-delay:.48s} .load-d6{animation-delay:.58s}
+
+  /* Scroll reveal */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s cubic-bezier(.22,1,.36,1), transform .7s cubic-bezier(.22,1,.36,1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .rv1{transition-delay:.05s} .rv2{transition-delay:.15s} .rv3{transition-delay:.25s}
+  .rv4{transition-delay:.35s} .rv5{transition-delay:.45s}
+
+  /* Shimmer */
+  @keyframes shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+  .shimmer-text {
+    background: linear-gradient(90deg, #a365fe, #a66aff, #6d4e9c, #a365fe);
+    background-size: 200% auto;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* Orbs */
+  @keyframes orb1 { 0%,100%{transform:translate(0,0) scale(1);}40%{transform:translate(30px,-25px) scale(1.08);}70%{transform:translate(-15px,18px) scale(.94);} }
+  @keyframes orb2 { 0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-40px,35px) scale(1.1);} }
+  .orb1 { animation: orb1 10s ease-in-out infinite; }
+  .orb2 { animation: orb2 14s ease-in-out infinite; }
+
+  /* Badge pulse */
+  @keyframes pulseBadge { 0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.35);}50%{box-shadow:0 0 0 8px rgba(163,101,254,0);} }
+  .badge-pulse { animation: pulseBadge 2.5s ease-in-out infinite; }
+
+  /* Search */
+  .search-wrap { transition: box-shadow .35s, transform .35s; }
+  .search-wrap:focus-within { box-shadow: 0 0 0 4px rgba(163,101,254,.3), 0 20px 48px -12px rgba(163,101,254,.25); transform: translateY(-2px); }
+  .search-input { outline: none; }
+  .search-input:focus { outline: none !important; box-shadow: none !important; border: none !important; }
+  .search-btn { position: relative; overflow: hidden; transition: filter .2s, transform .2s, box-shadow .2s; }
+  .search-btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(163,101,254,.5); }
+  .search-btn:active { transform: translateY(0); }
+
+  /* Table */
+  .trow { transition: background .2s, transform .2s; }
+  .trow:hover { background: rgba(163,101,254,.03); transform: translateX(3px); }
+  .sel-btn { transition: background .25s, color .25s, transform .2s, box-shadow .2s; }
+  .sel-btn:hover { background: #a365fe; color: #fff; transform: scale(1.05); box-shadow: 0 4px 12px rgba(163,101,254,.45); }
+  .sel-btn:active { transform: scale(.98); }
+
+  /* Steps */
+  @keyframes bounceIn { 0%{transform:scale(.5);opacity:0;}60%{transform:scale(1.12);opacity:1;}100%{transform:scale(1);} }
+  .step-icon { transition: transform .3s ease, box-shadow .3s ease; }
+  .step-icon:hover { transform: translateY(-6px) scale(1.08); box-shadow: 0 16px 32px rgba(163,101,254,.35); }
+  .step-icon.visible { animation: bounceIn .6s cubic-bezier(.22,1,.36,1) both; }
+  .si-d1{animation-delay:.1s} .si-d2{animation-delay:.25s} .si-d3{animation-delay:.4s}
+
+  /* Promo & sidebar */
+  .promo-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s; }
+  .promo-card:hover { transform: translateY(-5px); box-shadow: 0 20px 48px -8px rgba(163,101,254,.35); }
+  .side-card { transition: transform .3s ease, box-shadow .3s ease; }
+  .side-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,.08); }
+
+  /* Nav underline */
+  nav a { position: relative; }
+  nav a::after { content:''; position:absolute; bottom:-3px; left:0; width:0; height:2px; background:#a365fe; border-radius:2px; transition: width .3s cubic-bezier(.22,1,.36,1); }
+  nav a:hover::after { width: 100%; }
+
+  /* Footer */
+  .footer-link { transition: color .2s, padding-left .2s; display: inline-block; }
+  .footer-link:hover { color: #a365fe; padding-left: 5px; }
+  .social-icon { transition: color .2s, transform .3s ease; }
+  .social-icon:hover { color: #a365fe; transform: rotate(12deg) scale(1.2); }
+
+  /* Header */
+  header { transition: box-shadow .3s; }
+  header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
+
+  /* Chips */
+  @keyframes chipIn { from{opacity:0;transform:scale(.8) translateY(6px);}to{opacity:1;transform:scale(1) translateY(0);} }
+  .chip { animation: chipIn .5s cubic-bezier(.22,1,.36,1) both; }
+  .chip:nth-child(1){animation-delay:.6s} .chip:nth-child(2){animation-delay:.72s} .chip:nth-child(3){animation-delay:.84s}
+
+  /* Step line */
+  .step-line { transform-origin: left center; transform: scaleX(0); transition: transform 1.2s cubic-bezier(.22,1,.36,1); }
+  .step-line.visible { transform: scaleX(1); }
+
+  /* Dot background */
+  @keyframes dotMove { 0%{background-position:0 0;}100%{background-position:30px 30px;} }
+  .steps-section {
+    background-image: radial-gradient(circle, rgba(163,101,254,.06) 1px, transparent 0);
+    background-size: 30px 30px; animation: dotMove 5s linear infinite;
+  }
+
+  /* Table rows animation */
+  .ext-badge { transition: transform .2s; }
+  .trow:hover .ext-badge { transform: scale(1.1); }
+  @keyframes rowReveal { from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:translateX(0);} }
+  .table-body tr { animation: rowReveal .5s cubic-bezier(.22,1,.36,1) both; }
+  .table-body tr:nth-child(1){animation-delay:.5s} .table-body tr:nth-child(2){animation-delay:.62s}
+  .table-body tr:nth-child(3){animation-delay:.74s} .table-body tr:nth-child(4){animation-delay:.86s}
+
+  /* ════════════════════════════════════════
+     MOBILE DRAWER
+  ════════════════════════════════════════ */
+  #menu-toggle { position:relative; width:40px; height:40px; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; z-index:60; }
+  #menu-toggle .bar { display:block; height:2px; border-radius:2px; background:#1e293b; transition:all .35s cubic-bezier(.22,1,.36,1); }
+  #menu-toggle .bar-top{width:22px;} #menu-toggle .bar-mid{width:16px;transform-origin:right center;} #menu-toggle .bar-bot{width:22px;}
+  #menu-toggle.open .bar-top{transform:translateY(7px) rotate(45deg);width:22px;}
+  #menu-toggle.open .bar-mid{width:0;opacity:0;}
+  #menu-toggle.open .bar-bot{transform:translateY(-7px) rotate(-45deg);width:22px;}
+
+  #mobile-overlay { position:fixed;inset:0;background:rgba(10,5,25,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:49;opacity:0;pointer-events:none;transition:opacity .35s ease; }
+  #mobile-overlay.show { opacity:1;pointer-events:all; }
+
+  #mobile-drawer { position:fixed;top:0;right:0;bottom:0;width:min(88vw,360px);background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);z-index:50;overflow-y:auto;overflow-x:hidden;transform:translateX(100%);transition:transform .4s cubic-bezier(.22,1,.36,1);box-shadow:-20px 0 60px rgba(0,0,0,.5); }
+  #mobile-drawer.open { transform:translateX(0); }
+  #mobile-drawer::before { content:'';position:absolute;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.18; }
+  #mobile-drawer::after { content:'';position:absolute;top:-80px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,#a365fe44 0%,transparent 70%);pointer-events:none;z-index:0;border-radius:50%; }
+  .drawer-glow-bottom { position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;background:radial-gradient(circle,#6633cc33 0%,transparent 70%);border-radius:50%;pointer-events:none;z-index:0; }
+  .drawer-inner { position:relative;z-index:1; }
+  .drawer-header { padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between; }
+  .mob-nav-item { display:flex;align-items:center;gap:12px;padding:11px 24px;cursor:pointer;color:rgba(255,255,255,.8);font-size:14px;font-weight:600;position:relative;transition:background .2s ease,color .2s ease,padding-left .2s ease;text-decoration:none; }
+  .mob-nav-item:hover { background:rgba(163,101,254,.12);color:#fff;padding-left:30px; }
+  .mob-nav-item .item-icon { width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:transform .25s ease; }
+  .mob-nav-item:hover .item-icon { transform:scale(1.15) rotate(-5deg); }
+  .mob-nav-item .item-arrow { margin-left:auto;opacity:.4;font-size:16px;transition:transform .2s ease,opacity .2s ease; }
+  .mob-nav-item:hover .item-arrow { transform:translateX(4px);opacity:.8; }
+  .mob-submenu { max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1);background:rgba(0,0,0,.2); }
+  .mob-submenu.open { max-height:500px; }
+  .mob-submenu-item { display:flex;align-items:center;gap:10px;padding:10px 24px 10px 56px;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:color .2s,padding-left .2s;text-decoration:none; }
+  .mob-submenu-item:hover { color:#a365fe;padding-left:62px; }
+  .mob-submenu-item::before { content:'';width:5px;height:5px;border-radius:50%;background:#a365fe;opacity:.5;flex-shrink:0;transition:opacity .2s,transform .2s; }
+  .mob-submenu-item:hover::before { opacity:1;transform:scale(1.4); }
+  .mob-nav-item .chevron { transition:transform .3s ease; }
+  .mob-nav-item.sub-open .chevron { transform:rotate(180deg); }
+  .drawer-divider { height:1px;background:rgba(255,255,255,.06);margin:8px 24px; }
+  .drawer-cta { padding:20px 24px;display:flex;flex-direction:column;gap:10px; }
+  .drawer-btn-support { display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;border:1px solid rgba(163,101,254,.35);color:rgba(255,255,255,.85);font-weight:700;font-size:14px;transition:background .2s,border-color .2s; }
+  .drawer-btn-support:hover { background:rgba(163,101,254,.12);border-color:#a365fe; }
+  .drawer-btn-login { display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:12px;background:linear-gradient(135deg,#a365fe,#7c3aed);color:#fff;font-weight:800;font-size:14px;box-shadow:0 6px 24px rgba(163,101,254,.4);transition:filter .2s,transform .2s,box-shadow .2s; }
+  .drawer-btn-login:hover { filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 10px 30px rgba(163,101,254,.55); }
+  @keyframes slideInRight { from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);} }
+  #mobile-drawer.open .drawer-inner>*{animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;}
+  #mobile-drawer.open .drawer-inner>*:nth-child(1){animation-delay:.05s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(2){animation-delay:.10s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(3){animation-delay:.15s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(4){animation-delay:.20s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(5){animation-delay:.25s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(6){animation-delay:.30s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(7){animation-delay:.35s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(8){animation-delay:.40s}
+  .drawer-social { display:flex;gap:10px;padding:0 24px 24px; }
+  .drawer-social a { width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:14px;transition:background .2s,color .2s,transform .2s; }
+  .drawer-social a:hover { background:rgba(163,101,254,.25);color:#a365fe;transform:translateY(-3px); }
+  body.nav-open { overflow:hidden; }
+
+  /* Glow input */
+  .glow-input { transition: box-shadow .3s, border-color .3s; }
+  .glow-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(163,101,254,.2); border-color: #a365fe; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/domain.html">
+</head>
+<body class="bg-background-light text-slate-900">
+
+<div id="cursor-glow"></div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+
+    <div class="drawer-header">
+     <a href="/index.html">
+      <img alt="Crapplet" src="/Crapplet_logo.png"
+           class="h-10 w-auto"
+           onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
+      /></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">shield</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div class="drawer-divider"></div>
+
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">500+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Extensions</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">Instant</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Activation</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">24/7</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+      <a href="/contact.html">
+      <button class="drawer-btn-support w-full">
+        <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+        Support
+      </button></a>
+                  <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+
+    </div>
+
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<div class="relative flex min-h-screen flex-col">
+
+  <!-- ── HEADER ── -->
+  <header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link is-current" href="/domain.html" aria-current="page"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+  <!-- ── MAIN ── -->
+  <main class="flex-grow">
+
+    <!-- Hero & Search -->
+    <section class="relative py-24 flex flex-col items-center justify-center text-center overflow-hidden">
+      <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_120%,rgba(129,28,255,0.2),transparent)]"></div>
+      <div class="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div class="orb1 absolute -top-24 -left-24 w-80 h-80 rounded-full bg-primary/8 blur-3xl"></div>
+        <div class="orb2 absolute -bottom-16 -right-16 w-72 h-72 rounded-full bg-pink-200/20 blur-3xl"></div>
+      </div>
+
+      <div class="max-w-7xl w-full flex flex-col gap-8 px-4">
+        <div class="flex flex-col gap-4">
+          <span class="load-anim load-d1 inline-block text-primary font-bold tracking-widest text-xs uppercase badge-pulse px-3 py-1 rounded-full bg-primary/10 border border-primary/20 w-fit mx-auto">
+            The first step to your new website
+          </span>
+          <h1 class="load-anim load-d2 text-2xl md:text-4xl font-black leading-tight tracking-tight">
+            Find the perfect <span class="shimmer-text">domain</span> for your idea
+          </h1>
+          <p class="load-anim load-d3 text-slate-600 text-base md:text-lg max-w-2xl mx-auto">
+            Search from hundreds of extensions and secure your unique online identity today with our lightning-fast registration.
+          </p>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="load-anim load-d4 w-full max-w-3xl mx-auto">
+          <div class="search-wrap flex flex-col sm:flex-row items-stretch p-2 rounded-xl bg-white shadow-2xl border border-slate-200">
+            <div class="flex flex-1 items-center px-4 gap-3">
+              <span class="material-symbols-outlined text-slate-400" style="transition:color .3s" id="searchIcon">search</span>
+              <input id="searchInput" class="search-input w-full bg-transparent border-none text-slate-900 placeholder:text-slate-400 h-12 md:h-14 text-lg" placeholder="Type your dream domain here (e.g. mynewbrand.com)" type="text"/>
+            </div>
+            <button type="button" onclick="crDomainSearch()" class="search-btn flex items-center justify-center rounded-lg bg-primary text-white px-8 py-3 md:py-0 font-bold text-lg">
+              Search
+            </button>
+          </div>
+          <!-- Trust chips -->
+          <div class="mt-4 flex flex-wrap justify-center gap-4 text-xs font-medium text-slate-500">
+            <span class="chip flex items-center gap-1">
+              <span class="material-symbols-outlined text-xs text-green-500">check_circle</span> Instant Activation
+            </span>
+            <span class="chip flex items-center gap-1">
+              <span class="material-symbols-outlined text-xs text-green-500">check_circle</span> Privacy Protection Included
+            </span>
+            <span class="chip flex items-center gap-1">
+              <span class="material-symbols-outlined text-xs text-green-500">check_circle</span> 24/7 Expert Support
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Popular Extensions -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="flex items-end justify-between mb-8 reveal rv1">
+        <div>
+          <h2 class="text-2xl font-bold">Popular Extensions</h2>
+          <p class="text-slate-500 text-sm mt-1">Special introductory pricing for first-year registrations.</p>
+        </div>
+        <a class="text-primary text-sm font-semibold hover:underline flex items-center gap-1" href="/clientarea/cart.php?a=add&domain=register">
+          View all extensions
+          <span class="material-symbols-outlined text-sm">arrow_forward</span>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Pricing Table -->
+        <div class="lg:col-span-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm reveal rv2">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr class="bg-slate-50">
+                <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Extension</th>
+                <th class="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-500">Annual Price</th>
+                <th class="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                <th class="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 table-body">
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.com</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="12.99">$12.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-tight">Popular</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.ai</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="59.99">$59.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full text-[10px] font-bold uppercase tracking-tight">Trending</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.io</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="39.99">$39.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-purple-500/10 text-purple-500 rounded-full text-[10px] font-bold uppercase tracking-tight">Tech</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.net</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="10.99">$10.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-slate-500/10 text-slate-500 rounded-full text-[10px] font-bold uppercase tracking-tight">Classic</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.in</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="8.99">$8.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-green-500/10 text-green-600 rounded-full text-[10px] font-bold uppercase tracking-tight">India</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+              <tr class="trow">
+                <td class="px-6 py-4 font-bold text-lg">.org</td>
+                <td class="px-6 py-4"><span class="text-primary font-bold"><span class="price-amount" data-usd="11.99">$11.99</span></span><span class="text-slate-400 text-sm">/yr</span></td>
+                <td class="px-6 py-4 text-center"><span class="ext-badge px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full text-[10px] font-bold uppercase tracking-tight">Non-profit</span></td>
+                <td class="px-6 py-4 text-right"><button class="sel-btn bg-primary/10 text-primary px-4 py-1.5 rounded-lg text-sm font-bold" onclick="location.href='/clientarea/cart.php?a=add&domain=register'">Select</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="flex flex-col gap-6 reveal rv3">
+          <div class="promo-card bg-primary rounded-xl p-8 text-white relative overflow-hidden">
+            <div class="absolute -right-12 -top-12 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+            <h3 class="text-xl font-bold mb-2 relative z-10">Transfer Domain</h3>
+            <p class="text-white/80 text-sm mb-6 relative z-10">Moving from another registrar? Get 1 year free extension on transfers.</p>
+            <button class="relative z-10 w-full bg-white text-primary font-bold py-3 rounded-lg hover:bg-slate-100 transition-all hover:shadow-lg" onclick="location.href='/clientarea/cart.php?a=add&domain=transfer'">Start Transfer</button>
+          </div>
+          <div class="side-card bg-slate-100 rounded-xl p-8 border border-slate-200">
+            <h3 class="text-lg font-bold mb-4">Need Hosting?</h3>
+            <div class="flex items-center gap-4 mb-4">
+              <span class="material-symbols-outlined text-primary text-3xl">cloud_done</span>
+              <div>
+                <p class="font-bold">Web Hosting</p>
+                <p class="text-slate-500 text-xs">Starting at <span class="price-amount" data-usd="2.99">$2.99</span>/mo</p>
+              </div>
+            </div>
+            <p class="text-slate-600 text-sm mb-4">Get a FREE domain when you sign up for any yearly hosting plan.</p>
+            <a class="text-primary text-sm font-bold hover:underline inline-flex items-center gap-1" href="/shared-hosting.html">
+              Explore Plans <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="steps-section py-16 px-4 sm:px-6">
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-16 reveal rv1">
+          <h2 class="text-3xl font-bold mb-4">How it works</h2>
+          <p class="text-slate-500">Get your domain live in three simple steps</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+          <!-- Connecting line -->
+          <div class="hidden md:block absolute top-10 left-[20%] right-[20%] h-0.5 bg-slate-200 overflow-hidden">
+            <div class="step-line h-full bg-gradient-to-r from-primary/60 to-primary/20 rounded-full"></div>
+          </div>
+
+          <div class="step-reveal relative flex flex-col items-center text-center gap-6">
+            <div class="step-icon w-20 h-20 rounded-full bg-primary flex items-center justify-center text-white shadow-xl si-d1" style="box-shadow:0 16px 32px rgba(163,101,254,.3)">
+              <span class="material-symbols-outlined text-4xl">search</span>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold mb-2">1. Search</h3>
+              <p class="text-slate-500 text-sm leading-relaxed">Enter your desired name and find available extensions instantly.</p>
+            </div>
+          </div>
+
+          <div class="step-reveal relative flex flex-col items-center text-center gap-6">
+            <div class="step-icon w-20 h-20 rounded-full bg-primary flex items-center justify-center text-white shadow-xl si-d2" style="box-shadow:0 16px 32px rgba(163,101,254,.3)">
+              <span class="material-symbols-outlined text-4xl">shopping_cart</span>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold mb-2">2. Register</h3>
+              <p class="text-slate-500 text-sm leading-relaxed">Add to cart and choose your registration period (1 to 10 years).</p>
+            </div>
+          </div>
+
+          <div class="step-reveal relative flex flex-col items-center text-center gap-6">
+            <div class="step-icon w-20 h-20 rounded-full bg-primary flex items-center justify-center text-white shadow-xl si-d3" style="box-shadow:0 16px 32px rgba(163,101,254,.3)">
+              <span class="material-symbols-outlined text-4xl">rocket_launch</span>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold mb-2">3. Go Live</h3>
+              <p class="text-slate-500 text-sm leading-relaxed">Your domain is active immediately. Connect to your site or email.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ── -->
+  <footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Hosting</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Company</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Support</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  /* Cursor glow */
+  const glow = document.getElementById('cursor-glow');
+  document.addEventListener('mousemove', e => {
+    glow.style.left = e.clientX + 'px';
+    glow.style.top  = e.clientY + 'px';
+  });
+
+  /* Header shadow */
+  const hdr = document.getElementById('site-header');
+  window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+  /* Scroll reveal */
+  const revealEls = document.querySelectorAll('.reveal, .step-reveal, .step-line');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        const icon = e.target.querySelector('.step-icon');
+        if (icon) icon.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.15 });
+  revealEls.forEach(el => observer.observe(el));
+
+  /* Search icon color on focus */
+  const input = document.getElementById('searchInput');
+  const searchIcon = document.getElementById('searchIcon');
+  input.addEventListener('focus', () => { searchIcon.style.color = '#a365fe'; });
+  input.addEventListener('blur',  () => { searchIcon.style.color = ''; });
+
+  /* Promo card blob */
+  const promoCard = document.querySelector('.promo-card');
+  if (promoCard) {
+    promoCard.addEventListener('mouseenter', () => { const b = promoCard.querySelector('div'); if(b) b.style.transform = 'scale(1.2)'; });
+    promoCard.addEventListener('mouseleave', () => { const b = promoCard.querySelector('div'); if(b) b.style.transform = ''; });
+  }
+
+  /* Placeholder cycling */
+  const placeholders = [
+    'Type your dream domain here (e.g. mynewbrand.com)',
+    'Try yourstartup.io …',
+    'How about yourname.ai ?',
+    'Explore yourshop.net …',
+    'Register yourbrand.in today!',
+  ];
+  let pi = 0;
+  setInterval(() => {
+    if (document.activeElement !== input) {
+      pi = (pi + 1) % placeholders.length;
+      input.setAttribute('placeholder', placeholders[pi]);
+    }
+  }, 3500);
+
+  /* Select buttons */
+  document.querySelectorAll('.sel-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.textContent = '✓ Added';
+      this.style.background = '#16a34a';
+      this.style.color = '#fff';
+      this.style.transform = 'scale(1.08)';
+      setTimeout(() => {
+        this.textContent = 'Select';
+        this.style.background = '';
+        this.style.color = '';
+        this.style.transform = '';
+      }, 1800);
+    });
+  });
+
+  /* ══ MOBILE DRAWER ══ */
+  const toggle   = document.getElementById('menu-toggle');
+  const drawer   = document.getElementById('mobile-drawer');
+  const overlay  = document.getElementById('mobile-overlay');
+  const closeBtn = document.getElementById('close-drawer');
+
+  function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+  function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+  toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+  overlay.addEventListener('click', closeDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+
+  /* Submenu accordions */
+  document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+    trigger.addEventListener('click', function() {
+      const subId = 'sub-' + this.id.replace('acc-', '');
+      const sub   = document.getElementById(subId);
+      if (!sub) return;
+      const isOpen = sub.classList.contains('open');
+      document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+      document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+      if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+    });
+  });
+</script>
+<script>function crDomainSearch(){var v=(document.getElementById("searchInput").value||"").trim();location.href="/clientarea/cart.php?a=add&domain=register"+(v?"&query="+encodeURIComponent(v):"");}document.getElementById("searchInput").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();crDomainSearch();}});</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

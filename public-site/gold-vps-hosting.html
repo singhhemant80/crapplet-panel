@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png"/>
+<title>Gold VPS Hosting - Premium Performance Servers | Crapplet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#a365fe",
+        gold: "#c9972a",
+        "gold-light": "#f0c060",
+        "gold-pale": "#fdf6e3",
+        "gold-dark": "#8b6914",
+      },
+      fontFamily: {
+        display: ["'Playfair Display'", "serif"],
+        body: ["'DM Sans'", "sans-serif"],
+      },
+    },
+  },
+}
+</script>
+<style>
+  :root {
+    --gold: #c9972a;
+    --primary: #a365fe;
+    --primary-glow: rgba(163,101,254,0.25);
+    --gold-light: #f0c060;
+    --gold-dark: #8b6914;
+    --gold-pale: #fdf6e3;
+    --gold-glow: rgba(201,151,42,0.25);
+    --cream: #fffdf7;
+    --off-white: #faf8f2;
+  }
+
+  * { box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #ffffff; color: #1e293b; overflow-x: hidden; }
+
+  /* Cursor glow */
+  #cursor-glow {
+    position: fixed; width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,151,42,.1) 0%, transparent 70%);
+    pointer-events: none; z-index: 9999; transform: translate(-50%,-50%);
+    transition: left .08s ease, top .08s ease;
+  }
+
+  /* Gold shimmer text */
+  @keyframes goldShimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+  .gold-text {
+    background: linear-gradient(90deg, #a365fe, #c084fc, #7c3aed, #a365fe);
+    background-size: 200% auto;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; animation: goldShimmer 4s linear infinite;
+  }
+
+  /* Fade in up */
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(28px);} to{opacity:1;transform:translateY(0);} }
+  .load { animation: fadeInUp .8s cubic-bezier(.22,1,.36,1) both; }
+  .ld1{animation-delay:.08s} .ld2{animation-delay:.18s} .ld3{animation-delay:.28s}
+  .ld4{animation-delay:.38s} .ld5{animation-delay:.48s}
+
+  /* Scroll reveal */
+  .reveal { opacity:0; transform:translateY(30px); transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1); }
+  .reveal.visible { opacity:1; transform:translateY(0); }
+  .rv1{transition-delay:.05s} .rv2{transition-delay:.14s} .rv3{transition-delay:.23s}
+  .rv4{transition-delay:.32s} .rv5{transition-delay:.41s}
+  .reveal-left{opacity:0;transform:translateX(-32px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+  .reveal-left.visible{opacity:1;transform:translateX(0);}
+  .reveal-right{opacity:0;transform:translateX(32px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+  .reveal-right.visible{opacity:1;transform:translateX(0);}
+
+  /* Gold line divider */
+  .gold-line { height: 1px; background: #e2e8f0; }
+
+  /* Floating orbs */
+  @keyframes orb1 { 0%,100%{transform:translate(0,0);} 50%{transform:translate(28px,-22px);} }
+  @keyframes orb2 { 0%,100%{transform:translate(0,0);} 50%{transform:translate(-36px,28px);} }
+  .orb1 { animation: orb1 12s ease-in-out infinite; }
+  .orb2 { animation: orb2 16s ease-in-out infinite; }
+
+  /* Float animation */
+  @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+  .float-anim { animation: floatY 5s ease-in-out infinite; }
+
+  /* Badge pulse */
+  @keyframes goldPulse { 0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.35);} 50%{box-shadow:0 0 0 8px rgba(163,101,254,0);} }
+  .gold-pulse { animation: goldPulse 2.5s ease-in-out infinite; }
+
+  /* Ticker */
+  @keyframes ticker { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  .ticker-inner { display:flex; width:max-content; animation:ticker 28s linear infinite; }
+  .ticker-inner:hover { animation-play-state:paused; }
+
+  /* Header */
+  header { transition: box-shadow .3s; }
+  header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
+  nav a { position: relative; }
+  nav a::after { content:''; position:absolute; bottom:-4px; left:0; width:0; height:2px; background:#a365fe; border-radius:2px; transition:width .3s ease; }
+  nav a:hover::after { width:100%; }
+  .nav-dropdown:hover .dropdown-menu { display:block; }
+
+  /* Plan cards */
+  .plan-card {
+    background: #ffffff; border: 1.5px solid #e2e8f0;
+    transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, border-color .3s;
+  }
+  .plan-card:hover { transform: translateY(-8px); box-shadow: 0 20px 48px -12px rgba(163,101,254,.18); border-color: rgba(163,101,254,.4); }
+  .plan-featured {
+    background: #ffffff; border: 2px solid #a365fe;
+    box-shadow: 0 0 40px -10px rgba(163,101,254,.2);
+    transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s;
+  }
+  .plan-featured:hover { transform: translateY(-10px) scale(1.02); box-shadow: 0 28px 56px -12px rgba(163,101,254,.3); }
+
+  /* Popular badge */
+  @keyframes badgePop { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.06);} }
+  .popular-badge { animation: badgePop 2.5s ease-in-out infinite; }
+
+  /* Select buttons */
+  .select-btn { border: 2px solid #a365fe; color: #7c3aed; transition: background .2s, color .2s, transform .15s, box-shadow .2s; }
+  .select-btn:hover { background: #a365fe; color: #fff; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(163,101,254,.4); }
+  .select-primary { background: #a365fe; color: #fff; transition: filter .2s, transform .15s, box-shadow .2s; }
+  .select-primary:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,101,254,.45); }
+
+  /* Spec rows */
+  @keyframes specIn { from{opacity:0;transform:translateX(-10px);} to{opacity:1;transform:translateX(0);} }
+  .spec-row { opacity:0; }
+  .plan-card.visible .spec-row, .plan-featured.visible .spec-row { animation: specIn .4s cubic-bezier(.22,1,.36,1) both; }
+  .spec-row:nth-child(1){animation-delay:.08s} .spec-row:nth-child(2){animation-delay:.16s}
+  .spec-row:nth-child(3){animation-delay:.24s} .spec-row:nth-child(4){animation-delay:.32s}
+  .spec-row:nth-child(5){animation-delay:.40s} .spec-row:nth-child(6){animation-delay:.48s}
+
+  /* Feature cards */
+  .feat-card {
+    background: #ffffff; border: 1.5px solid #e2e8f0;
+    transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s, border-color .2s;
+  }
+  .feat-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px -8px rgba(163,101,254,.18); border-color: rgba(163,101,254,.4); }
+  .feat-icon { transition: transform .3s ease; }
+  .feat-card:hover .feat-icon { transform: scale(1.2) rotate(-5deg); }
+
+  /* Gold bar */
+  @keyframes barFill { from{width:0;} to{width:var(--w);} }
+  .gold-bar-fill { animation: barFill 1.4s cubic-bezier(.22,1,.36,1) .3s both; }
+
+  /* FAQ */
+  .faq-item { background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 14px; overflow:hidden; transition: border-color .25s, box-shadow .25s, transform .2s; }
+  .faq-item:hover { border-color: rgba(163,101,254,.35); box-shadow: 0 8px 28px -6px rgba(163,101,254,.12); }
+  .faq-item.open { border-color: #a365fe; box-shadow: 0 12px 36px -8px rgba(163,101,254,.18); transform: scale(1.005); }
+  .faq-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:18px 22px; background:transparent; border:none; cursor:pointer; text-align:left; transition:background .2s; }
+  .faq-trigger:hover { background: rgba(163,101,254,.04); }
+  .faq-item.open .faq-trigger { background: rgba(163,101,254,.06); }
+  .faq-icon { width:30px; height:30px; border-radius:8px; background:rgba(163,101,254,.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .2s,transform .3s; }
+  .faq-item.open .faq-icon { background: #a365fe; transform:rotate(45deg); }
+  .faq-sym { font-size:17px; color: #64748b; transition:color .2s; }
+  .faq-item.open .faq-sym { color:#fff; }
+  .faq-body { max-height:0; overflow:hidden; transition:max-height .4s cubic-bezier(.22,1,.36,1); }
+  .faq-body.open { max-height:280px; }
+  .faq-inner { padding:0 22px 18px; color:#475569; font-size:14px; line-height:1.75; border-top:1px solid rgba(163,101,254,.12); }
+
+  /* CTA */
+  .glow-input { transition: box-shadow .3s, border-color .3s; border-color: #e2e8f0; }
+  .glow-input:focus { outline:none; box-shadow: 0 0 0 3px rgba(163,101,254,.2); border-color: #a365fe; }
+  .deploy-btn { background: #a365fe; color:#fff; transition: filter .2s, transform .2s, box-shadow .2s; }
+  .deploy-btn:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(163,101,254,.45); }
+
+  /* Footer */
+  .footer-link { transition: color .2s, padding-left .2s; display:inline-block; }
+  .footer-link:hover { color: #a365fe; padding-left: 5px; }
+  .social-icon { transition: color .2s, transform .3s ease; }
+  .social-icon:hover { color: #a365fe; transform: rotate(15deg) scale(1.2); }
+
+  /* Stat counter */
+  @keyframes countIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+  .count-anim.visible { animation: countIn .8s cubic-bezier(.22,1,.36,1) both; }
+
+  /* Tab pills */
+  .tab-pill { border: 1.5px solid rgba(163,101,254,.3); color: #7c3aed; background: transparent; transition: background .2s, color .2s, box-shadow .2s, transform .15s; }
+  .tab-pill:hover:not(.active-tab) { background: rgba(163,101,254,.08); }
+  .tab-pill.active-tab { background: #a365fe; color:#fff; border-color:#a365fe; box-shadow: 0 4px 14px rgba(163,101,254,.4); }
+
+  /* Use-case chips */
+  .use-chip { background:#fff; border:1.5px solid #e2e8f0; transition: transform .25s, box-shadow .25s, border-color .2s; }
+  .use-chip:hover { transform: translateY(-3px); box-shadow: 0 10px 28px -6px rgba(163,101,254,.2); border-color: rgba(163,101,254,.4); }
+
+  /* Gold star animation */
+  @keyframes starPop { 0%{transform:scale(0) rotate(-20deg);} 70%{transform:scale(1.2);} 100%{transform:scale(1);} }
+  .star-pop.visible { animation: starPop .5s cubic-bezier(.22,1,.36,1) both; }
+  .star-pop:nth-child(1){animation-delay:.05s} .star-pop:nth-child(2){animation-delay:.12s}
+  .star-pop:nth-child(3){animation-delay:.19s} .star-pop:nth-child(4){animation-delay:.26s}
+  .star-pop:nth-child(5){animation-delay:.33s}
+
+  /* ════════════════════════════════════════
+     MOBILE DRAWER — Purple theme (matches all other pages)
+  ════════════════════════════════════════ */
+  body.nav-open { overflow: hidden; }
+
+  /* Animated hamburger */
+  #menu-toggle { position:relative; width:40px; height:40px; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; z-index:60; }
+  #menu-toggle .bar { display:block; height:2px; border-radius:2px; background:#1e293b; transition:all .35s cubic-bezier(.22,1,.36,1); }
+  #menu-toggle .bar-top { width:22px; }
+  #menu-toggle .bar-mid { width:16px; transform-origin:right center; }
+  #menu-toggle .bar-bot { width:22px; }
+  #menu-toggle.open .bar-top { transform:translateY(7px) rotate(45deg); width:22px; }
+  #menu-toggle.open .bar-mid { width:0; opacity:0; }
+  #menu-toggle.open .bar-bot { transform:translateY(-7px) rotate(-45deg); width:22px; }
+
+  /* Overlay */
+  #mobile-overlay {
+    position:fixed; inset:0;
+    background:rgba(10,5,25,.55);
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    z-index:49; opacity:0; pointer-events:none;
+    transition:opacity .35s ease;
+  }
+  #mobile-overlay.show { opacity:1; pointer-events:all; }
+
+  /* Drawer — standard purple dark gradient */
+  #mobile-drawer {
+    position:fixed; top:0; right:0; bottom:0;
+    width:min(88vw,360px);
+    background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);
+    z-index:50; overflow-y:auto; overflow-x:hidden;
+    transform:translateX(100%);
+    transition:transform .4s cubic-bezier(.22,1,.36,1);
+    box-shadow:-20px 0 60px rgba(0,0,0,.5);
+  }
+  #mobile-drawer.open { transform:translateX(0); }
+  #mobile-drawer::before {
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity:.18;
+  }
+  #mobile-drawer::after {
+    content:''; position:absolute; top:-80px; right:-60px;
+    width:260px; height:260px;
+    background:radial-gradient(circle,#a365fe44 0%,transparent 70%);
+    pointer-events:none; z-index:0; border-radius:50%;
+  }
+  .drawer-glow-bottom {
+    position:absolute; bottom:-60px; left:-40px;
+    width:200px; height:200px;
+    background:radial-gradient(circle,#6633cc33 0%,transparent 70%);
+    border-radius:50%; pointer-events:none; z-index:0;
+  }
+  .drawer-inner { position:relative; z-index:1; }
+  .drawer-header {
+    padding:20px 24px 16px;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .mob-nav-item {
+    display:flex; align-items:center; gap:12px;
+    padding:11px 24px; cursor:pointer;
+    color:rgba(255,255,255,.8); font-size:14px; font-weight:600;
+    position:relative; text-decoration:none;
+    transition:background .2s ease, color .2s ease, padding-left .2s ease;
+  }
+  .mob-nav-item:hover { background:rgba(163,101,254,.12); color:#fff; padding-left:30px; }
+  .mob-nav-item .item-icon {
+    width:32px; height:32px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; flex-shrink:0; transition:transform .25s ease;
+  }
+  .mob-nav-item:hover .item-icon { transform:scale(1.15) rotate(-5deg); }
+  .mob-nav-item .item-arrow { margin-left:auto; opacity:.4; font-size:16px; transition:transform .2s ease, opacity .2s ease; }
+  .mob-nav-item:hover .item-arrow { transform:translateX(4px); opacity:.8; }
+  .mob-submenu { max-height:0; overflow:hidden; transition:max-height .35s cubic-bezier(.22,1,.36,1); background:rgba(0,0,0,.2); }
+  .mob-submenu.open { max-height:500px; }
+  .mob-submenu-item {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 24px 10px 56px;
+    color:rgba(255,255,255,.6); font-size:13px; font-weight:500;
+    transition:color .2s, padding-left .2s; text-decoration:none;
+  }
+  .mob-submenu-item:hover { color:#a365fe; padding-left:62px; }
+  .mob-submenu-item::before {
+    content:''; width:5px; height:5px; border-radius:50%;
+    background:#a365fe; opacity:.5; flex-shrink:0;
+    transition:opacity .2s, transform .2s;
+  }
+  .mob-submenu-item:hover::before { opacity:1; transform:scale(1.4); }
+  .mob-nav-item .chevron { transition:transform .3s ease; }
+  .mob-nav-item.sub-open .chevron { transform:rotate(180deg); }
+  .drawer-divider { height:1px; background:rgba(255,255,255,.06); margin:8px 24px; }
+  .drawer-cta { padding:20px 24px; display:flex; flex-direction:column; gap:10px; }
+  .drawer-btn-support {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px; border-radius:12px;
+    border:1px solid rgba(163,101,254,.35);
+    color:rgba(255,255,255,.85); font-weight:700; font-size:14px;
+    background:transparent; cursor:pointer;
+    transition:background .2s, border-color .2s;
+  }
+  .drawer-btn-support:hover { background:rgba(163,101,254,.12); border-color:#a365fe; }
+  .drawer-btn-login {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:13px; border-radius:12px;
+    background:linear-gradient(135deg,#a365fe,#7c3aed);
+    color:#fff; font-weight:800; font-size:14px;
+    border:none; cursor:pointer;
+    box-shadow:0 6px 24px rgba(163,101,254,.4);
+    transition:filter .2s, transform .2s, box-shadow .2s;
+  }
+  .drawer-btn-login:hover { filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 10px 30px rgba(163,101,254,.55); }
+  @keyframes slideInRight { from{opacity:0;transform:translateX(24px);} to{opacity:1;transform:translateX(0);} }
+  #mobile-drawer.open .drawer-inner>*{animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;}
+  #mobile-drawer.open .drawer-inner>*:nth-child(1){animation-delay:.05s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(2){animation-delay:.10s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(3){animation-delay:.15s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(4){animation-delay:.20s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(5){animation-delay:.25s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(6){animation-delay:.30s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(7){animation-delay:.35s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(8){animation-delay:.40s}
+  .drawer-social { display:flex; gap:10px; padding:0 24px 24px; }
+  .drawer-social a {
+    width:36px; height:36px; border-radius:10px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(255,255,255,.5); text-decoration:none;
+    transition:background .2s, color .2s, transform .2s;
+  }
+  .drawer-social a:hover { background:rgba(163,101,254,.25); color:#a365fe; transform:translateY(-3px); }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/gold-vps-hosting.html">
+</head>
+<body>
+
+<div id="cursor-glow"></div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+
+    <!-- Drawer Header -->
+    <div class="drawer-header">
+      <a href="/index.html">
+        <img alt="Crapplet" src="/Crapplet_logo.png" class="h-12 w-auto"
+             onerror="this.outerHTML='<span style=\'color:#a365fe;font-weight:900;font-size:18px;font-family:Inter,sans-serif\'>Crapplet</span>'"/>
+      </a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item" style="color:#a365fe;font-weight:700">★ Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div class="drawer-divider"></div>
+
+    <!-- Stats strip -->
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">25+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Regions</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">2 min</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+      <a href="/contact.html">
+        <button class="drawer-btn-support w-full">
+          <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+          Support
+        </button>
+      </a>
+      <a href="/clientarea/index.php?rp=/login">
+        <button class="drawer-btn-login w-full">
+          <span class="material-symbols-outlined" style="font-size:18px">login</span>
+          Login
+        </button>
+      </a>
+    </div>
+
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li is-current" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main>
+
+<!-- ══ HERO ══ -->
+<section class="relative overflow-hidden py-10" style="background:linear-gradient(135deg,#0e001a 0%,#10002d 35%,#21003d 60%,#07001a 100%)">
+  <div class="absolute inset-0 pointer-events-none opacity-10" style="background-image:radial-gradient(circle at 2px 2px,rgba(90,42,201,0.6) 1px,transparent 0);background-size:32px 32px;"></div>
+  <div class="orb1 absolute top-10 left-10 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none" style="background:radial-gradient(circle,#bb60f0,transparent)"></div>
+  <div class="orb2 absolute bottom-10 right-10 w-64 h-64 rounded-full blur-3xl opacity-15 pointer-events-none" style="background:radial-gradient(circle,#bb60f0,transparent)"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div class="space-y-8 text-center lg:text-left">
+        <div class="load ld1 inline-flex items-center gap-2 px-4 py-1.5 rounded-full gold-pulse" style="background:rgba(163,101,254,.15);border:2px solid rgba(163,101,254,.4)">
+          <span class="text-lg font-bold" style="color:#a365fe">★</span>
+          <span class="text-xs font-bold uppercase tracking-widest" style="color:#c084fc">Premium Gold Tier Infrastructure</span>
+        </div>
+        <h1 class="load ld2 font-display text-2xl lg:text-4xl font-black leading-tight" style="color:#fff;text-shadow:0 0 60px rgba(201,151,42,.3)">
+          Gold VPS<br/><span class="gold-text">Hosting.</span>
+        </h1>
+        <p class="load ld3 text-slate-400 text-md leading-relaxed max-w-xl">
+          Enterprise-grade VPS servers with premium NVMe Gen4 storage, dedicated CPU cores, and a 99.99% uptime SLA. Built for businesses that demand nothing but the best.
+        </p>
+        <div class="load ld4 flex flex-wrap justify-center lg:justify-start gap-3">
+          <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(163,101,254,.12);border:1px solid rgba(163,101,254,.3);color:#c084fc">⚡ NVMe Gen4 SSD</span>
+          <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(163,101,254,.12);border:1px solid rgba(163,101,254,.3);color:#c084fc">🛡 DDoS Protection</span>
+          <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(163,101,254,.12);border:1px solid rgba(163,101,254,.3);color:#c084fc">🔑 Full Root Access</span>
+          <span class="px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(163,101,254,.12);border:1px solid rgba(163,101,254,.3);color:#c084fc">📞 Priority Support</span>
+        </div>
+        <div class="load ld5 flex flex-wrap justify-center lg:justify-start gap-4">
+          <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})" class="deploy-btn px-8 py-3 rounded-xl font-bold text-lg shadow-2xl">View Gold Plans</button>
+          <button class="px-8 py-3 rounded-xl font-bold text-lg border-2 hover:-translate-y-1 transition-all" style="border-color:rgba(163,101,254,.35);color:#c084fc;background:rgba(163,101,254,.08)" onclick="location.href='#plans'">Compare Specs</button>
+        </div>
+      </div>
+
+      <!-- Right: Gold performance card -->
+      <div class="load ld5 float-anim">
+        <div class="relative">
+          <div class="absolute -inset-4 rounded-3xl opacity-20 blur-xl" style="background:linear-gradient(135deg,var(--primary),transparent,var(--primary-glow))"></div>
+          <div class="relative rounded-2xl overflow-hidden" style="background:linear-gradient(145deg,#fff9ed,#fffdf7);box-shadow:0 0 60px rgba(201,151,42,.25)">
+            <div class="px-6 py-4 flex items-center justify-between border-b" style="background:linear-gradient(90deg,#4e148b,#5f2ac9,#9760f0);border-color:rgba(135,42,201,0.3)">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white font-bold text-lg">★</div>
+                <span class="font-display font-bold text-white text-lg">Gold VPS Dashboard</span>
+              </div>
+              <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20">
+                <span class="w-2 h-2 rounded-full bg-green-300 animate-pulse"></span>
+                <span class="text-white text-xs font-bold">LIVE</span>
+              </div>
+            </div>
+            <div class="p-6 space-y-5">
+              <div>
+                <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-slate-500">CPU Usage</span><span class="text-sm font-black" style="color:#7c3aed">28%</span></div>
+                <div class="h-3 rounded-full overflow-hidden bg-amber-100"><div class="h-full rounded-full gold-bar-fill" style="--w:28%;background:linear-gradient(90deg,#7c3aed,#a365fe,#c084fc);box-shadow:0 0 8px rgba(163,101,254,.5)"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-slate-500">RAM Usage</span><span class="text-sm font-black" style="color:#7c3aed">4.2 GB / 16 GB</span></div>
+                <div class="h-3 rounded-full overflow-hidden bg-amber-100"><div class="h-full rounded-full gold-bar-fill" style="--w:26%;animation-delay:.15s;background:linear-gradient(90deg,#7c3aed,#a365fe);box-shadow:0 0 8px rgba(163,101,254,.4)"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-slate-500">NVMe Storage</span><span class="text-sm font-black" style="color:#7c3aed">120 GB / 480 GB</span></div>
+                <div class="h-3 rounded-full overflow-hidden bg-amber-100"><div class="h-full rounded-full gold-bar-fill" style="--w:25%;animation-delay:.3s;background:linear-gradient(90deg,#a365fe,#c084fc);box-shadow:0 0 8px rgba(163,101,254,.35)"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-slate-500">Bandwidth Used</span><span class="text-sm font-black" style="color:#7c3aed">1.2 TB / 10 TB</span></div>
+                <div class="h-3 rounded-full overflow-hidden bg-amber-100"><div class="h-full rounded-full gold-bar-fill" style="--w:12%;animation-delay:.45s;background:linear-gradient(90deg,#a365fe,#c084fc);box-shadow:0 0 8px rgba(163,101,254,.3)"></div></div>
+              </div>
+              <div class="grid grid-cols-3 gap-3 pt-2">
+                <div class="rounded-xl p-3 text-center" style="background:#fafafa;border:1.5px solid #e2e8f0">
+                  <div class="font-display font-black text-xl" style="color:#7c3aed">99.99%</div>
+                  <div class="text-xs text-slate-500 mt-0.5 font-medium">Uptime</div>
+                </div>
+                <div class="rounded-xl p-3 text-center" style="background:#fafafa;border:1.5px solid #e2e8f0">
+                  <div class="font-display font-black text-xl" style="color:#7c3aed">&lt;2ms</div>
+                  <div class="text-xs text-slate-500 mt-0.5 font-medium">Latency</div>
+                </div>
+                <div class="rounded-xl p-3 text-center" style="background:#fafafa;border:1.5px solid #e2e8f0">
+                  <div class="font-display font-black text-xl" style="color:#7c3aed">10G</div>
+                  <div class="text-xs text-slate-500 mt-0.5 font-medium">Network</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="absolute bottom-0 left-0 right-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(163,101,254,.4),transparent)"></div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="border-y py-3 overflow-hidden" style="background:#f8f5ff;border-color:rgba(163,101,254,.2)">
+  <div class="ticker-inner text-xs font-bold uppercase tracking-widest" style="color:#7c3aed;font-family:'DM Sans',sans-serif;letter-spacing:.08em">
+    <span class="mx-10">★ NVMe Gen4 SSD</span><span class="mx-10">★ 10 Gbps Network Port</span>
+    <span class="mx-10">★ KVM Virtualization</span><span class="mx-10">★ Full Root SSH Access</span>
+    <span class="mx-10">★ 99.99% Uptime SLA</span><span class="mx-10">★ DDoS Protected</span>
+    <span class="mx-10">★ Daily Snapshots</span><span class="mx-10">★ Priority Gold Support</span>
+    <span class="mx-10">★ NVMe Gen4 SSD</span><span class="mx-10">★ 10 Gbps Network Port</span>
+    <span class="mx-10">★ KVM Virtualization</span><span class="mx-10">★ Full Root SSH Access</span>
+    <span class="mx-10">★ 99.99% Uptime SLA</span><span class="mx-10">★ DDoS Protected</span>
+    <span class="mx-10">★ Daily Snapshots</span><span class="mx-10">★ Priority Gold Support</span>
+  </div>
+</div>
+
+<!-- ══ STATS BAR ══ -->
+<section class="py-14 border-b" style="background:#fafafa;border-color:#e2e8f0">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div class="count-anim reveal rv1 text-center p-6 rounded-2xl" style="background:#fff;border:1.5px solid #e2e8f0;box-shadow:0 2px 12px rgba(163,101,254,.06)">
+        <div class="font-display text-4xl font-black mb-1" style="color:#7c3aed">99.99%</div>
+        <div class="text-sm font-semibold text-slate-700">Uptime SLA</div>
+        <div class="text-xs text-slate-500 mt-1">Gold guarantee</div>
+      </div>
+      <div class="count-anim reveal rv2 text-center p-6 rounded-2xl" style="background:#fff;border:1.5px solid #e2e8f0;box-shadow:0 2px 12px rgba(163,101,254,.06)">
+        <div class="font-display text-4xl font-black mb-1" style="color:#7c3aed">10G</div>
+        <div class="text-sm font-semibold text-slate-700">Network Speed</div>
+        <div class="text-xs text-slate-500 mt-1">Unmetered bandwidth</div>
+      </div>
+      <div class="count-anim reveal rv3 text-center p-6 rounded-2xl" style="background:#fff;border:1.5px solid #e2e8f0;box-shadow:0 2px 12px rgba(163,101,254,.06)">
+        <div class="font-display text-4xl font-black mb-1" style="color:#7c3aed">&lt;60s</div>
+        <div class="text-sm font-semibold text-slate-700">Provisioning</div>
+        <div class="text-xs text-slate-500 mt-1">Instant deployment</div>
+      </div>
+      <div class="count-anim reveal rv4 text-center p-6 rounded-2xl" style="background:#fff;border:1.5px solid #e2e8f0;box-shadow:0 2px 12px rgba(163,101,254,.06)">
+        <div class="font-display text-4xl font-black mb-1" style="color:#7c3aed">24/7</div>
+        <div class="text-sm font-semibold text-slate-700">Priority Support</div>
+        <div class="text-xs text-slate-500 mt-1">Priority response</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES ══ -->
+<section class="py-16" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">
+        <span style="color:#a365fe">★</span>
+        <span class="text-xs font-bold uppercase tracking-widest" style="color:#7c3aed">Why Gold VPS</span>
+      </div>
+      <h2 class="font-display text-4xl font-black text-slate-900 mb-4">Built for <span class="gold-text">Peak Performance</span></h2>
+      <p class="text-slate-600 max-w-2xl mx-auto text-lg">Every Gold VPS server is hand-configured on enterprise hardware with dedicated resources — no noisy neighbours, no compromise.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="feat-card reveal rv1 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">⚡</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">NVMe Gen4 SSD</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Up to 7,000 MB/s sequential read. Your databases and apps load in milliseconds, not seconds.</p>
+      </div>
+      <div class="feat-card reveal rv2 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">🔒</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Enterprise Security</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Always-on 1 Tbps DDoS mitigation, custom firewall rules, and isolated KVM virtualization.</p>
+      </div>
+      <div class="feat-card reveal rv3 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">📈</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Instant Scaling</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Upgrade CPU, RAM, and storage from the portal without reinstalling your OS or losing data.</p>
+      </div>
+      <div class="feat-card reveal rv4 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">👑</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Gold Priority Support</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Dedicated Gold-tier engineers with under 2-minute response time via live chat and phone.</p>
+      </div>
+      <div class="feat-card reveal rv1 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">💾</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Auto Backups</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Daily automated off-site snapshots with 14-day retention and one-click rollback via the panel.</p>
+      </div>
+      <div class="feat-card reveal rv2 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">🌐</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Global Anycast</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">25+ data centers worldwide with Anycast routing — your users always connect to the nearest node.</p>
+      </div>
+      <div class="feat-card reveal rv3 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">🐧</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Any OS / Distro</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Deploy Ubuntu, Debian, CentOS, AlmaLinux, Rocky, or Windows Server with one click.</p>
+      </div>
+      <div class="feat-card reveal rv4 p-7 rounded-2xl space-y-4">
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl feat-icon" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">🔑</div>
+        <h4 class="font-display font-bold text-xl text-slate-900">Full Root Control</h4>
+        <p class="text-slate-600 text-sm leading-relaxed">Complete server ownership — install any software, configure services, manage users freely via SSH.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PLANS ══ -->
+<section id="plans" class="py-24" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">
+        <span style="color:#a365fe">★</span>
+        <span class="text-xs font-bold uppercase tracking-widest" style="color:#7c3aed">Pricing</span>
+      </div>
+      <h2 class="font-display text-4xl font-black text-slate-900 mb-4">Gold VPS <span class="gold-text">Plans</span></h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">Every plan includes NVMe Gen4 SSD, DDoS protection, daily backups, dedicated IPv4 + IPv6, and Gold Priority Support.</p>
+    </div>
+
+    <div id="plans-linux" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Gold S -->
+      <div class="plan-card visible flex flex-col p-8 rounded-2xl">
+        <div class="mb-3">
+          <span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full" style="background:rgba(163,101,254,.08);border:1px solid rgba(163,101,254,.25);color:#7c3aed">★ GOLD STARTER</span>
+        </div>
+        <div class="mb-8">
+          <h3 class="font-display text-2xl font-black text-slate-900 mb-1">Gold S</h3>
+          <div class="flex items-baseline gap-1 mt-3">
+            <span class="font-display text-5xl font-black" style="color:#7c3aed"><span class="price-amount" data-inr="999">₹999</span></span>
+            <span class="text-slate-500 font-medium">/mo</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5">Ideal for growing apps & APIs</p>
+        </div>
+        <div class="space-y-4 mb-8 flex-grow">
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">⚡</span>2x Intel Xeon Gold 6136</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💾</span>4 GB RAM</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🗄️</span>80 GB SSD</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🌐</span>Unlimited Bandwidth</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💿</span>1 Dedicated IP</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🖥</span>Full Root Access</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📊</span>99.9% Uptime</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📍</span>Server Location India</div>
+        </div>
+        <a href="/clientarea/cart.php?a=add&pid=33&carttpl=lagom2" class="select-btn w-full py-3.5 rounded-xl font-bold text-sm text-center block">Select Gold S</a>
+      </div>
+
+      <!-- Gold M (Featured) -->
+      <div class="plan-featured visible flex flex-col p-8 rounded-2xl relative">
+        <div class="popular-badge absolute -top-4 left-1/2 -translate-x-1/2 text-white text-xs font-black uppercase tracking-widest px-5 py-1.5 rounded-full" style="background:#a365fe;box-shadow:0 4px 14px rgba(163,101,254,.5)">★ Most Popular</div>
+        <div class="mb-3">
+          <span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full" style="background:rgba(163,101,254,.12);border:1px solid rgba(163,101,254,.35);color:#7c3aed">★ GOLD PRO</span>
+        </div>
+        <div class="mb-8">
+          <h3 class="font-display text-2xl font-black text-slate-900 mb-1">Gold M</h3>
+          <div class="flex items-baseline gap-1 mt-3">
+            <span class="font-display text-5xl font-black gold-text"><span class="price-amount" data-inr="1299">₹1299</span></span>
+            <span class="text-slate-500 font-medium">/mo</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5">High-traffic sites & e-commerce</p>
+        </div>
+        <div class="space-y-4 mb-8 flex-grow">
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">⚡</span>4x Intel Xeon Gold 6136</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💾</span>8 GB RAM</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🗄️</span>120 GB SSD</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🌐</span>Unlimited Bandwidth</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💿</span>1 Dedicated IP</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🖥</span>Full Root Access</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📊</span>99.9% Uptime</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📍</span>Server Location India</div>
+        </div>
+        <a href="/clientarea/cart.php?a=add&pid=34&carttpl=lagom2" class="select-primary w-full py-3.5 rounded-xl font-bold text-sm text-center block">Select Gold M</a>
+      </div>
+
+      <!-- Gold L -->
+      <div class="plan-card visible flex flex-col p-8 rounded-2xl">
+        <div class="mb-3">
+          <span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full" style="background:rgba(163,101,254,.08);border:1px solid rgba(163,101,254,.25);color:#7c3aed">★ GOLD ELITE</span>
+        </div>
+        <div class="mb-8">
+          <h3 class="font-display text-2xl font-black text-slate-900 mb-1">Gold L</h3>
+          <div class="flex items-baseline gap-1 mt-3">
+            <span class="font-display text-5xl font-black" style="color:#7c3aed"><span class="price-amount" data-inr="1599">₹1599</span></span>
+            <span class="text-slate-500 font-medium">/mo</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5">Enterprise workloads & SaaS</p>
+        </div>
+        <div class="space-y-4 mb-8 flex-grow">
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">⚡</span>8x Intel Xeon Gold 6136</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💾</span>16 GB RAM</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🗄️</span>160 GB SSD</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🌐</span>Unlimited Bandwidth</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">💿</span>1 Dedicated IP</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">🖥</span>Full Root Access</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📊</span>99.9% Uptime</div>
+          <div class="flex items-center gap-3 spec-row"><span class="text-lg">📍</span>Server Location India</div>
+        </div>
+        <a href="/clientarea/cart.php?a=add&pid=35&carttpl=lagom2" class="select-btn w-full py-3.5 rounded-xl font-bold text-sm text-center block">Select Gold L</a>
+      </div>
+    </div>
+    <p class="text-center text-sm text-slate-500 mt-10 reveal rv5">Need a custom Gold configuration? <a href="/contact.html" class="font-bold hover:underline" style="color:#a365fe">Talk to our Gold team →</a></p>
+  </div>
+</section>
+
+<!-- ══ SPLIT FEATURE SECTION ══ -->
+<section class="py-24" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div class="reveal-left space-y-7">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">
+          <span style="color:#a365fe">★</span>
+          <span class="text-xs font-bold uppercase tracking-widest" style="color:#7c3aed">Infrastructure</span>
+        </div>
+        <h2 class="font-display text-4xl font-black text-slate-900 leading-tight">Dedicated Resources.<br/><span class="gold-text">Zero Sharing.</span></h2>
+        <p class="text-slate-600 text-lg leading-relaxed">Our Gold VPS servers run on enterprise KVM hypervisors with pinned CPU cores and ECC RAM. Your server's resources are yours alone — no overselling, no performance degradation from other customers.</p>
+        <ul class="space-y-5">
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5" style="background:#a365fe">✓</div>
+            <div><div class="font-bold text-slate-900">KVM Hypervisor with CPU Pinning</div><div class="text-sm text-slate-600 mt-0.5">Dedicated cores that never share compute with other VMs on the host</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5" style="background:#a365fe">✓</div>
+            <div><div class="font-bold text-slate-900">ECC RAM for Data Integrity</div><div class="text-sm text-slate-600 mt-0.5">Error-correcting memory prevents data corruption — critical for databases and financial apps</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5" style="background:#a365fe">✓</div>
+            <div><div class="font-bold text-slate-900">NVMe Gen4 with RAID-10</div><div class="text-sm text-slate-600 mt-0.5">Both performance and redundancy — your data is safe even if a drive fails</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5" style="background:#a365fe">✓</div>
+            <div><div class="font-bold text-slate-900">10 Gbps Dedicated Uplink</div><div class="text-sm text-slate-600 mt-0.5">Full 10G port speed — serve thousands of simultaneous connections without throttling</div></div>
+          </li>
+        </ul>
+      </div>
+      <div class="reveal-right">
+        <p class="text-sm font-bold uppercase tracking-widest mb-6" style="color:#7c3aed">★ Gold VPS Powers</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🛒</div><div class="font-bold text-slate-800 text-sm">E-Commerce</div><div class="text-xs text-slate-500 mt-1">WooCommerce, Shopify alt</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🗄️</div><div class="font-bold text-slate-800 text-sm">Databases</div><div class="text-xs text-slate-500 mt-1">MySQL, PostgreSQL, MongoDB</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🤖</div><div class="font-bold text-slate-800 text-sm">AI / ML Apps</div><div class="text-xs text-slate-500 mt-1">Model inference, APIs</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">📊</div><div class="font-bold text-slate-800 text-sm">ERP / CRM</div><div class="text-xs text-slate-500 mt-1">Odoo, ERPNext, Zoho</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🎮</div><div class="font-bold text-slate-800 text-sm">Game Servers</div><div class="text-xs text-slate-500 mt-1">CS2, Valheim, ARK</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🔄</div><div class="font-bold text-slate-800 text-sm">CI/CD & DevOps</div><div class="text-xs text-slate-500 mt-1">Jenkins, GitHub Actions</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">🔒</div><div class="font-bold text-slate-800 text-sm">VPN / Proxy</div><div class="text-xs text-slate-500 mt-1">WireGuard, OpenVPN</div></div>
+          <div class="use-chip p-5 rounded-2xl text-center cursor-default"><div class="text-3xl mb-3">📧</div><div class="font-bold text-slate-800 text-sm">Mail Servers</div><div class="text-xs text-slate-500 mt-1">Postfix, iRedMail</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TESTIMONIALS ══ -->
+<section class="py-16" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <h2 class="font-display text-4xl font-black text-slate-900 mb-3">Trusted by <span class="gold-text">Gold Customers</span></h2>
+      <p class="text-slate-600">What our premium clients say about Gold VPS performance.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-7">
+      <div class="reveal rv1 p-7 rounded-2xl bg-white flex flex-col" style="border:1.5px solid #e2e8f0">
+        <div class="flex gap-0.5 mb-5 stars-row">
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed flex-grow">"Switched from a major cloud provider and cut our infrastructure bill by 60% while getting better performance. The NVMe storage speed is incredible — our MySQL queries are 3x faster."</p>
+        <div class="mt-6 flex items-center gap-3 pt-5 border-t" style="border-color:#e2e8f0">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-black text-white text-sm" style="background:#a365fe">AK</div>
+          <div><div class="font-bold text-slate-900 text-sm">Arjun K.</div><div class="text-xs text-slate-500">SaaS Founder · Bangalore</div></div>
+          <span class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</span>
+        </div>
+      </div>
+      <div class="reveal rv2 p-7 rounded-2xl bg-white flex flex-col" style="border:2px solid rgba(163,101,254,.4)">
+        <div class="flex gap-0.5 mb-5 stars-row">
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed flex-grow">"The Gold Priority Support is worth it alone. Our dedicated engineer responds in under 2 minutes at 2 AM. When we had a critical issue, it was resolved in 8 minutes. Unmatched."</p>
+        <div class="mt-6 flex items-center gap-3 pt-5 border-t" style="border-color:#e2e8f0">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-black text-white text-sm" style="background:#a365fe">PR</div>
+          <div><div class="font-bold text-slate-900 text-sm">Priya R.</div><div class="text-xs text-slate-500">CTO · E-commerce Platform · Mumbai</div></div>
+          <span class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</span>
+        </div>
+      </div>
+      <div class="reveal rv3 p-7 rounded-2xl bg-white flex flex-col" style="border:1.5px solid #e2e8f0">
+        <div class="flex gap-0.5 mb-5 stars-row">
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+          <span class="star-pop material-symbols-outlined" style="font-size:20px;color:#a365fe;font-variation-settings:'FILL' 1">star</span>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed flex-grow">"Running our Odoo ERP on Gold L VPS. 0 downtime in 14 months. The ECC RAM gives us peace of mind for financial data. Migration was handled by their team — zero disruption."</p>
+        <div class="mt-6 flex items-center gap-3 pt-5 border-t" style="border-color:#e2e8f0">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-black text-white text-sm" style="background:#a365fe">VS</div>
+          <div><div class="font-bold text-slate-900 text-sm">Vikram S.</div><div class="text-xs text-slate-500">IT Director · Manufacturing Co. · Pune</div></div>
+          <span class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section class="py-24" style="background:#fafafa">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex flex-col lg:flex-row gap-16 items-start">
+      <div class="lg:w-80 flex-shrink-0 reveal rv1">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5" style="background:rgba(163,101,254,.08);border:1.5px solid rgba(163,101,254,.2)">
+          <span style="color:#a365fe">★</span>
+          <span class="text-xs font-bold uppercase tracking-widest" style="color:#7c3aed">FAQ</span>
+        </div>
+        <h2 class="font-display text-3xl font-black text-slate-900 leading-tight mb-5">Frequently Asked <span class="gold-text">Questions</span></h2>
+        <p class="text-slate-600 text-sm leading-relaxed mb-8">Everything about Gold VPS hosting. Our Gold support team is always online.</p>
+        <div class="rounded-2xl p-5 space-y-4" style="background:#f5f0ff;border:1.5px solid rgba(163,101,254,.25)">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:#a365fe">
+              <span class="material-symbols-outlined text-white text-lg">support_agent</span>
+            </div>
+            <div>
+              <div class="font-bold text-slate-900 text-sm">Gold Priority Support</div>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-xs text-green-600 font-semibold">Online now · &lt;2 min response</span>
+              </div>
+            </div>
+          </div>
+          <a href="/contact.html" class="w-full flex items-center justify-center gap-2 py-3 text-white rounded-xl text-sm font-bold hover:brightness-110 transition-all" style="background:#a365fe;box-shadow:0 4px 14px rgba(163,101,254,.4)">
+            <span class="material-symbols-outlined text-sm">chat</span> Chat with Gold Team
+          </a>
+        </div>
+      </div>
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="faq-item reveal rv1"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">What makes Gold VPS different from regular VPS?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Gold VPS uses <strong>CPU-pinned dedicated cores, ECC RAM, NVMe Gen4 SSD in RAID-10</strong>, and a 10 Gbps dedicated uplink. Regular VPS shares CPU and uses standard SSDs. Gold also includes Priority Support with under 2-minute response time.</div></div></div>
+        <div class="faq-item reveal rv2"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Is a 99.99% uptime SLA guaranteed?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. Gold VPS plans come with a <strong>99.99% network uptime SLA</strong> — that's less than 52 minutes of downtime per year. Service credits are automatically applied if we fall short in any calendar month.</div></div></div>
+        <div class="faq-item reveal rv3"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I migrate my existing server for free?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Absolutely. Our Gold team handles complete server migrations — from cPanel, Plesk, DirectAdmin, or bare Linux servers — at zero cost. Open a support ticket after signing up and we coordinate at your convenience.</div></div></div>
+        <div class="faq-item reveal rv4"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">How do backups work on Gold VPS?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">All Gold plans include <strong>daily automated off-site snapshots with 14-day retention</strong>. Restore to any point in one click. You can also trigger manual snapshots before major deployments.</div></div></div>
+        <div class="faq-item reveal rv5"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I upgrade without reinstalling the OS?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. Scale CPU and RAM from the Gold control panel with one click. A brief ~60 second reboot applies the new resources. All data, applications, and configurations are fully preserved.</div></div></div>
+        <div class="faq-item reveal rv1"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">What payment methods do you accept?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner"><strong>India:</strong> UPI, Net Banking, Debit/Credit Cards (Visa, Mastercard, RuPay). <strong>International:</strong> Visa, Mastercard, Amex, PayPal. GST-compliant invoices generated automatically.</div></div></div>
+        <div class="faq-item reveal rv2"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Is DDoS protection included in all plans?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes — all Gold VPS plans include <strong>always-on enterprise DDoS mitigation</strong> (up to 1 Tbps scrubbing) at no extra cost. Gold L includes enhanced Layer 7 WAF and rate-limiting on top.</div></div></div>
+        <div class="faq-item reveal rv3"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Do you offer a money-back guarantee?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Gold VPS plans have a <strong>7-day full refund</strong> policy. If you're not satisfied for any reason within the first 7 days, we'll refund 100% of your payment — no questions asked.</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA ══ -->
+<section class="py-24 relative overflow-hidden" style="background:linear-gradient(135deg,#1a0e00 0%,#2d1a00 40%,#3d2200 70%,#1a0e00 100%)">
+  <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image:radial-gradient(circle at 2px 2px,rgba(201,151,42,.5) 1px,transparent 0);background-size:28px 28px;"></div>
+  <div class="orb1 absolute top-0 left-1/3 w-96 h-96 rounded-full blur-3xl opacity-15 pointer-events-none" style="background:radial-gradient(circle,#f0c060,transparent)"></div>
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 relative z-10 reveal rv1">
+    <div class="text-5xl mb-4" style="color:#a365fe">★</div>
+    <h2 class="font-display text-4xl lg:text-5xl font-black text-white leading-tight">Ready to Go Gold?</h2>
+    <p class="text-slate-300 text-xl max-w-2xl mx-auto">Join thousands of businesses running on premium Gold VPS infrastructure. Deploy in under 60 seconds.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+      <input id="ctaEmail" type="email" placeholder="Enter your business email"
+        class="glow-input w-full sm:w-80 px-5 py-4 rounded-xl border text-sm bg-white/10 text-white placeholder:text-slate-500"
+        style="border-color:rgba(201,151,42,.4)"/>
+      <button id="deployBtn" class="deploy-btn w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-lg shadow-2xl">★ Get Gold VPS</button>
+    </div>
+    <p class="text-xs text-slate-400 mt-4">No setup fee · 7-day money back · Cancel anytime</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+    <div class="flex flex-col gap-4">
+      <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+      <div class="flex flex-col gap-1">
+        <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+      </div>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">Hosting</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+        <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+        <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+        <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+      </nav>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">Company</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+      </nav>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">Support</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+        <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+        <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+        <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+      </nav>
+    </div>
+  </div>
+  <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+    <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+    <div class="flex gap-6">
+      <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+      <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+      <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => { glow.style.left = e.clientX+'px'; glow.style.top = e.clientY+'px'; });
+
+/* Header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+/* Scroll reveal */
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      e.target.querySelectorAll('.star-pop').forEach(s => s.classList.add('visible'));
+      obs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .plan-card, .plan-featured, .feat-card, .faq-item, .count-anim').forEach(el => obs.observe(el));
+
+/* Select button feedback */
+function attachSelectListeners() {
+  document.querySelectorAll('.select-btn, .select-primary').forEach(btn => {
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click', function() {
+      const orig = this.textContent;
+      const origStyle = this.getAttribute('style') || '';
+      this.textContent = '★ Added to Cart!';
+      this.style.background = '#16a34a'; this.style.color = '#fff'; this.style.border = 'none';
+      setTimeout(() => { this.textContent = orig; this.setAttribute('style', origStyle); }, 2000);
+    });
+  });
+}
+attachSelectListeners();
+
+/* Deploy CTA */
+const deployBtn = document.getElementById('deployBtn');
+const ctaEmail  = document.getElementById('ctaEmail');
+if (deployBtn && ctaEmail) {
+  deployBtn.addEventListener('click', () => {
+    if (ctaEmail.value.trim()) {
+      deployBtn.textContent = '★ Launching Gold VPS…';
+      deployBtn.style.background = 'linear-gradient(135deg,#16a34a,#15803d)';
+      setTimeout(() => { deployBtn.textContent = '★ Get Gold VPS'; deployBtn.style.background = ''; ctaEmail.value = ''; }, 2200);
+    } else {
+      ctaEmail.style.borderColor = '#ef4444'; ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+      setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+    }
+  });
+}
+
+/* FAQ accordion */
+document.querySelectorAll('.faq-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const item = btn.closest('.faq-item');
+    const body = item.querySelector('.faq-body');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => {
+      i.classList.remove('open'); i.querySelector('.faq-body').classList.remove('open');
+      i.querySelector('.faq-sym').textContent = 'add';
+    });
+    if (!isOpen) {
+      item.classList.add('open'); body.classList.add('open');
+      btn.querySelector('.faq-sym').textContent = 'close';
+    }
+  });
+});
+
+/* ══ MOBILE DRAWER ══ */
+const toggle   = document.getElementById('menu-toggle');
+const drawer   = document.getElementById('mobile-drawer');
+const overlay  = document.getElementById('mobile-overlay');
+const closeBtn = document.getElementById('close-drawer');
+
+function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+overlay.addEventListener('click', closeDrawer);
+if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+  trigger.addEventListener('click', function() {
+    const subId = 'sub-' + this.id.replace('acc-', '');
+    const sub = document.getElementById(subId);
+    if (!sub) return;
+    const isOpen = sub.classList.contains('open');
+    document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+    document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+    if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+  });
+});
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

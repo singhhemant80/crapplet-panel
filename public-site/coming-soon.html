@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="/Crapplet_Icon.png" />
+
+<title>Coming Soon | Crapplet</title>
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#a365fe",
+        "background-dark": "#101922"
+      },
+      fontFamily: { display: ["Inter", "sans-serif"] }
+    }
+  }
+}
+</script>
+
+<style>
+body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+/* cursor glow */
+#cursor-glow {
+  position: fixed;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #8949ea29 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+}
+
+/* shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg,#a365fe,#a66aff,#6d4e9c,#a365fe);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.load { animation: fadeInUp .7s ease both; }
+
+/* orb */
+@keyframes orb1 {
+  0%,100% { transform: translate(0,0); }
+  50% { transform: translate(40px,-30px); }
+}
+.orb1 { animation: orb1 10s infinite ease-in-out; }
+
+/* glow input */
+.glow-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(163,101,254,.2);
+  border-color: #a365fe;
+}
+
+/* header shadow */
+header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
+
+        /* ══════════════════════════════════════════
+           MOBILE NAV — Full-Screen Drawer
+        ══════════════════════════════════════════ */
+
+        /* Hamburger button */
+#menu-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    /* ❌ REMOVE display:flex from here */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    z-index: 60;
+}      
+  #menu-toggle .bar { display:block; height:2px; border-radius:2px; background:#1e293b; transition:all .35s cubic-bezier(.22,1,.36,1); }
+        #menu-toggle .bar-top    { width:22px; }
+        #menu-toggle .bar-mid    { width:16px; transform-origin:right center; }
+        #menu-toggle .bar-bot    { width:22px; }
+        #menu-toggle.open .bar-top { transform:translateY(7px) rotate(45deg); width:22px; }
+        #menu-toggle.open .bar-mid { width:0; opacity:0; }
+        #menu-toggle.open .bar-bot { transform:translateY(-7px) rotate(-45deg); width:22px; }
+
+        /* Overlay */
+        #mobile-overlay {
+            position:fixed; inset:0; background:rgba(10,5,25,.55);
+            backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+            z-index:49; opacity:0; pointer-events:none;
+            transition:opacity .35s ease;
+        }
+        #mobile-overlay.show { opacity:1; pointer-events:all; }
+
+        /* Drawer */
+        #mobile-drawer {
+            position:fixed; top:0; right:0; bottom:0;
+            width:min(88vw,360px);
+            background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);
+            z-index:50; overflow-y:auto; overflow-x:hidden;
+            transform:translateX(100%);
+            transition:transform .4s cubic-bezier(.22,1,.36,1);
+            box-shadow:-20px 0 60px rgba(0,0,0,.5);
+        }
+        #mobile-drawer.open { transform:translateX(0); }
+
+        /* Noise texture overlay on drawer */
+        #mobile-drawer::before {
+            content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity:.18;
+        }
+
+        /* Glow orbs inside drawer */
+        #mobile-drawer::after {
+            content:''; position:absolute; top:-80px; right:-60px; width:260px; height:260px;
+            background:radial-gradient(circle, #a365fe44 0%, transparent 70%);
+            pointer-events:none; z-index:0; border-radius:50%;
+        }
+
+        .drawer-glow-bottom {
+            position:absolute; bottom:-60px; left:-40px; width:200px; height:200px;
+            background:radial-gradient(circle, #6633cc33 0%, transparent 70%);
+            border-radius:50%; pointer-events:none; z-index:0;
+        }
+
+        /* Drawer inner content */
+        .drawer-inner { position:relative; z-index:1; }
+
+        /* Drawer header */
+        .drawer-header {
+            padding:20px 24px 16px;
+            border-bottom:1px solid rgba(255,255,255,.07);
+            display:flex; align-items:center; justify-content:space-between;
+        }
+
+        /* Nav group label */
+        .nav-group-label {
+            font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+            color:rgba(163,101,254,.6); padding:20px 24px 8px;
+        }
+
+        /* Nav item */
+        .mob-nav-item {
+            display:flex; align-items:center; gap:12px;
+            padding:11px 24px; cursor:pointer;
+            color:rgba(255,255,255,.8); font-size:14px; font-weight:600;
+            border-radius:0; position:relative;
+            transition:background .2s ease, color .2s ease, padding-left .2s ease;
+            text-decoration:none;
+        }
+        .mob-nav-item:hover {
+            background:rgba(163,101,254,.12);
+            color:#fff;
+            padding-left:30px;
+        }
+        .mob-nav-item .item-icon {
+            width:32px; height:32px; border-radius:8px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:16px; flex-shrink:0;
+            transition:transform .25s ease;
+        }
+        .mob-nav-item:hover .item-icon { transform:scale(1.15) rotate(-5deg); }
+        .mob-nav-item .item-arrow {
+            margin-left:auto; opacity:.4; font-size:16px;
+            transition:transform .2s ease, opacity .2s ease;
+        }
+        .mob-nav-item:hover .item-arrow { transform:translateX(4px); opacity:.8; }
+
+        /* Submenu accordion */
+        .mob-submenu {
+            max-height:0; overflow:hidden;
+            transition:max-height .35s cubic-bezier(.22,1,.36,1);
+            background:rgba(0,0,0,.2);
+        }
+        .mob-submenu.open { max-height:500px; }
+        .mob-submenu-item {
+            display:flex; align-items:center; gap:10px;
+            padding:10px 24px 10px 56px;
+            color:rgba(255,255,255,.6); font-size:13px; font-weight:500;
+            transition:color .2s, padding-left .2s;
+            text-decoration:none;
+        }
+        .mob-submenu-item:hover { color:#a365fe; padding-left:62px; }
+        .mob-submenu-item::before {
+            content:''; width:5px; height:5px; border-radius:50%;
+            background:#a365fe; opacity:.5; flex-shrink:0;
+            transition:opacity .2s, transform .2s;
+        }
+        .mob-submenu-item:hover::before { opacity:1; transform:scale(1.4); }
+
+        /* Chevron rotate on open */
+        .mob-nav-item .chevron { transition:transform .3s ease; }
+        .mob-nav-item.sub-open .chevron { transform:rotate(180deg); }
+
+        /* Divider */
+        .drawer-divider { height:1px; background:rgba(255,255,255,.06); margin:8px 24px; }
+
+        /* Drawer CTA buttons */
+        .drawer-cta { padding:20px 24px; display:flex; flex-direction:column; gap:10px; margin-top:auto; }
+        .drawer-btn-support {
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            padding:12px; border-radius:12px;
+            border:1px solid rgba(163,101,254,.35);
+            color:rgba(255,255,255,.85); font-weight:700; font-size:14px;
+            transition:background .2s, border-color .2s;
+        }
+        .drawer-btn-support:hover { background:rgba(163,101,254,.12); border-color:#a365fe; }
+        .drawer-btn-login {
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            padding:13px; border-radius:12px;
+            background:linear-gradient(135deg,#a365fe,#7c3aed);
+            color:#fff; font-weight:800; font-size:14px;
+            box-shadow:0 6px 24px rgba(163,101,254,.4);
+            transition:filter .2s, transform .2s, box-shadow .2s;
+        }
+        .drawer-btn-login:hover { filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 10px 30px rgba(163,101,254,.55); }
+
+        /* Stagger animation for drawer items */
+        @keyframes slideInRight {
+            from { opacity:0; transform:translateX(24px); }
+            to   { opacity:1; transform:translateX(0); }
+        }
+        #mobile-drawer.open .drawer-inner > * {
+            animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;
+        }
+        #mobile-drawer.open .drawer-inner > *:nth-child(1)  { animation-delay:.05s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(2)  { animation-delay:.10s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(3)  { animation-delay:.15s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(4)  { animation-delay:.20s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(5)  { animation-delay:.25s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(6)  { animation-delay:.30s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(7)  { animation-delay:.35s }
+        #mobile-drawer.open .drawer-inner > *:nth-child(8)  { animation-delay:.40s }
+
+        /* Social row */
+        .drawer-social { display:flex; gap:10px; padding:0 24px 24px; }
+        .drawer-social a {
+            width:36px; height:36px; border-radius:10px;
+            background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+            display:flex; align-items:center; justify-content:center;
+            color:rgba(255,255,255,.5); font-size:14px;
+            transition:background .2s, color .2s, transform .2s;
+        }
+        .drawer-social a:hover { background:rgba(163,101,254,.25); color:#a365fe; transform:translateY(-3px); }
+
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+</head>
+
+<body class="bg-slate-50">
+
+<div id="cursor-glow"></div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+
+    <div class="drawer-header">
+     <a href="/index.html">
+      <img alt="Crapplet" src="/Crapplet_logo.png"
+           class="h-10 w-auto"
+           onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
+      /></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">shield</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div class="drawer-divider"></div>
+
+    <!-- Stats strip -->
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">25+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Regions</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">2 min</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+        <a href="/contact.html">
+      <button class="drawer-btn-support w-full">
+        <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+        Support
+      </button>
+      </a>
+                  <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+
+    </div>
+
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="relative flex min-h-screen flex-col">
+
+<!-- HEADER -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="flex items-center justify-center min-h-screen relative">
+
+  <!-- background -->
+  <div class="absolute inset-0 -z-10 overflow-hidden">
+    <div class="orb1 absolute -top-20 -left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-0 right-0 w-72 h-72 bg-purple-200/30 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="text-center max-w-2xl px-6">
+
+    <div class="load mb-6 text-primary font-bold uppercase text-xs">
+      🚀 Coming Soon
+    </div>
+
+    <h1 class="text-5xl font-black shimmer-text mb-4 load">
+      Something Amazing is Coming
+    </h1>
+
+    <p class="text-slate-600 mb-10 load">
+      We're working hard to launch our new experience.
+    </p>
+
+    <!-- countdown -->
+    <div class="grid grid-cols-4 gap-4 mb-10 load">
+      <div class="bg-white p-4 rounded-xl shadow">
+        <div id="days" class="text-2xl font-bold text-primary">00</div>
+        <div class="text-xs">Days</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow">
+        <div id="hours" class="text-2xl font-bold text-primary">00</div>
+        <div class="text-xs">Hours</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow">
+        <div id="minutes" class="text-2xl font-bold text-primary">00</div>
+        <div class="text-xs">Minutes</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow">
+        <div id="seconds" class="text-2xl font-bold text-primary">00</div>
+        <div class="text-xs">Seconds</div>
+      </div>
+    </div>
+
+    <!-- email -->
+    <div class="flex gap-3 justify-center">
+      <input type="email" placeholder="Enter email"
+        class="glow-input px-4 py-3 border rounded-lg w-72"/>
+      <button class="bg-primary text-white px-6 rounded-lg font-bold">
+        Notify
+      </button>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal">
+        <div class="flex flex-col gap-4">
+            <h4 class="text-slate-900 font-bold">Hosting</h4>
+            <nav class="flex flex-col gap-2">
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/shared-hosting.html">Shared Hosting</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/linux-vps-hosting.html">Cloud Hosting</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/linux-vps-hosting.html">VPS Hosting</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/dedicated-hosting.html">Dedicated Servers</a>
+            </nav>
+        </div>
+        <div class="flex flex-col gap-4">
+            <h4 class="text-slate-900 font-bold">Company</h4>
+            <nav class="flex flex-col gap-2">
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/index.html">About Us</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/contact.html">Contact</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/contact.html">Careers</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/contact.html">Network Status</a>
+            </nav>
+        </div>
+        <div class="flex flex-col gap-4">
+            <h4 class="text-slate-900 font-bold">Support</h4>
+            <nav class="flex flex-col gap-2">
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/contact.html">Help Center</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/terms-and-conditions.html">Terms & Conditions</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/privacy-and-policy.html">Privacy & Policy</a>
+                <a class="footer-link text-sm text-slate-500 hover:text-primary" href="/refund-policy.html">Refund Policy</a>
+            </nav>
+        </div>
+        <div class="flex flex-col gap-4">
+            <h4 class="text-slate-900 font-bold">Newsletter</h4>
+            <p class="text-sm text-slate-500">Get the latest hosting news and offers.</p>
+            <div class="flex gap-2">
+                <input class="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Email" type="email"/>
+                <button class="bg-primary text-white p-2 rounded-lg hover:brightness-110 transition-all">
+                    <span class="material-symbols-outlined">send</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+        <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+        <div class="flex gap-6">
+            <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+            <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+            <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+        </div>
+    </div>
+</footer>
+
+<script>
+
+/* cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => {
+  glow.style.left = e.clientX + 'px';
+  glow.style.top = e.clientY + 'px';
+});
+
+/* header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => {
+  hdr.classList.toggle('scrolled', window.scrollY > 20);
+});
+
+/* countdown */
+const launchDate = new Date("2026-05-01").getTime();
+
+setInterval(() => {
+  const now = new Date().getTime();
+  const diff = launchDate - now;
+
+  const d = Math.floor(diff / (1000*60*60*24));
+  const h = Math.floor((diff / (1000*60*60)) % 24);
+  const m = Math.floor((diff / (1000*60)) % 60);
+  const s = Math.floor((diff / 1000) % 60);
+
+  document.getElementById("days").innerText = d;
+  document.getElementById("hours").innerText = h;
+  document.getElementById("minutes").innerText = m;
+  document.getElementById("seconds").innerText = s;
+
+},1000);
+
+ /* ══ MOBILE DRAWER ══ */
+    const toggle   = document.getElementById('menu-toggle');
+    const drawer   = document.getElementById('mobile-drawer');
+    const overlay  = document.getElementById('mobile-overlay');
+
+    function openDrawer() {
+        drawer.classList.add('open');
+        overlay.classList.add('show');
+        toggle.classList.add('open');
+        document.body.classList.add('nav-open');
+    }
+    function closeDrawer() {
+        drawer.classList.remove('open');
+        overlay.classList.remove('show');
+        toggle.classList.remove('open');
+        document.body.classList.remove('nav-open');
+    }
+
+     const closeBtn = document.getElementById('close-drawer');
+if (closeBtn) {
+    closeBtn.addEventListener('click', closeDrawer);
+}
+
+    toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+    overlay.addEventListener('click', closeDrawer);
+
+</script>
+
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

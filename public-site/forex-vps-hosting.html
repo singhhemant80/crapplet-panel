@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png" /><title>Forex VPS Hosting - Ultra-Low Latency Trading Servers | Crapplet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+        darkMode:"class",
+        theme:{
+            extend:{
+                colors:{"primary":"#a365fe","background-light":"#ffffff","background-dark":"#101922"},
+                fontFamily:{"display":["Inter","sans-serif"]},
+                borderRadius:{"DEFAULT":"0.5rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},
+            },
+        },
+    }
+</script>
+<style>
+body { font-family:'Inter',sans-serif; }
+.nav-dropdown:hover .dropdown-menu { display:block; }
+
+/* cursor glow */
+#cursor-glow{position:fixed;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,#8949ea29 0%,transparent 70%);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:left .1s ease,top .1s ease;}
+
+/* Scrollbar width */
+::-webkit-scrollbar {
+    width: 10px;   /* vertical scrollbar */
+    height: 10px;  /* horizontal scrollbar */
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+    background: #f1f5f9;   /* light background */
+    border-radius: 10px;
+}
+
+/* Thumb (scroll handle) */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a365fe, #7c3aed);
+    border-radius: 10px;
+    border: 2px solid #f1f5f9;
+}
+
+/* Hover effect */
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #7c3aed, #a365fe);
+}
+
+/* load animations */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+.load{animation:fadeInUp .75s cubic-bezier(.22,1,.36,1) both;}
+.ld1{animation-delay:.07s}.ld2{animation-delay:.17s}.ld3{animation-delay:.27s}.ld4{animation-delay:.37s}.ld5{animation-delay:.47s}
+
+/* scroll reveal */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.rv1{transition-delay:.05s}.rv2{transition-delay:.15s}.rv3{transition-delay:.25s}.rv4{transition-delay:.35s}.rv5{transition-delay:.45s}
+.reveal-left{opacity:0;transform:translateX(-36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-left.visible{opacity:1;transform:translateX(0);}
+.reveal-right{opacity:0;transform:translateX(36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-right.visible{opacity:1;transform:translateX(0);}
+
+/* shimmer text */
+@keyframes shimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+.shimmer-text{background:linear-gradient(90deg,#a365fe,#a66aff,#6d4e9c,#a365fe);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 3s linear infinite;}
+
+/* gold shimmer for forex accent */
+@keyframes goldShimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+.gold-text{background:linear-gradient(90deg,#f59e0b,#fbbf24,#d97706,#fcd34d,#f59e0b);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:goldShimmer 3s linear infinite;}
+
+/* orbs */
+@keyframes orb1{0%,100%{transform:translate(0,0) scale(1);}40%{transform:translate(35px,-28px) scale(1.1);}70%{transform:translate(-18px,20px) scale(.93);}}
+@keyframes orb2{0%,100%{transform:translate(0,0);}50%{transform:translate(-45px,38px) scale(1.08);}}
+.orb1{animation:orb1 11s ease-in-out infinite;}
+.orb2{animation:orb2 15s ease-in-out infinite;}
+
+/* float */
+@keyframes floatCard{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+.float-card{animation:floatCard 5s ease-in-out infinite;}
+
+/* badge pulse */
+@keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.5);}50%{box-shadow:0 0 0 8px rgba(163,101,254,0);}}
+.badge-pulse{animation:pulseBadge 2.5s ease-in-out infinite;}
+
+/* status dot */
+@keyframes statusPing{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.7;transform:scale(1.5);}}
+.status-dot{animation:statusPing 1.8s ease-in-out infinite;}
+
+/* popular badge bounce */
+@keyframes badgePop{0%,100%{transform:translateX(-50%) scale(1);}50%{transform:translateX(-50%) scale(1.07);}}
+.popular-badge{animation:badgePop 2.5s ease-in-out infinite;}
+
+/* uptime blink */
+@keyframes uptimeBlink{0%,100%{opacity:1;}50%{opacity:.6;}}
+.uptime-val{animation:uptimeBlink .9s steps(1) infinite;}
+
+/* nav */
+nav a{position:relative;}
+nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:#a365fe;border-radius:2px;transition:width 0.3s ease;}
+nav a:hover::after{width:100%;}
+
+/* header */
+header{transition:box-shadow .3s;}
+header.scrolled{box-shadow:0 4px 20px rgba(0,0,0,.07);}
+
+/* plan cards */
+.plan-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.plan-card:hover{transform:translateY(-8px);box-shadow:0 20px 48px -12px rgba(0,0,0,.12);border-color:rgba(163,101,254,.4);}
+.plan-featured{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s;}
+.plan-featured:hover{transform:translateY(-10px) scale(1.02);box-shadow:0 28px 56px -12px rgba(163,101,254,.35);}
+
+@keyframes specIn{from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:translateX(0);}}
+.spec-row{opacity:0;}
+.plan-card.visible .spec-row,.plan-featured.visible .spec-row{animation:specIn .45s cubic-bezier(.22,1,.36,1) both;}
+.spec-row:nth-child(1){animation-delay:.1s}.spec-row:nth-child(2){animation-delay:.2s}.spec-row:nth-child(3){animation-delay:.3s}.spec-row:nth-child(4){animation-delay:.4s}.spec-row:nth-child(5){animation-delay:.5s}.spec-row:nth-child(6){animation-delay:.6s}
+
+.select-btn{transition:background .25s,color .25s,transform .2s,box-shadow .2s;}
+.select-btn:hover{background:#a365fe;color:#fff;transform:translateY(-2px);box-shadow:0 6px 18px rgba(163,101,254,.5);}
+.select-primary{transition:filter .2s,transform .2s,box-shadow .2s;}
+.select-primary:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 8px 22px rgba(163,101,254,.5);}
+
+/* tab pills */
+.tab-pill{transition:background .25s,color .25s,box-shadow .25s;}
+.tab-pill:hover:not(.active-tab){background:rgba(163,101,254,.1);color:#a365fe;}
+.tab-pill.active-tab{background:#a365fe;color:#fff;box-shadow:0 4px 14px rgba(163,101,254,.5);}
+
+/* feat cards */
+.feat-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.feat-card:hover{transform:translateY(-6px);box-shadow:0 16px 36px -8px rgba(0,0,0,.1);border-color:rgba(163,101,254,.3);}
+.feat-icon{transition:transform .3s ease,color .2s;}
+.feat-card:hover .feat-icon{transform:scale(1.2) rotate(6deg);color:#a365fe;}
+
+@keyframes featBounce{0%{opacity:0;transform:scale(.7);}60%{transform:scale(1.08);}100%{opacity:1;transform:scale(1);}}
+.feat-card.visible{animation:featBounce .55s cubic-bezier(.22,1,.36,1) both;}
+.feat-card:nth-child(1).visible{animation-delay:.05s}.feat-card:nth-child(2).visible{animation-delay:.15s}.feat-card:nth-child(3).visible{animation-delay:.25s}.feat-card:nth-child(4).visible{animation-delay:.35s}
+
+@keyframes checkSlide{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:translateX(0);}}
+.check-item{opacity:0;}
+.features-reveal.visible .check-item{animation:checkSlide .4s cubic-bezier(.22,1,.36,1) both;}
+.check-item:nth-child(1){animation-delay:.25s}.check-item:nth-child(2){animation-delay:.38s}.check-item:nth-child(3){animation-delay:.51s}
+
+/* CTA dot grid */
+@keyframes dotMove{0%{background-position:0 0;}100%{background-position:30px 30px;}}
+.cta-section{background-image:radial-gradient(circle,rgba(163,101,254,.08) 1px,transparent 0);background-size:30px 30px;animation:dotMove 6s linear infinite;}
+
+/* inputs */
+.glow-input{transition:box-shadow .3s,border-color .3s;}
+.glow-input:focus{outline:none;box-shadow:0 0 0 3px rgba(163,101,254,.2);border-color:#a365fe;}
+
+.deploy-btn{transition:filter .2s,transform .2s,box-shadow .2s;}
+.deploy-btn:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 8px 22px rgba(163,101,254,.4);}
+
+/* footer */
+.footer-link{transition:color .2s,padding-left .2s;display:inline-block;}
+.footer-link:hover{color:#a365fe;padding-left:5px;}
+.social-icon{transition:color .2s,transform .3s ease;}
+.social-icon:hover{color:#a365fe;transform:rotate(15deg) scale(1.2);}
+
+/* faq */
+.faq-item{transition:border-color .3s,box-shadow .3s;}
+
+/* ── FOREX-SPECIFIC ANIMATIONS ── */
+
+/* Candlestick chart animation */
+@keyframes candleGrow{0%{transform:scaleY(0);}100%{transform:scaleY(1);}}
+.candle{transform-origin:bottom;animation:candleGrow .6s cubic-bezier(.22,1,.36,1) both;}
+.candle:nth-child(1){animation-delay:.1s}.candle:nth-child(2){animation-delay:.2s}.candle:nth-child(3){animation-delay:.3s}
+.candle:nth-child(4){animation-delay:.4s}.candle:nth-child(5){animation-delay:.5s}.candle:nth-child(6){animation-delay:.6s}
+.candle:nth-child(7){animation-delay:.7s}.candle:nth-child(8){animation-delay:.8s}
+
+/* ticker tape */
+@keyframes tickerScroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.forex-ticker{display:flex;width:max-content;animation:tickerScroll 22s linear infinite;}
+.forex-ticker:hover{animation-play-state:paused;}
+
+/* ping latency dot */
+@keyframes latencyPing{0%{transform:scale(.8);opacity:.9;}50%{transform:scale(1.4);opacity:.4;}100%{transform:scale(.8);opacity:.9;}}
+.latency-ping{animation:latencyPing 1.4s ease-in-out infinite;}
+
+/* price tick up/down flash */
+@keyframes flashGreen{0%,100%{color:#22c55e;}50%{color:#86efac;}}
+@keyframes flashRed{0%,100%{color:#ef4444;}50%{color:#fca5a5;}}
+.price-up{animation:flashGreen 1.8s ease-in-out infinite;}
+.price-down{animation:flashRed 2.1s ease-in-out infinite;}
+
+/* chart line draw */
+@keyframes drawLine{from{stroke-dashoffset:400;}to{stroke-dashoffset:0;}}
+.chart-line{stroke-dasharray:400;stroke-dashoffset:400;animation:drawLine 2.5s cubic-bezier(.22,1,.36,1) .3s forwards;}
+
+/* broker badge hover */
+.broker-badge{transition:transform .2s,box-shadow .2s,border-color .2s;}
+.broker-badge:hover{transform:translateY(-4px);box-shadow:0 10px 24px rgba(163,101,254,.2);border-color:#a365fe;}
+
+/* ── HOW IT WORKS steps ── */
+.step-card{transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s,border-color .3s;}
+.step-card:hover{transform:translateY(-6px);box-shadow:0 20px 40px -10px rgba(163,101,254,.18);border-color:rgba(163,101,254,.4);}
+.step-num{background:linear-gradient(135deg,#a365fe,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+@keyframes connectorPulse{0%,100%{opacity:.4;}50%{opacity:1;}}
+.connector{animation:connectorPulse 2s ease-in-out infinite;}
+
+/* ── Testimonials ── */
+.testi-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.testi-card:hover{transform:translateY(-8px);box-shadow:0 24px 48px -12px rgba(163,101,254,.2);border-color:rgba(163,101,254,.35);}
+@keyframes starPop{0%{transform:scale(0) rotate(-20deg);}70%{transform:scale(1.2) rotate(5deg);}100%{transform:scale(1) rotate(0deg);}}
+.testi-card.visible .star-item{animation:starPop .4s cubic-bezier(.22,1,.36,1) both;}
+.testi-card.visible .star-item:nth-child(1){animation-delay:.1s}.testi-card.visible .star-item:nth-child(2){animation-delay:.16s}.testi-card.visible .star-item:nth-child(3){animation-delay:.22s}.testi-card.visible .star-item:nth-child(4){animation-delay:.28s}.testi-card.visible .star-item:nth-child(5){animation-delay:.34s}
+
+/* ── Data Centre Map ── */
+.dc-dot{transition:transform .2s,box-shadow .2s;}
+.dc-dot:hover{transform:scale(1.6);box-shadow:0 0 0 6px rgba(163,101,254,.25);}
+@keyframes dcPing{0%,100%{transform:scale(1);opacity:.8;}50%{transform:scale(2.2);opacity:0;}}
+.dc-ping{animation:dcPing 2.2s ease-out infinite;}
+
+/* ── Comparison table ── */
+.comp-row{transition:background .2s;}
+.comp-row:hover{background:#f8f5ff;}
+.comp-check{color:#a365fe;font-variation-settings:'FILL' 1,'wght' 600,'GRAD' 0,'opsz' 24;}
+.comp-cross{color:#cbd5e1;}
+
+/* ── Broker logos strip ── */
+@keyframes brokerScroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.broker-strip{display:flex;width:max-content;animation:brokerScroll 28s linear infinite;}
+.broker-strip:hover{animation-play-state:paused;}
+.broker-logo{transition:filter .2s,transform .2s;}
+.broker-logo:hover{filter:brightness(1);transform:scale(1.08);}
+
+/* mobile nav */
+#menu-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    /* ❌ REMOVE display:flex from here */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    z-index: 60;
+}#menu-toggle .bar{display:block;height:2px;border-radius:2px;background:#1e293b;transition:all .35s cubic-bezier(.22,1,.36,1);}
+#menu-toggle .bar-top{width:22px;}
+#menu-toggle .bar-mid{width:16px;transform-origin:right center;}
+#menu-toggle .bar-bot{width:22px;}
+#menu-toggle.open .bar-top{transform:translateY(7px) rotate(45deg);width:22px;}
+#menu-toggle.open .bar-mid{width:0;opacity:0;}
+#menu-toggle.open .bar-bot{transform:translateY(-7px) rotate(-45deg);width:22px;}
+
+#mobile-overlay{position:fixed;inset:0;background:rgba(10,5,25,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:49;opacity:0;pointer-events:none;transition:opacity .35s ease;}
+#mobile-overlay.show{opacity:1;pointer-events:all;}
+
+#mobile-drawer{position:fixed;top:0;right:0;bottom:0;width:min(88vw,360px);background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);z-index:50;overflow-y:auto;overflow-x:hidden;transform:translateX(100%);transition:transform .4s cubic-bezier(.22,1,.36,1);box-shadow:-20px 0 60px rgba(0,0,0,.5);}
+#mobile-drawer.open{transform:translateX(0);}
+#mobile-drawer::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.18;}
+#mobile-drawer::after{content:'';position:absolute;top:-80px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,#a365fe44 0%,transparent 70%);pointer-events:none;z-index:0;border-radius:50%;}
+.drawer-glow-bottom{position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;background:radial-gradient(circle,#6633cc33 0%,transparent 70%);border-radius:50%;pointer-events:none;z-index:0;}
+.drawer-inner{position:relative;z-index:1;}
+.drawer-header{padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;}
+.nav-group-label{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(163,101,254,.6);padding:20px 24px 8px;}
+.mob-nav-item{display:flex;align-items:center;gap:12px;padding:11px 24px;cursor:pointer;color:rgba(255,255,255,.8);font-size:14px;font-weight:600;position:relative;text-decoration:none;transition:background .2s,color .2s,padding-left .2s;}
+.mob-nav-item:hover{background:rgba(163,101,254,.12);color:#fff;padding-left:30px;}
+.mob-nav-item .item-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:transform .25s ease;}
+.mob-nav-item:hover .item-icon{transform:scale(1.15) rotate(-5deg);}
+.mob-nav-item .item-arrow{margin-left:auto;opacity:.4;font-size:16px;transition:transform .2s,opacity .2s;}
+.mob-nav-item:hover .item-arrow{transform:translateX(4px);opacity:.8;}
+.mob-nav-item .chevron{margin-left:auto;opacity:.5;font-size:18px;transition:transform .3s ease;}
+.mob-nav-item.sub-open .chevron{transform:rotate(180deg);}
+.mob-submenu{max-height:0;overflow:hidden;background:rgba(0,0,0,.2);transition:max-height .35s cubic-bezier(.22,1,.36,1);}
+.mob-submenu.open{max-height:500px;}
+.mob-submenu-item{display:flex;align-items:center;gap:10px;padding:10px 24px 10px 56px;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:color .2s,padding-left .2s;text-decoration:none;}
+.mob-submenu-item:hover{color:#a365fe;padding-left:62px;}
+.mob-submenu-item::before{content:'';width:5px;height:5px;border-radius:50%;background:#a365fe;opacity:.5;flex-shrink:0;transition:opacity .2s,transform .2s;}
+.mob-submenu-item:hover::before{opacity:1;transform:scale(1.4);}
+.drawer-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 24px;}
+.drawer-cta{padding:20px 24px;display:flex;flex-direction:column;gap:10px;}
+.drawer-btn-support{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;border:1px solid rgba(163,101,254,.35);color:rgba(255,255,255,.85);font-weight:700;font-size:14px;background:transparent;cursor:pointer;transition:background .2s,border-color .2s;}
+.drawer-btn-support:hover{background:rgba(163,101,254,.12);border-color:#a365fe;}
+.drawer-btn-login{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:12px;background:linear-gradient(135deg,#a365fe,#7c3aed);color:#fff;font-weight:800;font-size:14px;border:none;cursor:pointer;box-shadow:0 6px 24px rgba(163,101,254,.4);transition:filter .2s,transform .2s,box-shadow .2s;}
+.drawer-btn-login:hover{filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 10px 30px rgba(163,101,254,.55);}
+.drawer-social{display:flex;gap:10px;padding:0 24px 24px;}
+.drawer-social a{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);transition:background .2s,color .2s,transform .2s;text-decoration:none;}
+.drawer-social a:hover{background:rgba(163,101,254,.25);color:#a365fe;transform:translateY(-3px);}
+@keyframes slideInRight{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);}}
+#mobile-drawer.open .drawer-inner > *{animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;}
+#mobile-drawer.open .drawer-inner > *:nth-child(1){animation-delay:.05s}#mobile-drawer.open .drawer-inner > *:nth-child(2){animation-delay:.10s}#mobile-drawer.open .drawer-inner > *:nth-child(3){animation-delay:.15s}#mobile-drawer.open .drawer-inner > *:nth-child(4){animation-delay:.20s}#mobile-drawer.open .drawer-inner > *:nth-child(5){animation-delay:.25s}#mobile-drawer.open .drawer-inner > *:nth-child(6){animation-delay:.30s}#mobile-drawer.open .drawer-inner > *:nth-child(7){animation-delay:.35s}#mobile-drawer.open .drawer-inner > *:nth-child(8){animation-delay:.40s}
+body.nav-open{overflow:hidden;}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/forex-vps-hosting.html">
+</head>
+<body class="bg-white font-display text-slate-900">
+<div id="cursor-glow"></div>
+
+<!-- Mobile overlay + drawer -->
+<div id="mobile-overlay"></div>
+<div id="mobile-drawer">
+    <div class="drawer-glow-bottom"></div>
+    <div class="drawer-inner">
+        <div class="drawer-header">
+            <img alt="Crapplet" src="/Crapplet_logo.png" class="h-10 w-auto" onerror="this.outerHTML='<span style=\'color:#a365fe;font-weight:900;font-size:18px\'>Crapplet</span>'"/>
+              <button id="close-drawer"
+    class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+    
+    <span class="material-symbols-outlined" style="font-size:20px;">
+        close
+    </span>
+</button>
+        </div>
+        <a href="/index.html" class="mob-nav-item">
+            <span class="item-icon" style="background:rgba(163,101,254,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#a365fe;">home</span></span>
+            Home<span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+        </a>
+        <div>
+            <div class="mob-nav-item" id="acc-hosting">
+                <span class="item-icon" style="background:rgba(59,130,246,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#60a5fa;">dns</span></span>
+                Hosting<span class="material-symbols-outlined chevron">expand_more</span>
+            </div>
+            <div class="mob-submenu" id="sub-hosting">
+                <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+                <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+                <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+            </div>
+        </div>
+        <div>
+            <div class="mob-nav-item" id="acc-vps">
+                <span class="item-icon" style="background:rgba(139,92,246,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#a78bfa;">cloud</span></span>
+                VPS &amp; Cloud<span class="material-symbols-outlined chevron">expand_more</span>
+            </div>
+            <div class="mob-submenu" id="sub-vps">
+                <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+                <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+                <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+                <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+                <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+                <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+                <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+            </div>
+        </div>
+        <a href="/dedicated-hosting.html" class="mob-nav-item"><span class="item-icon" style="background:rgba(249,115,22,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#fb923c;">storage</span></span>Dedicated Servers<span class="material-symbols-outlined item-arrow">arrow_forward_ios</span></a>
+        <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+        <a href="/colocation.html" class="mob-nav-item"><span class="item-icon" style="background:rgba(6,182,212,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#22d3ee;">hub</span></span>Colocation<span class="material-symbols-outlined item-arrow">arrow_forward_ios</span></a>
+        <a href="/domain.html" class="mob-nav-item"><span class="item-icon" style="background:rgba(34,197,94,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#4ade80;">language</span></span>Domain<span class="material-symbols-outlined item-arrow">arrow_forward_ios</span></a>
+       <a href="/ddos-protection.html" class="mob-nav-item">
+            <span class="item-icon bg-pink-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+            DDos Protection
+            <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+        </a>
+        <a href="/contact.html" class="mob-nav-item"><span class="item-icon" style="background:rgba(236,72,153,.15);"><span class="material-symbols-outlined" style="font-size:16px;color:#f472b6;">mail</span></span>Contact<span class="material-symbols-outlined item-arrow">arrow_forward_ios</span></a>
+        <div class="drawer-divider"></div>
+        <div style="margin:16px 24px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:14px;display:flex;justify-content:space-around;text-align:center;">
+            <div><div style="font-size:15px;font-weight:900;color:#a365fe;">99.99%</div><div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;margin-top:2px;">Uptime</div></div>
+            <div style="width:1px;background:rgba(255,255,255,.1);"></div>
+            <div><div style="font-size:15px;font-weight:900;color:#fbbf24;">&lt;1ms</div><div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;margin-top:2px;">Latency</div></div>
+            <div style="width:1px;background:rgba(255,255,255,.1);"></div>
+            <div><div style="font-size:15px;font-weight:900;color:#4ade80;">24/7</div><div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:600;margin-top:2px;">Support</div></div>
+        </div>
+        <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+            <a href="/contact.html"><button class="drawer-btn-support w-full"><span class="material-symbols-outlined" style="font-size:18px;">headset_mic</span>Support</button></a>
+            <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+        </div>
+        <div class="drawer-social">
+            <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px;">public</span></a>
+            <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px;">terminal</span></a>
+            <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px;">shield</span></a>
+            <span style="margin-left:auto;font-size:10px;color:rgba(255,255,255,.2);font-weight:600;align-self:center;">© 2026 Crapplet</span>
+        </div>
+    </div>
+</div>
+
+<div class="relative flex min-h-screen flex-col">
+
+<!-- ── Header ── -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li is-current" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-grow">
+
+<!-- ── Forex Ticker Tape (LIVE) ── -->
+<div class="bg-slate-900 border-b border-slate-700 py-2 overflow-hidden relative" id="ticker-wrap">
+    <!-- Loading shimmer shown until data arrives -->
+    <div id="ticker-loading" class="flex items-center justify-center gap-3 py-0.5">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span class="text-xs text-slate-400 font-mono tracking-widest uppercase">Fetching live rates…</span>
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse" style="animation-delay:.3s"></span>
+    </div>
+    <!-- Live ticker injected by JS — hidden until ready -->
+    <div id="ticker-live" class="forex-ticker text-xs font-bold tracking-wide hidden"></div>
+</div>
+
+<!-- ── Hero ── -->
+<section class="relative py-12 overflow-hidden bg-slate-50/50">
+    <div class="absolute inset-0 pointer-events-none -z-0">
+        <div class="orb1 absolute -top-20 -left-20 w-72 h-72 rounded-full bg-primary/8 blur-3xl"></div>
+        <div class="orb2 absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-amber-200/20 blur-3xl"></div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-12 relative z-10">
+        <!-- Text -->
+        <div class="flex-1 space-y-7 text-center lg:text-left">
+            <div class="load ld1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-600 border border-amber-400/25 text-xs font-bold uppercase tracking-wider badge-pulse">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+                </span>
+                Ultra-Low Latency Trading Servers
+            </div>
+
+            <h1 class="load ld2 text-2xl lg:text-4xl font-black tracking-tight leading-[1.1] text-slate-900">
+                Win Every Trade with <span class="gold-text">Forex VPS</span> That Never Sleeps.
+            </h1>
+            <p class="load ld3 text-md text-slate-600 max-w-xl">
+                Sub-millisecond execution, 99.99% uptime, and MT4/MT5 pre-installed. Your trading bots run 24/7 — even when your PC is off. Co-located near top broker servers for the fastest possible fills.
+            </p>
+
+            <!-- Broker compatibility badges -->
+            <div class="load ld3 flex flex-wrap justify-center lg:justify-start gap-2">
+                <span class="broker-badge px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">📊 MT4 Ready</span>
+                <span class="broker-badge px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">📊 MT5 Ready</span>
+                <span class="broker-badge px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">⚡ cTrader</span>
+                <span class="broker-badge px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">🤖 EA / Bots</span>
+                <span class="broker-badge px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">💹 NinjaTrader</span>
+            </div>
+
+            <div class="load ld4 flex flex-wrap justify-center lg:justify-start gap-4">
+                <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})"
+                    class="bg-[#a365fe] text-white px-8 py-2.5 rounded-xl font-bold text-lg hover:shadow-2xl hover:shadow-[#a365fe]/50 hover:-translate-y-1 transition-all">
+                    View Trading Plans
+                </button>
+                <button class="bg-white border border-slate-200 px-8 py-2.5 rounded-xl font-bold text-lg hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm" onclick="location.href='/contact.html'">
+                    Check Latency
+                </button>
+            </div>
+        </div>
+
+        <!-- Trading terminal card -->
+        <div class="flex-1 w-full max-w-xl load ld5 float-card">
+            <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-2xl">
+                <!-- Terminal dark theme -->
+                <div class="bg-[#0d1117] rounded-xl overflow-hidden">
+                    <!-- Title bar -->
+                    <div class="flex items-center gap-2 px-4 py-2.5 bg-[#161b22] border-b border-[#30363d]">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span class="ml-3 text-xs text-slate-400 font-mono">MetaTrader 5 — crapplet-forex-vps</span>
+                        <span class="ml-auto flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-green-400 latency-ping"></span>
+                            <span class="text-[10px] text-green-400 font-bold font-mono">&lt;1ms</span>
+                        </span>
+                    </div>
+
+                    <!-- Chart area -->
+                    <div class="px-4 pt-3 pb-2">
+                        <!-- Pair + price row -->
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <span class="text-white font-black text-lg font-mono">EUR/USD</span>
+                                <span class="ml-2 text-[10px] text-slate-500 font-mono">M15</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-green-400 font-black text-xl font-mono price-up">1.0842</div>
+                                <div class="text-[10px] text-green-500 font-mono">+0.0018 (+0.17%)</div>
+                            </div>
+                        </div>
+
+                        <!-- Candlestick chart SVG -->
+                        <svg viewBox="0 0 280 90" class="w-full" style="height:90px;">
+                            <!-- Grid lines -->
+                            <line x1="0" y1="22" x2="280" y2="22" stroke="#21262d" stroke-width="1"/>
+                            <line x1="0" y1="45" x2="280" y2="45" stroke="#21262d" stroke-width="1"/>
+                            <line x1="0" y1="68" x2="280" y2="68" stroke="#21262d" stroke-width="1"/>
+                            <!-- Chart line -->
+                            <polyline class="chart-line" points="0,72 30,65 55,58 80,62 105,48 130,40 155,35 180,42 205,30 230,22 255,18 280,12" fill="none" stroke="#a365fe" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <!-- Area fill -->
+                            <defs>
+                                <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#a365fe" stop-opacity="0.2"/>
+                                    <stop offset="100%" stop-color="#a365fe" stop-opacity="0"/>
+                                </linearGradient>
+                            </defs>
+                            <polygon points="0,72 30,65 55,58 80,62 105,48 130,40 155,35 180,42 205,30 230,22 255,18 280,12 280,90 0,90" fill="url(#chartFill)"/>
+                            <!-- Candlesticks overlay (simplified) -->
+                            <rect class="candle" x="10" y="60" width="6" height="18" fill="#ef4444" rx="1"/>
+                            <rect class="candle" x="38" y="52" width="6" height="20" fill="#22c55e" rx="1"/>
+                            <rect class="candle" x="66" y="55" width="6" height="14" fill="#22c55e" rx="1"/>
+                            <rect class="candle" x="94" y="42" width="6" height="22" fill="#ef4444" rx="1"/>
+                            <rect class="candle" x="122" y="34" width="6" height="18" fill="#22c55e" rx="1"/>
+                            <rect class="candle" x="150" y="28" width="6" height="16" fill="#22c55e" rx="1"/>
+                            <rect class="candle" x="178" y="35" width="6" height="20" fill="#ef4444" rx="1"/>
+                            <rect class="candle" x="206" y="20" width="6" height="24" fill="#22c55e" rx="1"/>
+                        </svg>
+
+                        <!-- Open positions row -->
+                        <div class="mt-2 grid grid-cols-3 gap-1.5 text-[10px] font-mono">
+                            <div class="bg-green-500/10 border border-green-500/20 rounded px-2 py-1.5">
+                                <div class="text-green-400 font-bold">BUY 0.50</div>
+                                <div class="text-slate-400">+$84.20</div>
+                            </div>
+                            <div class="bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
+                                <div class="text-red-400 font-bold">SELL 0.25</div>
+                                <div class="text-slate-400">-$12.50</div>
+                            </div>
+                            <div class="bg-blue-500/10 border border-blue-500/20 rounded px-2 py-1.5">
+                                <div class="text-blue-400 font-bold">EA Active</div>
+                                <div class="text-slate-400">Running</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status bar -->
+                <div class="p-4 bg-white/80 backdrop-blur-md border-t border-slate-200">
+                    <div class="flex items-center justify-between text-sm font-semibold text-slate-700">
+                        <span class="flex items-center gap-2">
+                            <span class="h-2 w-2 rounded-full bg-green-500 status-dot"></span>
+                            MT5 Connected — 3 EAs Running
+                        </span>
+                        <span class="font-mono text-xs">Ping: <span class="text-green-500 font-black uptime-val">0.8ms</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Stats Bar ── -->
+<section class="py-8 bg-slate-900 border-y border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            <div class="reveal rv1">
+                <div class="text-3xl font-black text-amber-400">&lt; 1ms</div>
+                <div class="text-sm text-slate-400 font-medium mt-1">Broker Latency</div>
+            </div>
+            <div class="reveal rv2">
+                <div class="text-3xl font-black text-primary">99.99%</div>
+                <div class="text-sm text-slate-400 font-medium mt-1">Uptime SLA</div>
+            </div>
+            <div class="reveal rv3">
+                <div class="text-3xl font-black text-green-400">24/7</div>
+                <div class="text-sm text-slate-400 font-medium mt-1">EA Execution</div>
+            </div>
+            <div class="reveal rv4">
+                <div class="text-3xl font-black text-white">500+</div>
+                <div class="text-sm text-slate-400 font-medium mt-1">Brokers Supported</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Plans ── -->
+<section id="plans" class="py-16 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16 space-y-4 reveal rv1">
+            <h2 class="text-3xl font-bold tracking-tight text-slate-900">Forex VPS <span class="shimmer-text">Trading Plans</span></h2>
+            <p class="text-slate-600 max-w-2xl mx-auto">All plans include MT4/MT5 pre-installed, Windows Server 2022, DDoS protection, and co-location near major broker servers.</p>
+        </div>
+
+        <!-- Standard Plans -->
+<div id="plans-std" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+    <!-- S1 -->
+    <div class="plan-card visible flex flex-col p-8 rounded-2xl bg-white border border-slate-200">
+        <span class="inline-flex w-fit items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mb-4">📈 Trader Lite</span>
+
+        <div class="mb-8">
+            <h3 class="text-lg font-bold mb-1">VPS F1</h3>
+            <div class="flex items-baseline gap-1">
+                <span class="text-4xl font-black"><span class="price-amount" data-inr="799">₹799</span></span>
+                <span class="text-slate-500 font-medium">/mo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">1–2 EAs, single broker account</p>
+        </div>
+
+        <div class="space-y-3 mb-8 flex-grow">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">developer_board</span>2 vCPU Cores</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">memory</span>4 GB RAM</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">database</span>80 GB SSD</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">network_ping</span>&lt; 5ms Broker Latency</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">desktop_windows</span>MT4 / MT5 Pre-installed</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">shield</span>DDoS Protection</div>
+        </div>
+
+        <a href="/clientarea/cart.php?a=add&pid=26&carttpl=lagom2"
+           class="select-btn w-full py-3 rounded-xl border-2 border-primary text-primary font-bold text-center">
+            Select VPS F1
+        </a>
+    </div>
+
+    <!-- S2 -->
+    <div class="plan-featured visible flex flex-col p-8 rounded-2xl bg-white border-2 border-primary relative shadow-xl shadow-primary/10">
+        <div class="popular-badge absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full whitespace-nowrap">
+            Most Popular
+        </div>
+
+        <span class="inline-flex w-fit items-center gap-1 text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full mb-4">📈 Trader Pro</span>
+
+        <div class="mb-8">
+            <h3 class="text-lg font-bold mb-1">VPS F2</h3>
+            <div class="flex items-baseline gap-1">
+                <span class="text-4xl font-black text-primary"><span class="price-amount" data-inr="999">₹999</span></span>
+                <span class="text-slate-500 font-medium">/mo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">5–10 EAs, multi-account trading</p>
+        </div>
+
+        <div class="space-y-3 mb-8 flex-grow">
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">developer_board</span>4 vCPU Cores</div>
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">memory</span>8 GB RAM</div>
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">database</span>120 GB SSD</div>
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">network_ping</span>&lt; 2ms Broker Latency</div>
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">desktop_windows</span>MT4 / MT5 / cTrader</div>
+            <div class="flex items-center gap-3 font-bold"><span class="material-symbols-outlined text-primary">security</span>Dedicated IPv4 + DDoS</div>
+        </div>
+
+        <a href="/clientarea/cart.php?a=add&pid=27&carttpl=lagom2"
+           class="select-primary w-full py-3 rounded-xl bg-primary text-white font-bold text-center">
+            Select VPS F2
+        </a>
+    </div>
+
+    <!-- S3 -->
+    <div class="plan-card visible flex flex-col p-8 rounded-2xl bg-white border border-slate-200">
+        <span class="inline-flex w-fit items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mb-4">📈 Trader Elite</span>
+
+        <div class="mb-8">
+            <h3 class="text-lg font-bold mb-1">VPS F3</h3>
+            <div class="flex items-baseline gap-1">
+                <span class="text-4xl font-black"><span class="price-amount" data-inr="1299">₹1299</span></span>
+                <span class="text-slate-500 font-medium">/mo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Unlimited EAs, fund managers</p>
+        </div>
+
+        <div class="space-y-3 mb-8 flex-grow">
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">developer_board</span>8 vCPU Cores</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">memory</span>16 GB RAM</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">database</span>160 GB SSD</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">network_ping</span>&lt; 1ms Broker Latency</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">desktop_windows</span>All Platforms Included</div>
+            <div class="flex items-center gap-3"><span class="material-symbols-outlined text-primary">support_agent</span>24/7 Priority Support</div>
+        </div>
+
+        <a href="/clientarea/cart.php?a=add&pid=28&carttpl=lagom2"
+           class="select-btn w-full py-3 rounded-xl border-2 border-primary text-primary font-bold text-center">
+            Select VPS F3
+        </a>
+    </div>
+
+</div>
+
+        <p class="text-center text-sm text-slate-500 mt-8 reveal rv5">Need a custom latency-optimised configuration? <a href="/contact.html" class="text-primary font-bold hover:underline">Talk to our trading infrastructure team →</a></p>
+    </div>
+</section>
+
+<!-- ── Features ── -->
+<section class="py-16 bg-slate-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <!-- Cards -->
+            <div class="order-2 lg:order-1 grid grid-cols-2 gap-4">
+                <div class="feat-card reveal rv1 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+                    <span class="material-symbols-outlined text-primary feat-icon">network_ping</span>
+                    <h4 class="font-bold">Sub-Millisecond Latency</h4>
+                    <p class="text-sm text-slate-600">Co-located near broker servers for the fastest order execution — no slippage, no delays.</p>
+                </div>
+                <div class="feat-card reveal rv2 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+                    <span class="material-symbols-outlined text-primary feat-icon">smart_toy</span>
+                    <h4 class="font-bold">EA & Bot Automation</h4>
+                    <p class="text-sm text-slate-600">Run unlimited Expert Advisors and trading bots 24/5 without your PC being on.</p>
+                </div>
+                <div class="feat-card reveal rv3 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+                    <span class="material-symbols-outlined text-primary feat-icon">electric_bolt</span>
+                    <h4 class="font-bold">Instant MT4/MT5 Setup</h4>
+                    <p class="text-sm text-slate-600">MetaTrader 4 &amp; 5 pre-configured and ready in under 60 seconds after checkout.</p>
+                </div>
+                <div class="feat-card reveal rv4 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+                    <span class="material-symbols-outlined text-primary feat-icon">shield_lock</span>
+                    <h4 class="font-bold">DDoS &amp; Security</h4>
+                    <p class="text-sm text-slate-600">Always-on DDoS mitigation ensures your trading sessions are never interrupted.</p>
+                </div>
+            </div>
+            <!-- Text -->
+            <div class="order-1 lg:order-2 space-y-6 features-reveal reveal-right">
+                <h2 class="text-4xl font-black tracking-tight leading-tight">Speed is Your <span class="shimmer-text">Edge in the Market</span>.</h2>
+                <p class="text-slate-600 text-lg">Every millisecond counts in Forex trading. Our VPS servers are co-located in tier-1 data centres physically close to major broker matching engines — so your orders reach the market before the competition.</p>
+                <ul class="space-y-4">
+                    <li class="check-item flex items-center gap-3">
+                        <span class="material-symbols-outlined text-green-500">check_circle</span>
+                        <span class="font-semibold text-slate-700">Co-located near IC Markets, FXCM, Pepperstone & 500+ brokers</span>
+                    </li>
+                    <li class="check-item flex items-center gap-3">
+                        <span class="material-symbols-outlined text-green-500">check_circle</span>
+                        <span class="font-semibold text-slate-700">Windows Server 2022 with RDP access — always on, always trading</span>
+                    </li>
+                    <li class="check-item flex items-center gap-3">
+                        <span class="material-symbols-outlined text-green-500">check_circle</span>
+                        <span class="font-semibold text-slate-700">Supports MT4, MT5, cTrader, NinjaTrader &amp; custom Python/C++ algos</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Supported Platforms ── -->
+<section class="py-16 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12 reveal rv1">
+            <h2 class="text-3xl font-bold text-slate-900">Compatible with <span class="shimmer-text">Every Platform</span></h2>
+            <p class="text-slate-600 mt-3 max-w-xl mx-auto">All major trading software works out-of-the-box. No configuration headaches.</p>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 reveal rv2">
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">📊</div>
+                <div class="text-xs font-bold text-slate-700">MetaTrader 4</div>
+            </div>
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">📊</div>
+                <div class="text-xs font-bold text-slate-700">MetaTrader 5</div>
+            </div>
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">⚡</div>
+                <div class="text-xs font-bold text-slate-700">cTrader</div>
+            </div>
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">🥷</div>
+                <div class="text-xs font-bold text-slate-700">NinjaTrader</div>
+            </div>
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">🐍</div>
+                <div class="text-xs font-bold text-slate-700">Python Algos</div>
+            </div>
+            <div class="broker-badge p-4 rounded-xl bg-slate-50 border border-slate-100 text-center cursor-default">
+                <div class="text-2xl mb-2">⚙️</div>
+                <div class="text-xs font-bold text-slate-700">Custom EA / Bot</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION: HOW IT WORKS — 4-step visual flow
+═══════════════════════════════════════════════════ -->
+<section class="py-24 bg-white overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16 reveal rv1">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">Simple Setup</span>
+            <h2 class="text-3xl font-black tracking-tight text-slate-900">Up & Trading in <span class="shimmer-text">Under 5 Minutes</span></h2>
+            <p class="text-slate-600 mt-3 max-w-xl mx-auto">No technical skills needed. Follow four steps and your EAs are live.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+            <!-- connector line (desktop only) -->
+            <div class="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-primary/20 via-primary/60 to-primary/20 connector" style="z-index:0;"></div>
+
+            <!-- Step 1 -->
+            <div class="step-card reveal rv1 relative bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm z-10">
+                <div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
+                    <span class="material-symbols-outlined text-primary text-2xl">shopping_cart</span>
+                </div>
+                <div class="text-4xl font-black step-num mb-2">01</div>
+                <h4 class="font-bold text-slate-900 mb-2">Choose a Plan</h4>
+                <p class="text-sm text-slate-500 leading-relaxed">Pick the Forex VPS plan that matches your number of EAs and preferred trading platform.</p>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-card reveal rv2 relative bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm z-10">
+                <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
+                    <span class="material-symbols-outlined text-blue-500 text-2xl">credit_card</span>
+                </div>
+                <div class="text-4xl font-black step-num mb-2">02</div>
+                <h4 class="font-bold text-slate-900 mb-2">Complete Checkout</h4>
+                <p class="text-sm text-slate-500 leading-relaxed">Secure payment in seconds. Your server is provisioned automatically the moment payment clears.</p>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-card reveal rv3 relative bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm z-10">
+                <div class="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-4 border border-green-500/20">
+                    <span class="material-symbols-outlined text-green-500 text-2xl">desktop_windows</span>
+                </div>
+                <div class="text-4xl font-black step-num mb-2">03</div>
+                <h4 class="font-bold text-slate-900 mb-2">Connect via RDP</h4>
+                <p class="text-sm text-slate-500 leading-relaxed">Use Remote Desktop from any device. MT4/MT5 is already installed — just log into your broker account.</p>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="step-card reveal rv4 relative bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm z-10">
+                <div class="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4 border border-amber-500/20">
+                    <span class="material-symbols-outlined text-amber-500 text-2xl">smart_toy</span>
+                </div>
+                <div class="text-4xl font-black step-num mb-2">04</div>
+                <h4 class="font-bold text-slate-900 mb-2">Run Your EAs 24/7</h4>
+                <p class="text-sm text-slate-500 leading-relaxed">Attach your Expert Advisors, enable AutoTrading and walk away. Your bots run non-stop even with your PC off.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION: CRAPPLET vs COMPETITORS — Comparison Table
+═══════════════════════════════════════════════════ -->
+<section class="py-24 bg-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-14 reveal rv1">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-600 border border-green-500/20 text-xs font-bold uppercase tracking-wider mb-4">Why Crapplet</span>
+            <h2 class="text-3xl font-black tracking-tight text-slate-900">How We Stack Up Against <span class="shimmer-text">The Competition</span></h2>
+            <p class="text-slate-600 mt-3 max-w-xl mx-auto">See why thousands of Forex traders switch to Crapplet.</p>
+        </div>
+
+        <div class="reveal rv2 rounded-2xl border border-slate-200 overflow-hidden shadow-xl">
+            <!-- Header -->
+            <div class="grid grid-cols-4 bg-slate-900 text-white text-sm font-bold">
+                <div class="p-4 col-span-2">Feature</div>
+                <div class="p-4 text-center text-primary">Crapplet 🏆</div>
+                <div class="p-4 text-center text-slate-400">Others</div>
+            </div>
+
+            <!-- Rows -->
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-amber-400 text-base">network_ping</span>Broker Latency</div>
+                <div class="p-4 text-center"><span class="text-xs font-black text-green-600 bg-green-50 px-2 py-1 rounded-full">&lt; 1ms</span></div>
+                <div class="p-4 text-center text-xs text-slate-400 font-medium">5–50ms</div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center bg-primary/2">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-primary text-base">smart_toy</span>MT4/MT5 Pre-installed</div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-check text-xl">check_circle</span></div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-cross text-xl">cancel</span></div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-blue-500 text-base">shield_lock</span>DDoS Protection Included</div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-check text-xl">check_circle</span></div>
+                <div class="p-4 text-center"><span class="text-xs text-slate-400">Paid add-on</span></div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-green-500 text-base">rocket_launch</span>Deployment Time</div>
+                <div class="p-4 text-center"><span class="text-xs font-black text-green-600 bg-green-50 px-2 py-1 rounded-full">&lt; 60 sec</span></div>
+                <div class="p-4 text-center text-xs text-slate-400 font-medium">15–60 min</div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-orange-500 text-base">support_agent</span>24/7 Live Support</div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-check text-xl">check_circle</span></div>
+                <div class="p-4 text-center"><span class="text-xs text-slate-400">Ticket only</span></div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-cyan-500 text-base">backup</span>Free Daily Backups</div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-check text-xl">check_circle</span></div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-cross text-xl">cancel</span></div>
+            </div>
+            <div class="comp-row grid grid-cols-4 border-b border-slate-100 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-violet-500 text-base">savings</span>No Setup Fee</div>
+                <div class="p-4 text-center"><span class="material-symbols-outlined comp-check text-xl">check_circle</span></div>
+                <div class="p-4 text-center"><span class="text-xs text-slate-400">Often charged</span></div>
+            </div>
+            <div class="comp-row grid grid-cols-4 items-center">
+                <div class="p-4 col-span-2 text-sm font-semibold text-slate-700 flex items-center gap-2"><span class="material-symbols-outlined text-pink-500 text-base">trending_up</span>Uptime SLA</div>
+                <div class="p-4 text-center"><span class="text-xs font-black text-green-600 bg-green-50 px-2 py-1 rounded-full">99.99%</span></div>
+                <div class="p-4 text-center text-xs text-slate-400 font-medium">99.5–99.9%</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION: TESTIMONIALS — 3 trader reviews
+═══════════════════════════════════════════════════ -->
+<section class="py-24 bg-slate-50 overflow-hidden relative">
+    <div class="absolute -top-32 -right-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="text-center mb-14 reveal rv1">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">Trader Reviews</span>
+            <h2 class="text-3xl font-black tracking-tight text-slate-900">Trusted by <span class="shimmer-text">Active Traders</span> Worldwide</h2>
+            <p class="text-slate-600 mt-3 max-w-xl mx-auto">Real feedback from traders who run their strategies on Crapplet Forex VPS every day.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Testimonial 1 -->
+            <div class="testi-card reveal rv1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+                <div class="flex gap-1 mb-4">
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                </div>
+                <p class="text-slate-600 text-sm leading-relaxed flex-grow">"Since switching to Crapplet Forex VPS my MT5 EAs haven't missed a single trade. The sub-1ms latency to IC Markets is genuinely noticeable — tighter fills and less slippage every session."</p>
+                <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-100">
+                    <div class="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary font-black text-sm">RK</div>
+                    <div>
+                        <div class="font-bold text-slate-900 text-sm">Rahul K.</div>
+                        <div class="text-xs text-slate-400">Algo Trader · Mumbai</div>
+                    </div>
+                    <div class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</div>
+                </div>
+            </div>
+
+            <!-- Testimonial 2 -->
+            <div class="testi-card reveal rv2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+                <div class="flex gap-1 mb-4">
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                </div>
+                <p class="text-slate-600 text-sm leading-relaxed flex-grow">"I run 12 EAs across 3 MT4 accounts simultaneously on the F3 plan. Not a single crash or disconnect in 8 months. The 24/7 support team even helped me migrate my entire setup for free."</p>
+                <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-100">
+                    <div class="w-10 h-10 rounded-full bg-amber-400/15 flex items-center justify-center text-amber-600 font-black text-sm">AS</div>
+                    <div>
+                        <div class="font-bold text-slate-900 text-sm">Arjun S.</div>
+                        <div class="text-xs text-slate-400">Forex Scalper · Delhi</div>
+                    </div>
+                    <div class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</div>
+                </div>
+            </div>
+
+            <!-- Testimonial 3 -->
+            <div class="testi-card reveal rv3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
+                <div class="flex gap-1 mb-4">
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star</span>
+                    <span class="star-item material-symbols-outlined text-amber-400 text-lg" style="font-variation-settings:'FILL' 1">star_half</span>
+                </div>
+                <p class="text-slate-600 text-sm leading-relaxed flex-grow">"Tried three other VPS providers before Crapplet. The difference is night and day — both in execution speed and in how responsive the support team is. MT5 set up in under 2 minutes!"</p>
+                <div class="mt-6 flex items-center gap-3 pt-4 border-t border-slate-100">
+                    <div class="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center text-green-600 font-black text-sm">PM</div>
+                    <div>
+                        <div class="font-bold text-slate-900 text-sm">Priya M.</div>
+                        <div class="text-xs text-slate-400">Swing Trader · Bangalore</div>
+                    </div>
+                    <div class="ml-auto text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Verified ✓</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trust stats row -->
+        <div class="mt-14 grid grid-cols-2 md:grid-cols-4 gap-6 reveal rv4">
+            <div class="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 hover:-translate-y-1 transition-all">
+                <div class="text-3xl font-black text-primary">12K+</div>
+                <div class="text-sm text-slate-500 font-medium mt-1">Active Traders</div>
+            </div>
+            <div class="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 hover:-translate-y-1 transition-all">
+                <div class="text-3xl font-black text-amber-500">4.8★</div>
+                <div class="text-sm text-slate-500 font-medium mt-1">Average Rating</div>
+            </div>
+            <div class="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 hover:-translate-y-1 transition-all">
+                <div class="text-3xl font-black text-green-600">98%</div>
+                <div class="text-sm text-slate-500 font-medium mt-1">Renewal Rate</div>
+            </div>
+            <div class="text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-primary/30 hover:-translate-y-1 transition-all">
+                <div class="text-3xl font-black text-slate-900">500+</div>
+                <div class="text-sm text-slate-500 font-medium mt-1">Brokers Supported</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION: SUPPORTED BROKERS LOGO STRIP (scrolling)
+═══════════════════════════════════════════════════ -->
+<section class="py-16 bg-white border-y border-slate-100 overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 text-center reveal rv1">
+        <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Co-located with 500+ broker matching engines worldwide</p>
+    </div>
+    <div class="broker-strip">
+        <!-- Each broker as a styled pill — no images needed, text-based -->
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">IC Markets</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Pepperstone</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FXCM</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">XM Group</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Exness</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Oanda</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FBS</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Vantage FX</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Tickmill</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FP Markets</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">AvaTrade</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">SAXO Bank</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Zerodha</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Angel One</div>
+        <!-- duplicate for seamless loop -->
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">IC Markets</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Pepperstone</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FXCM</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">XM Group</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Exness</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Oanda</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FBS</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Vantage FX</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Tickmill</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">FP Markets</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">AvaTrade</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">SAXO Bank</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Zerodha</div>
+        <div class="broker-logo mx-6 px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-black text-slate-600 whitespace-nowrap hover:border-primary/40 hover:text-primary transition-all cursor-default">Angel One</div>
+    </div>
+</section>
+
+
+<!-- ── CTA ── -->
+<section class="cta-section py-16 border-t border-primary/10">
+    <div class="max-w-4xl mx-auto px-4 text-center space-y-8 reveal rv1">
+        <h2 class="text-3xl font-bold text-slate-900">Start Trading Faster — Deploy Your Forex VPS Today</h2>
+        <p class="text-slate-600">Join thousands of traders running EAs 24/7 on Crapplet's ultra-low latency infrastructure.</p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <input id="ctaEmail" class="glow-input w-full sm:w-80 px-4 py-3 rounded-xl border border-slate-300 bg-white" placeholder="Enter your email address" type="email"/>
+            <button id="deployBtn" class="deploy-btn w-full sm:w-auto px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20">Deploy Forex VPS</button>
+        </div>
+    </div>
+</section>
+
+
+<!-- ── FAQ ── -->
+<section class="py-16 bg-slate-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16 reveal rv1">
+            <h2 class="text-3xl font-black tracking-tight text-slate-900">Forex VPS <span class="shimmer-text">FAQ</span></h2>
+            <p class="text-slate-600 mt-3 max-w-xl mx-auto">Everything traders ask before deploying.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 reveal rv2">
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Does the VPS stay on when I turn off my PC?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Yes — that's the whole point. Your Forex VPS runs in our data centre 24/7. Your EAs keep trading even while you sleep, travel, or have a power cut at home.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Is MT4 and MT5 already installed?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Yes. All Forex VPS plans come with MetaTrader 4 and MetaTrader 5 pre-installed on Windows Server 2022. You just connect via RDP, log in to your broker, and run your EAs.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Which brokers are supported?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">We support 500+ brokers worldwide including IC Markets, Pepperstone, FXCM, XM, Exness, FBS, Oanda, and most others. If your broker offers MT4/MT5, it works on our VPS.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">How many EAs can I run simultaneously?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">It depends on the plan and how resource-intensive your EAs are. The F1 plan comfortably runs 1–2 EAs; F2 handles 5–10; F3 and above can run unlimited EAs limited only by RAM and CPU.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">What is the actual latency to broker servers?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Our standard plans achieve under 5ms. Pro plans achieve under 1ms. HFT plans achieve sub-100 microseconds using kernel-bypass networking and direct data centre cross-connects.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Can I migrate my existing MT4/MT5 setup?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Absolutely. You can copy your existing MT4/MT5 folder (including all EAs, indicators, and templates) to the VPS via RDP drag-and-drop. Our team can also assist with migration for free.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Is there DDoS protection?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Yes. Every Forex VPS includes always-on DDoS mitigation at the network edge. Your trading sessions and RDP connections stay stable even under large-scale attacks.</p>
+                </div>
+            </div>
+
+            <div class="faq-item border border-slate-100 rounded-xl overflow-hidden hover:border-primary/30 hover:shadow-sm">
+                <button class="faq-trigger w-full flex items-center justify-between p-5 text-left bg-slate-50/50 hover:bg-white transition-colors">
+                    <span class="font-bold text-slate-800 text-sm">Can I upgrade my plan later?</span>
+                    <span class="material-symbols-outlined text-primary transition-transform duration-300">add</span>
+                </button>
+                <div class="faq-content max-h-0 overflow-hidden bg-white">
+                    <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed">Yes. Upgrading is instant from the client portal. A brief reboot applies the new resources. Your MT4/MT5 installations, EAs, and settings are preserved across upgrades.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+</main>
+
+<!-- ── Footer ── -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Hosting</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Company</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Support</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+
+</div><!-- /flex wrapper -->
+
+<script>
+    /* Cursor glow */
+    const glow = document.getElementById('cursor-glow');
+    document.addEventListener('mousemove', e => { glow.style.left = e.clientX+'px'; glow.style.top = e.clientY+'px'; });
+
+    /* Header shadow */
+    const hdr = document.getElementById('site-header');
+    window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+    /* Scroll reveal */
+    const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.plan-card,.plan-featured,.feat-card,.features-reveal').forEach(el => obs.observe(el));
+
+    /* Tab switching */
+    const tabMap = { 'tab-std':'plans-std', 'tab-pro':'plans-pro', 'tab-hft':'plans-hft' };
+    document.querySelectorAll('.tab-pill').forEach(tab => {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.tab-pill').forEach(t => {
+                t.classList.remove('active-tab');
+                t.classList.add('bg-slate-50','text-slate-600','border','border-slate-200');
+            });
+            this.classList.add('active-tab');
+            this.classList.remove('bg-slate-50','text-slate-600','border','border-slate-200');
+            Object.entries(tabMap).forEach(([tid,gid]) => document.getElementById(gid).classList.toggle('hidden', gid !== tabMap[this.id]));
+            attachSelectListeners();
+        });
+    });
+
+    /* Select button feedback */
+    function attachSelectListeners() {
+        document.querySelectorAll('.select-btn,.select-primary').forEach(btn => {
+            const fresh = btn.cloneNode(true);
+            btn.parentNode.replaceChild(fresh, btn);
+            fresh.addEventListener('click', function () {
+                const orig = this.textContent;
+                this.textContent = '✓ Added';
+                this.style.background = '#16a34a'; this.style.color = '#fff'; this.style.border = 'none';
+                setTimeout(() => { this.textContent = orig; this.style.background=''; this.style.color=''; this.style.border=''; }, 2000);
+            });
+        });
+    }
+    attachSelectListeners();
+
+    /* Deploy CTA */
+    const deployBtn = document.getElementById('deployBtn');
+    const ctaEmail  = document.getElementById('ctaEmail');
+    deployBtn.addEventListener('click', () => {
+        if (ctaEmail.value.trim()) {
+            deployBtn.textContent = '✓ Deploying Forex VPS…';
+            deployBtn.style.background = '#16a34a';
+            setTimeout(() => { deployBtn.textContent = 'Deploy Forex VPS'; deployBtn.style.background = ''; ctaEmail.value = ''; }, 2200);
+        } else {
+            ctaEmail.style.borderColor = '#ef4444'; ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+            setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+        }
+    });
+
+    /* FAQ accordion */
+    document.querySelectorAll('.faq-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const content = trigger.nextElementSibling;
+            const icon    = trigger.querySelector('.material-symbols-outlined');
+            const isOpen  = content.style.maxHeight && content.style.maxHeight !== '0px';
+            document.querySelectorAll('.faq-content').forEach(c => { c.style.maxHeight='0px'; c.previousElementSibling.querySelector('.material-symbols-outlined').textContent='add'; c.previousElementSibling.querySelector('.material-symbols-outlined').style.transform='rotate(0deg)'; c.parentElement.classList.remove('border-primary/40','shadow-lg'); });
+            if (!isOpen) { content.style.maxHeight = content.scrollHeight+'px'; icon.textContent='close'; icon.style.transform='rotate(180deg)'; trigger.parentElement.classList.add('border-primary/40','shadow-lg'); }
+        });
+    });
+
+    /* ═══════════════════════════════════════════════════
+       LIVE FOREX TICKER
+       Source: api.frankfurter.dev — no API key, no CORS issues
+       Pairs derived from USD base rates + EUR base rates.
+       Refreshes every 60 seconds.
+    ═══════════════════════════════════════════════════ */
+    (function () {
+        // Pairs we want to display. Format: { label, base, quote, decimals, scale }
+        // scale: multiply the raw rate to get the display price (e.g. USD/JPY = 1/EUR_JPY * scale)
+        const PAIRS = [
+            { label:'EUR/USD', base:'EUR', quote:'USD', dec:4 },
+            { label:'GBP/USD', base:'GBP', quote:'USD', dec:4 },
+            { label:'USD/JPY', base:'USD', quote:'JPY', dec:2 },
+            { label:'AUD/USD', base:'AUD', quote:'USD', dec:4 },
+            { label:'USD/CAD', base:'USD', quote:'CAD', dec:4 },
+            { label:'USD/CHF', base:'USD', quote:'CHF', dec:4 },
+            { label:'NZD/USD', base:'NZD', quote:'USD', dec:4 },
+            { label:'EUR/GBP', base:'EUR', quote:'GBP', dec:4 },
+            { label:'EUR/JPY', base:'EUR', quote:'JPY', dec:2 },
+            { label:'GBP/JPY', base:'GBP', quote:'JPY', dec:2 },
+        ];
+
+        // Simulated extras that free FX APIs don't cover
+        const EXTRAS = [
+            { label:'XAU/USD', price:2341.50, range:15 },
+            { label:'BTC/USD', price:67450,   range:400 },
+            { label:'ETH/USD', price:3520,    range:60 },
+        ];
+
+        let prevRates = {}; // store previous rates to compute direction
+
+        // Cache fetched rates (keyed "BASE") → rates object
+        const rateCache = {};
+
+        async function fetchBase(base) {
+            if (rateCache[base] && (Date.now() - rateCache[base].ts) < 55000) {
+                return rateCache[base].data;
+            }
+            const res  = await fetch(`https://api.frankfurter.dev/v1/latest?base=${base}`);
+            const json = await res.json();
+            rateCache[base] = { ts: Date.now(), data: json.rates };
+            return json.rates;
+        }
+
+        async function fetchAll() {
+            // Fetch USD and EUR base in parallel (covers all our pairs)
+            const [usdRates, eurRates] = await Promise.all([
+                fetchBase('USD'),
+                fetchBase('EUR'),
+            ]);
+
+            const resolved = {};
+
+            for (const p of PAIRS) {
+                let price;
+                if (p.base === 'USD') {
+                    price = usdRates[p.quote];
+                } else if (p.base === 'EUR') {
+                    price = eurRates[p.quote];
+                } else {
+                    // e.g. GBP/JPY: get EUR/GBP and EUR/JPY then divide
+                    const baseInEur = eurRates[p.base]; // EUR per BASE? No — rate = how many BASE per EUR
+                    // Frankfurter: base=EUR → rates.GBP = GBP per 1 EUR
+                    // So EUR/GBP = eurRates.GBP ; GBP/JPY = eurRates.JPY / eurRates.GBP
+                    price = eurRates[p.quote] / eurRates[p.base];
+                }
+                if (price) resolved[p.label] = parseFloat(price.toFixed(p.dec));
+            }
+
+            return resolved;
+        }
+
+        function buildTickerHTML(rates, extrasData) {
+            const items = [];
+
+            // Real pairs
+            for (const p of PAIRS) {
+                const price = rates[p.label];
+                if (!price) continue;
+                const prev  = prevRates[p.label];
+                const up    = !prev || price >= prev;
+                const arrow = up ? '▲' : '▼';
+                const cls   = up ? 'text-green-400' : 'text-red-400';
+                const diff  = prev ? (price - prev).toFixed(p.dec) : null;
+                const diffStr = diff !== null
+                    ? `<span class="text-slate-500 font-normal ml-1">(${diff > 0 ? '+' : ''}${diff})</span>`
+                    : '';
+                items.push(
+                    `<span class="mx-8 text-white font-bold">
+                        ${p.label}&nbsp;
+                        <span class="${cls} font-black">${price.toFixed(p.dec)}&nbsp;${arrow}</span>${diffStr}
+                    </span>`
+                );
+                prevRates[p.label] = price;
+            }
+
+            // Simulated extras (realistic random walk)
+            for (const e of extrasData) {
+                const up  = e.dir >= 0;
+                const cls = up ? 'text-green-400' : 'text-red-400';
+                const arrow = up ? '▲' : '▼';
+                const fmt = e.price >= 1000
+                    ? e.price.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })
+                    : e.price.toFixed(2);
+                items.push(
+                    `<span class="mx-8 text-white font-bold">
+                        ${e.label}&nbsp;
+                        <span class="${cls} font-black">${fmt}&nbsp;${arrow}</span>
+                    </span>`
+                );
+            }
+
+            // Double for seamless CSS scroll loop
+            const single = items.join('');
+            return single + single;
+        }
+
+        // Simulate extra pair prices with small random walk
+        const extrasState = EXTRAS.map(e => ({ ...e, dir: 1 }));
+        function tickExtras() {
+            extrasState.forEach(e => {
+                const move = (Math.random() - 0.495) * (e.range * 0.04);
+                e.price = Math.max(e.price * 0.995, e.price + move);
+                e.dir   = move;
+            });
+        }
+
+        async function refresh() {
+            try {
+                const rates = await fetchAll();
+                tickExtras();
+                const html = buildTickerHTML(rates, extrasState);
+
+                const ticker  = document.getElementById('ticker-live');
+                const loading = document.getElementById('ticker-loading');
+
+                ticker.innerHTML = html;
+
+                if (ticker.classList.contains('hidden')) {
+                    loading.style.display = 'none';
+                    ticker.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.warn('Ticker fetch failed, will retry:', err);
+            }
+        }
+
+        // Tick extras every 3s for visual liveliness, fetch real rates every 60s
+        refresh();
+        setInterval(refresh, 60000);
+        setInterval(() => {
+            tickExtras();
+            const ticker = document.getElementById('ticker-live');
+            if (!ticker.classList.contains('hidden')) {
+                // Re-render only extras portion — simpler: just tickle the innerHTML
+                // We keep existing real rates, just update extras
+                const existing = ticker.innerHTML;
+                // Quick approach: re-fetch from cache (no network) + re-render
+                fetchAll().then(rates => {
+                    ticker.innerHTML = buildTickerHTML(rates, extrasState);
+                }).catch(() => {});
+            }
+        }, 4000);
+
+    })();
+
+    /* Mobile drawer */
+    (function(){
+        const toggle = document.getElementById('menu-toggle');
+        const drawer = document.getElementById('mobile-drawer');
+        const overlay = document.getElementById('mobile-overlay');
+        function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+        function closeDrawer(){ drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+        
+        
+    const closeBtn = document.getElementById('close-drawer');
+if (closeBtn) {
+    closeBtn.addEventListener('click', closeDrawer);
+}
+
+        
+        toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+        overlay.addEventListener('click', closeDrawer);
+        document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+            trigger.addEventListener('click', function(){
+                const subId = 'sub-' + this.id.replace('acc-','');
+                const sub   = document.getElementById(subId);
+                const isOpen = sub.classList.contains('open');
+                document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+                document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+                if (!isOpen){ sub.classList.add('open'); this.classList.add('sub-open'); }
+            });
+        });
+    })();
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --p: #a365fe; --p-d: #7c3aed; }
+html { -webkit-font-smoothing: antialiased; }
+body { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: #0f172a; background: #fbf9ff; }
+.material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #a365fe, #7c3aed); border-radius: 10px; border: 2px solid #f1f5f9; }
+.hero-band { background: radial-gradient(circle at 85% 0%, rgba(255,255,255,.18) 0, transparent 45%), linear-gradient(140deg, #8b5cf6 0%, #6d28d9 55%, #4c1d95 100%); }
+.prose-kb { line-height: 1.7; white-space: pre-wrap; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+.fade-up { animation: fadeInUp .45s cubic-bezier(.22,1,.36,1) both; }

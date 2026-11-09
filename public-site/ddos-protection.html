@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png" /><title>DDoS Protection - Always-On Shield | Crapplet Infotech</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#a365fe",
+        "background-light": "#ffffff",
+        "background-dark": "#101922",
+      },
+      fontFamily: { "display": ["Inter"] },
+      borderRadius: {"DEFAULT":"0.5rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},
+    },
+  },
+}
+</script>
+<style>
+  body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+  .nav-dropdown:hover .dropdown-menu { display: block; }
+  .dropdown-menu { padding-top: 8px; top: 100%; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#a365fe,#7c3aed); border-radius: 10px; border: 2px solid #f1f5f9; }
+  ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#7c3aed,#a365fe); }
+
+  /* Cursor glow */
+  #cursor-glow {
+    position:fixed; width:340px; height:340px; border-radius:50%;
+    background:radial-gradient(circle,#8949ea22 0%,transparent 70%);
+    pointer-events:none; z-index:9999;
+    transform:translate(-50%,-50%);
+    transition:left .1s ease,top .1s ease;
+  }
+
+  /* Animations */
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(28px);} to{opacity:1;transform:translateY(0);} }
+  .load { animation: fadeInUp .75s cubic-bezier(.22,1,.36,1) both; }
+  .ld1{animation-delay:.07s} .ld2{animation-delay:.17s} .ld3{animation-delay:.27s}
+  .ld4{animation-delay:.37s} .ld5{animation-delay:.47s}
+
+  .reveal { opacity:0; transform:translateY(32px); transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1); }
+  .reveal.visible { opacity:1; transform:translateY(0); }
+  .rv1{transition-delay:.05s} .rv2{transition-delay:.15s} .rv3{transition-delay:.25s} .rv4{transition-delay:.35s} .rv5{transition-delay:.45s}
+
+  .reveal-left { opacity:0; transform:translateX(-36px); transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1); }
+  .reveal-left.visible { opacity:1; transform:translateX(0); }
+  .reveal-right { opacity:0; transform:translateX(36px); transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1); }
+  .reveal-right.visible { opacity:1; transform:translateX(0); }
+
+  /* Shimmer text */
+  @keyframes shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+  .shimmer-text {
+    background:linear-gradient(90deg,#a365fe,#c084fc,#7c3aed,#a365fe);
+    background-size:200% auto;
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; animation:shimmer 3s linear infinite;
+  }
+
+  /* Header */
+  header { transition: box-shadow .3s; }
+  header.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,.07); }
+  nav a { position:relative; }
+  nav a::after { content:''; position:absolute; bottom:-4px; left:0; width:0; height:2px; background:#a365fe; border-radius:2px; transition:width .3s ease; }
+  nav a:hover::after { width:100%; }
+
+  /* Shield pulse */
+  @keyframes shieldPulse { 0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.4);} 60%{box-shadow:0 0 0 20px rgba(163,101,254,0);} }
+  .shield-pulse { animation: shieldPulse 2.5s ease-in-out infinite; }
+
+  /* Radar sweep */
+  @keyframes radarSweep { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  .radar-sweep { animation: radarSweep 3s linear infinite; transform-origin: 50% 50%; }
+
+  /* Floating orbs */
+  @keyframes orb1 { 0%,100%{transform:translate(0,0);} 50%{transform:translate(30px,-20px);} }
+  @keyframes orb2 { 0%,100%{transform:translate(0,0);} 50%{transform:translate(-35px,25px);} }
+  .orb1 { animation: orb1 12s ease-in-out infinite; }
+  .orb2 { animation: orb2 15s ease-in-out infinite; }
+
+  /* Badge pulse */
+  @keyframes badgePulse { 0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.35);} 50%{box-shadow:0 0 0 8px rgba(163,101,254,0);} }
+  .badge-pulse { animation: badgePulse 2.5s ease-in-out infinite; }
+
+  /* Counter ping */
+  @keyframes ping { 0%{transform:scale(1);opacity:1;} 75%,100%{transform:scale(2.5);opacity:0;} }
+  .ping { animation: ping 1.6s cubic-bezier(0,0,.2,1) infinite; }
+
+  /* Data flow */
+  @keyframes flowRight { from{transform:translateX(-100%);} to{transform:translateX(100%);} }
+  .flow-bar { animation: flowRight 2.5s linear infinite; }
+
+  /* Ticker */
+  @keyframes ticker { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  .ticker-inner { display:flex; width:max-content; animation:ticker 26s linear infinite; }
+  .ticker-inner:hover { animation-play-state:paused; }
+
+  /* Stat cards */
+  .stat-card { transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s, border-color .3s; }
+  .stat-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px -8px rgba(163,101,254,.2); border-color: rgba(163,101,254,.4); }
+
+  /* Layer cards */
+  .layer-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, border-color .3s; }
+  .layer-card:hover { transform: translateY(-8px); box-shadow: 0 20px 48px -12px rgba(163,101,254,.2); border-color: rgba(163,101,254,.4); }
+
+  /* Feature cards */
+  .feat-card { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, border-color .3s; }
+  .feat-card:hover { transform: translateY(-6px); box-shadow: 0 16px 36px -8px rgba(163,101,254,.18); border-color: rgba(163,101,254,.35); }
+  .feat-icon { transition: transform .3s ease; }
+  .feat-card:hover .feat-icon { transform: scale(1.2) rotate(-5deg); }
+
+  /* CTA buttons */
+  .btn-primary { position:relative; overflow:hidden; background:#a365fe; color:#fff; transition:transform .2s,box-shadow .2s,filter .2s; }
+  .btn-primary:hover { transform:translateY(-2px); filter:brightness(1.08); box-shadow:0 8px 24px rgba(163,101,254,.4); }
+  .btn-primary:active { transform:translateY(0); }
+  .btn-secondary { transition:background .2s,transform .2s,box-shadow .2s; }
+  .btn-secondary:hover { background:#f1f5f9; transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,0,0,.08); }
+
+  /* Industry chips */
+  .industry-chip { transition: transform .25s, box-shadow .25s, border-color .2s; }
+  .industry-chip:hover { transform: translateY(-3px); box-shadow: 0 10px 28px -6px rgba(163,101,254,.2); border-color: rgba(163,101,254,.4); }
+
+  /* FAQ */
+  .faq-item { border:1.5px solid #e2e8f0; border-radius:14px; overflow:hidden; transition:border-color .25s,box-shadow .25s,transform .2s; }
+  .faq-item:hover { border-color:rgba(163,101,254,.35); box-shadow:0 8px 24px -6px rgba(163,101,254,.12); }
+  .faq-item.open { border-color:#a365fe; box-shadow:0 12px 32px -8px rgba(163,101,254,.18); transform:scale(1.005); }
+  .faq-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:20px 24px; background:transparent; border:none; cursor:pointer; text-align:left; transition:background .2s; }
+  .faq-trigger:hover { background:rgba(163,101,254,.04); }
+  .faq-item.open .faq-trigger { background:rgba(163,101,254,.06); }
+  .faq-icon { width:32px; height:32px; border-radius:8px; background:rgba(163,101,254,.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .2s,transform .3s; }
+  .faq-item.open .faq-icon { background:#a365fe; transform:rotate(45deg); }
+  .faq-sym { font-size:18px; color:#64748b; transition:color .2s; }
+  .faq-item.open .faq-sym { color:#fff; }
+  .faq-body { max-height:0; overflow:hidden; transition:max-height .4s cubic-bezier(.22,1,.36,1); }
+  .faq-body.open { max-height:300px; }
+  .faq-inner { padding:0 24px 20px; color:#475569; font-size:14px; line-height:1.75; border-top:1px solid rgba(163,101,254,.1); }
+
+  /* Plans */
+  .plan-card { transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s; }
+  .plan-card:hover { transform:translateY(-8px); box-shadow:0 20px 48px -12px rgba(163,101,254,.2); border-color:rgba(163,101,254,.4); }
+  .plan-featured { transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s; }
+  .plan-featured:hover { transform:translateY(-10px) scale(1.02); box-shadow:0 28px 56px -12px rgba(163,101,254,.35); }
+
+  /* Progress bars */
+  @keyframes barFill { from{width:0;} to{width:var(--w);} }
+  .bar-fill { animation:barFill 1.4s cubic-bezier(.22,1,.36,1) .3s both; }
+
+  /* Attack counter */
+  @keyframes countUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+  .count-anim.visible { animation:countUp .8s cubic-bezier(.22,1,.36,1) both; }
+
+  /* Glow input */
+  .glow-input { transition:box-shadow .3s,border-color .3s; }
+  .glow-input:focus { outline:none; box-shadow:0 0 0 3px rgba(163,101,254,.2); border-color:#a365fe; }
+
+  /* Footer */
+  .footer-link { transition:color .2s,padding-left .2s; display:inline-block; }
+  .footer-link:hover { color:#a365fe; padding-left:5px; }
+
+  /* ════════════════════════════════════════════
+     MOBILE DRAWER — All CSS
+  ════════════════════════════════════════════ */
+  body.nav-open { overflow: hidden; }
+
+  #menu-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    /* ❌ REMOVE display:flex from here */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    z-index: 60;
+}      
+  #menu-toggle .bar { display:block; height:2px; border-radius:2px; background:#1e293b; transition:all .35s cubic-bezier(.22,1,.36,1); }
+        #menu-toggle .bar-top    { width:22px; }
+        #menu-toggle .bar-mid    { width:16px; transform-origin:right center; }
+        #menu-toggle .bar-bot    { width:22px; }
+        #menu-toggle.open .bar-top { transform:translateY(7px) rotate(45deg); width:22px; }
+        #menu-toggle.open .bar-mid { width:0; opacity:0; }
+        #menu-toggle.open .bar-bot { transform:translateY(-7px) rotate(-45deg); width:22px; }
+
+  #mobile-overlay { position:fixed; inset:0; background:rgba(10,5,25,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:59; opacity:0; pointer-events:none; transition:opacity .35s ease; }
+  #mobile-overlay.show { opacity:1; pointer-events:all; }
+
+  #mobile-drawer { position:fixed; top:0; right:0; bottom:0; width:min(88vw,360px); background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%); z-index:60; overflow-y:auto; overflow-x:hidden; transform:translateX(100%); transition:transform .4s cubic-bezier(.22,1,.36,1); box-shadow:-20px 0 60px rgba(0,0,0,.5); }
+  #mobile-drawer.open { transform:translateX(0); }
+  #mobile-drawer::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); opacity:.18; }
+  #mobile-drawer::after { content:''; position:absolute; top:-80px; right:-60px; width:260px; height:260px; background:radial-gradient(circle,#a365fe44 0%,transparent 70%); pointer-events:none; z-index:0; border-radius:50%; }
+
+  .drawer-glow-bottom { position:absolute; bottom:-60px; left:-40px; width:200px; height:200px; background:radial-gradient(circle,#6633cc33 0%,transparent 70%); border-radius:50%; pointer-events:none; z-index:0; }
+  .drawer-inner { position:relative; z-index:1; }
+  .drawer-header { padding:20px 24px 16px; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; justify-content:space-between; }
+  .nav-group-label { font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:rgba(163,101,254,.6); padding:20px 24px 8px; }
+
+  .mob-nav-item { display:flex; align-items:center; gap:12px; padding:11px 24px; cursor:pointer; color:rgba(255,255,255,.8); font-size:14px; font-weight:600; position:relative; text-decoration:none; transition:background .2s ease,color .2s ease,padding-left .2s ease; }
+  .mob-nav-item:hover { background:rgba(163,101,254,.12); color:#fff; padding-left:30px; }
+  .mob-nav-item .item-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; transition:transform .25s ease; }
+  .mob-nav-item:hover .item-icon { transform:scale(1.15) rotate(-5deg); }
+  .mob-nav-item .item-arrow { margin-left:auto; opacity:.4; font-size:16px; transition:transform .2s ease,opacity .2s ease; }
+  .mob-nav-item:hover .item-arrow { transform:translateX(4px); opacity:.8; }
+
+  .mob-submenu { max-height:0; overflow:hidden; transition:max-height .35s cubic-bezier(.22,1,.36,1); background:rgba(0,0,0,.2); }
+  .mob-submenu.open { max-height:500px; }
+  .mob-submenu-item { display:flex; align-items:center; gap:10px; padding:10px 24px 10px 56px; color:rgba(255,255,255,.6); font-size:13px; font-weight:500; transition:color .2s,padding-left .2s; text-decoration:none; }
+  .mob-submenu-item:hover { color:#a365fe; padding-left:62px; }
+  .mob-submenu-item::before { content:''; width:5px; height:5px; border-radius:50%; background:#a365fe; opacity:.5; flex-shrink:0; transition:opacity .2s,transform .2s; }
+  .mob-submenu-item:hover::before { opacity:1; transform:scale(1.4); }
+
+  .mob-nav-item .chevron { transition:transform .3s ease; }
+  .mob-nav-item.sub-open .chevron { transform:rotate(180deg); }
+  .drawer-divider { height:1px; background:rgba(255,255,255,.06); margin:8px 24px; }
+  .drawer-cta { padding:20px 24px; display:flex; flex-direction:column; gap:10px; }
+  .drawer-btn-support { display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; border-radius:12px; border:1px solid rgba(163,101,254,.35); color:rgba(255,255,255,.85); font-weight:700; font-size:14px; background:transparent; cursor:pointer; transition:background .2s,border-color .2s; }
+  .drawer-btn-support:hover { background:rgba(163,101,254,.12); border-color:#a365fe; }
+  .drawer-btn-login { display:flex; align-items:center; justify-content:center; gap:8px; padding:13px; border-radius:12px; background:linear-gradient(135deg,#a365fe,#7c3aed); color:#fff; font-weight:800; font-size:14px; border:none; cursor:pointer; box-shadow:0 6px 24px rgba(163,101,254,.4); transition:filter .2s,transform .2s,box-shadow .2s; }
+  .drawer-btn-login:hover { filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 10px 30px rgba(163,101,254,.55); }
+
+  @keyframes slideInRight { from{opacity:0;transform:translateX(24px);} to{opacity:1;transform:translateX(0);} }
+  #mobile-drawer.open .drawer-inner > * { animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both; }
+  #mobile-drawer.open .drawer-inner > *:nth-child(1){animation-delay:.05s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(2){animation-delay:.10s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(3){animation-delay:.15s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(4){animation-delay:.20s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(5){animation-delay:.25s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(6){animation-delay:.30s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(7){animation-delay:.35s}
+  #mobile-drawer.open .drawer-inner > *:nth-child(8){animation-delay:.40s}
+
+  .drawer-social { display:flex; gap:10px; padding:0 24px 24px; }
+  .drawer-social a { width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.5); text-decoration:none; transition:background .2s,color .2s,transform .2s; }
+  .drawer-social a:hover { background:rgba(163,101,254,.25); color:#a365fe; transform:translateY(-3px); }
+
+  /* Diagonal divider */
+  .diagonal-top { clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%); }
+  .diagonal-bottom { clip-path: polygon(0 15%, 100% 0, 100% 100%, 0 100%); margin-top:-2px; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/ddos-protection.html">
+</head>
+<body class="bg-background-light font-display text-slate-900 antialiased">
+<div id="cursor-glow"></div>
+
+<!-- ① MOBILE OVERLAY -->
+<div id="mobile-overlay"></div>
+
+<!-- ② MOBILE DRAWER -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+    <div class="drawer-header">
+      <img alt="Crapplet" src="/Crapplet_logo.png" class="h-10 w-auto "
+           onerror="this.outerHTML='&lt;span style=&quot;color:#a365fe;font-weight:900;font-size:18px&quot;&gt;Crapplet&lt;/span&gt;'"/>
+      <div class="flex items-center gap-2 px-2 py-1 rounded-full bg-green-500/15 border border-green-500/25">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+        <span class="text-[10px] font-bold text-green-400 uppercase tracking-wider">All Systems Online</span>
+      </div>
+    </div>
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-[#a365fe]/15"><span class="material-symbols-outlined text-[#a365fe]" style="font-size:16px">home</span></span>
+      Home <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+            <span class="item-icon bg-pink-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+            DDos Protection
+            <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+        </a>
+    <div class="drawer-divider"></div>
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/10 p-4 flex justify-around text-center">
+      <div><div class="text-base font-black text-[#a365fe]">200+</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">Tbps Shield</div></div>
+      <div class="w-px bg-white/10"></div>
+      <div><div class="text-base font-black text-white">25+</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">PoPs</div></div>
+      <div class="w-px bg-white/10"></div>
+      <div><div class="text-base font-black text-green-400">24/7</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div></div>
+    </div>
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+<a href="/contact.html" >
+      <button class="drawer-btn-support w-full">
+                <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+                Support
+            </button></a>      
+            <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+    </div>
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li is-current" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-1">
+
+<!-- ══ HERO ══ -->
+<section class="relative overflow-hidden bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 py-10">
+  <!-- Background grid -->
+  <div class="absolute inset-0 opacity-10" style="background-image:linear-gradient(rgba(163,101,254,.5) 1px,transparent 1px),linear-gradient(90deg,rgba(163,101,254,.5) 1px,transparent 1px);background-size:40px 40px;"></div>
+  <!-- Orbs -->
+  <div class="orb1 absolute top-10 left-10 w-96 h-96 rounded-full blur-3xl pointer-events-none" style="background:radial-gradient(circle,rgba(163,101,254,.18),transparent)"></div>
+  <div class="orb2 absolute bottom-10 right-10 w-80 h-80 rounded-full blur-3xl pointer-events-none" style="background:radial-gradient(circle,rgba(139,92,246,.15),transparent)"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+
+      <!-- Left -->
+      <div class="space-y-6 text-center lg:text-left">
+        <div class="load ld1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full badge-pulse" style="background:rgba(163,101,254,.15);border:2px solid rgba(163,101,254,.4)">
+          <span class="relative flex h-2 w-2">
+            <span class="ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-400"></span>
+          </span>
+          <span class="text-xs font-bold uppercase tracking-widest text-purple-300">Always-On Protection · 200+ Tbps</span>
+        </div>
+
+        <h1 class="load ld2 text-2xl lg:text-4xl font-black leading-[1.05] tracking-tight text-white">
+          Stop DDoS Attacks<br/><span class="shimmer-text">Before They Start</span>
+        </h1>
+
+        <p class="load ld3 text-slate-400 text-md leading-relaxed max-w-xl">
+          Crapplet's global scrubbing network absorbs and neutralises volumetric, protocol, and application-layer attacks in real time — with zero impact on your legitimate traffic.
+        </p>
+
+        <!-- Trust badges -->
+        <div class="load ld4 flex flex-wrap justify-center lg:justify-start gap-3">
+          <span class="px-2 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac">✓ L3 · L4 · L7 Coverage</span>
+          <span class="px-2 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(163,101,254,.1);border:1px solid rgba(163,101,254,.3);color:#c084fc">✓ 99.99% Uptime SLA</span>
+          <span class="px-2 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:#93c5fd">✓ &lt;1s Mitigation</span>
+          <span class="px-2 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fcd34d">✓ BGP Anycast Routing</span>
+        </div>
+
+        <div class="load ld5 flex flex-wrap justify-center lg:justify-start gap-4">
+          <button class="btn-primary px-8 py-2 rounded-xl font-bold text-lg flex items-center gap-2 group" onclick="location.href='#plans'">
+            Get Protection Now
+            <span class="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+          </button>
+          <button class="btn-secondary bg-white/10 border border-white/20 text-white px-8 py-2 rounded-xl font-bold text-lg hover:bg-white/20 transition-all" onclick="location.href='/contact.html'">
+            Under Attack?
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Live Attack Map card -->
+      <div class="load ld5">
+        <div class="relative">
+          <div class="absolute -inset-2 rounded-2xl opacity-30 blur-xl" style="background:linear-gradient(135deg,#a365fe,#7c3aed)"></div>
+          <div class="relative rounded-2xl overflow-hidden" style="background:#0d0d1e;border:2px solid rgba(163,101,254,.3);box-shadow:0 0 60px rgba(163,101,254,.2)">
+            <!-- Card header -->
+            <div class="flex items-center justify-between px-5 py-4 border-b" style="background:rgba(163,101,254,.1);border-color:rgba(163,101,254,.2)">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500 opacity-80"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-400 opacity-80"></div>
+                <div class="w-3 h-3 rounded-full bg-green-400 opacity-80"></div>
+                <span class="ml-2 text-xs font-bold text-purple-300 uppercase tracking-widest">Live Shield Status</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="relative flex h-2 w-2"><span class="ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span></span>
+                <span class="text-[10px] font-bold text-green-400">ACTIVE</span>
+              </div>
+            </div>
+
+            <!-- Shield radar -->
+            <div class="flex items-center justify-center py-8 relative" style="background:#07071a">
+              <div class="relative w-52 h-52">
+                <!-- Radar rings -->
+                <div class="absolute inset-0 rounded-full border-2 opacity-20" style="border-color:#a365fe"></div>
+                <div class="absolute inset-4 rounded-full border opacity-30" style="border-color:#a365fe"></div>
+                <div class="absolute inset-8 rounded-full border opacity-40" style="border-color:#a365fe"></div>
+                <div class="absolute inset-14 rounded-full border opacity-50" style="border-color:#a365fe"></div>
+                <!-- Sweep -->
+                <svg class="radar-sweep absolute inset-0 w-full h-full" viewBox="0 0 200 200">
+                  <defs>
+                    <radialGradient id="sweep" cx="50%" cy="50%">
+                      <stop offset="0%" stop-color="#a365fe" stop-opacity="0.6"/>
+                      <stop offset="100%" stop-color="#a365fe" stop-opacity="0"/>
+                    </radialGradient>
+                  </defs>
+                  <path d="M100 100 L100 10 A90 90 0 0 1 190 100 Z" fill="url(#sweep)" opacity="0.6"/>
+                </svg>
+                <!-- Center shield -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center shield-pulse" style="background:linear-gradient(135deg,#a365fe,#7c3aed)">
+                    <span class="material-symbols-outlined text-white text-3xl" style="font-variation-settings:'FILL' 1">shield</span>
+                  </div>
+                </div>
+                <!-- Attack dots -->
+                <div class="absolute top-3 left-8 w-2 h-2 rounded-full bg-red-400 animate-pulse"></div>
+                <div class="absolute top-12 right-2 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" style="animation-delay:.4s"></div>
+                <div class="absolute bottom-8 left-3 w-2 h-2 rounded-full bg-red-400 animate-pulse" style="animation-delay:.8s"></div>
+                <div class="absolute top-20 left-1 w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" style="animation-delay:.2s"></div>
+                <div class="absolute bottom-14 right-5 w-2 h-2 rounded-full bg-red-500 animate-pulse" style="animation-delay:1s"></div>
+              </div>
+            </div>
+
+            <!-- Live stats -->
+            <div class="grid grid-cols-3 gap-px" style="background:rgba(163,101,254,.1)">
+              <div class="px-4 py-4 text-center" style="background:#0d0d1e">
+                <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Attacks Blocked</div>
+                <div class="text-xl font-black text-purple-400" id="attack-counter">1,284,971</div>
+              </div>
+              <div class="px-4 py-4 text-center" style="background:#0d0d1e">
+                <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Traffic Scrubbed</div>
+                <div class="text-xl font-black text-green-400">142 Gbps</div>
+              </div>
+              <div class="px-4 py-4 text-center" style="background:#0d0d1e">
+                <div class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Clean Delivery</div>
+                <div class="text-xl font-black text-blue-400">99.99%</div>
+              </div>
+            </div>
+
+            <!-- Traffic flow -->
+            <div class="px-5 py-4" style="background:#07071a">
+              <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <span>Incoming Traffic</span><span class="text-green-400 font-bold">→ Clean Pass-through</span>
+              </div>
+              <div class="h-3 rounded-full overflow-hidden" style="background:rgba(255,255,255,.06)">
+                <div class="flow-bar h-full rounded-full" style="width:60%;background:linear-gradient(90deg,transparent,#a365fe,#c084fc,transparent);opacity:.8"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="border-y py-3 overflow-hidden" style="background:#f5f0ff;border-color:rgba(163,101,254,.2)">
+  <div class="ticker-inner text-xs font-bold uppercase tracking-widest" style="color:#7c3aed">
+    <span class="mx-10">🛡 200+ Tbps Filtering Capacity</span>
+    <span class="mx-10">⚡ Sub-1 Second Mitigation</span>
+    <span class="mx-10">🌐 25+ Global Scrubbing Centers</span>
+    <span class="mx-10">🔒 L3 · L4 · L7 Protection</span>
+    <span class="mx-10">📡 BGP Anycast Routing</span>
+    <span class="mx-10">✓ 99.99% Uptime SLA</span>
+    <span class="mx-10">🚀 Zero Latency Impact</span>
+    <span class="mx-10">🛡 200+ Tbps Filtering Capacity</span>
+    <span class="mx-10">⚡ Sub-1 Second Mitigation</span>
+    <span class="mx-10">🌐 25+ Global Scrubbing Centers</span>
+    <span class="mx-10">🔒 L3 · L4 · L7 Protection</span>
+    <span class="mx-10">📡 BGP Anycast Routing</span>
+    <span class="mx-10">✓ 99.99% Uptime SLA</span>
+    <span class="mx-10">🚀 Zero Latency Impact</span>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<section class="py-14 bg-white border-b border-slate-100">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div class="stat-card reveal rv1 p-6 rounded-2xl bg-white border border-slate-100 text-center">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3"><span class="material-symbols-outlined text-primary text-2xl">security</span></div>
+        <div class="text-4xl font-black text-slate-900 mb-1">200+</div>
+        <div class="text-sm font-semibold text-slate-500">Tbps Capacity</div>
+        <div class="text-xs text-purple-500 mt-1 font-medium">Filtering network</div>
+      </div>
+      <div class="stat-card reveal rv2 p-6 rounded-2xl bg-white border border-slate-100 text-center">
+        <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mx-auto mb-3"><span class="material-symbols-outlined text-green-600 text-2xl">query_stats</span></div>
+        <div class="text-4xl font-black text-slate-900 mb-1">99.99%</div>
+        <div class="text-sm font-semibold text-slate-500">Uptime SLA</div>
+        <div class="text-xs text-green-600 mt-1 font-medium">Guaranteed</div>
+      </div>
+      <div class="stat-card reveal rv3 p-6 rounded-2xl bg-white border border-slate-100 text-center">
+        <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-3"><span class="material-symbols-outlined text-blue-600 text-2xl">bolt</span></div>
+        <div class="text-4xl font-black text-slate-900 mb-1">&lt;1s</div>
+        <div class="text-sm font-semibold text-slate-500">Mitigation Time</div>
+        <div class="text-xs text-blue-600 mt-1 font-medium">Instant detection</div>
+      </div>
+      <div class="stat-card reveal rv4 p-6 rounded-2xl bg-white border border-slate-100 text-center">
+        <div class="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center mx-auto mb-3"><span class="material-symbols-outlined text-orange-600 text-2xl">support_agent</span></div>
+        <div class="text-4xl font-black text-slate-900 mb-1">24/7</div>
+        <div class="text-sm font-semibold text-slate-500">Expert Support</div>
+        <div class="text-xs text-orange-600 mt-1 font-medium">Always available</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PROTECTION LAYERS ══ -->
+<section class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 bg-primary/8 border border-primary/20">
+        <span class="text-primary text-xs font-bold uppercase tracking-widest">Multi-Layer Defense</span>
+      </div>
+      <h2 class="text-2xl md:text-4xl font-black text-slate-900 mb-4">Protection Across <span class="shimmer-text">Every Attack Layer</span></h2>
+      <p class="text-slate-600 text-lg max-w-2xl mx-auto">Our scrubbing infrastructure covers every known DDoS vector — from brute-force floods to stealthy application exploits.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- L3 -->
+      <div class="layer-card reveal rv1 p-8 rounded-2xl border border-slate-100 bg-slate-50">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style="background:linear-gradient(135deg,#7c3aed,#a365fe)">L3</div>
+          <div>
+            <div class="font-black text-slate-900 text-lg">Network Layer</div>
+            <div class="text-xs text-slate-500 font-medium">Volumetric Attacks</div>
+          </div>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed mb-6">Protects against UDP/ICMP floods and massive bandwidth saturation. Our scrubbing centers absorb traffic spikes up to 200+ Tbps and filter malicious packets before they reach your infrastructure.</p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>UDP Flood Mitigation</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>ICMP Amplification Defense</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>IP Spoofing Detection</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>BGP Blackholing</div>
+        </div>
+      </div>
+
+      <!-- L4 -->
+      <div class="layer-card reveal rv2 p-8 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/10 relative">
+        <div class="absolute -top-3 left-6 bg-primary text-white text-[10px] font-black uppercase px-3 py-1 rounded-full">Most Common Attack</div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style="background:linear-gradient(135deg,#a365fe,#c084fc)">L4</div>
+          <div>
+            <div class="font-black text-slate-900 text-lg">Transport Layer</div>
+            <div class="text-xs text-primary font-medium">Connection Floods</div>
+          </div>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed mb-6">Blocks TCP/UDP flood attacks including SYN floods, RST floods, and connection exhaustion. Advanced algorithms detect protocol abuse while preserving all legitimate connections seamlessly.</p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>SYN Flood Protection</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>TCP State Exhaustion Defense</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>ACK/RST Flood Mitigation</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>Connection Rate Limiting</div>
+        </div>
+      </div>
+
+      <!-- L7 -->
+      <div class="layer-card reveal rv3 p-8 rounded-2xl border border-slate-100 bg-slate-50">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white" style="background:linear-gradient(135deg,#6d28d9,#7c3aed)">L7</div>
+          <div>
+            <div class="font-black text-slate-900 text-lg">Application Layer</div>
+            <div class="text-xs text-slate-500 font-medium">Smart App Attacks</div>
+          </div>
+        </div>
+        <p class="text-slate-600 text-sm leading-relaxed mb-6">ML-powered detection identifies sophisticated application-layer attacks targeting your web services. Behavioral analysis catches low-and-slow attacks that traditional rate limiting misses entirely.</p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>HTTP Flood Protection</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Slowloris Defense</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Bot & Crawler Detection</div>
+          <div class="flex items-center gap-2 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>WAF Integration</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW IT WORKS ══ -->
+<section class="py-16 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 bg-primary/8 border border-primary/20">
+        <span class="text-primary text-xs font-bold uppercase tracking-widest">How It Works</span>
+      </div>
+      <h2 class="text-3xl md:text-5xl font-black text-slate-900 mb-4">Scrubbing That Works <span class="shimmer-text">Invisibly</span></h2>
+      <p class="text-slate-600 text-lg max-w-2xl mx-auto">Your users experience zero disruption. Attackers experience a wall.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+      <!-- connector line -->
+      <div class="hidden md:block absolute top-14 left-[12.5%] right-[12.5%] h-0.5" style="background:linear-gradient(90deg,rgba(163,101,254,.1),rgba(163,101,254,.6),rgba(163,101,254,.1));z-index:0"></div>
+
+      <div class="reveal rv1 relative z-10 p-6 rounded-2xl bg-white border border-slate-200 text-center shadow-sm hover:-translate-y-1 transition-transform">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(163,101,254,.1);border:2px solid rgba(163,101,254,.2)">
+          <span class="material-symbols-outlined text-primary text-2xl">traffic</span>
+        </div>
+        <div class="text-3xl font-black text-primary mb-2">01</div>
+        <h4 class="font-bold text-slate-900 mb-2">Traffic Arrives</h4>
+        <p class="text-sm text-slate-500">All inbound traffic is routed through Crapplet's Anycast scrubbing nodes before reaching your server.</p>
+      </div>
+
+      <div class="reveal rv2 relative z-10 p-6 rounded-2xl bg-white border border-slate-200 text-center shadow-sm hover:-translate-y-1 transition-transform">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(59,130,246,.1);border:2px solid rgba(59,130,246,.2)">
+          <span class="material-symbols-outlined text-blue-600 text-2xl">manage_search</span>
+        </div>
+        <div class="text-3xl font-black text-primary mb-2">02</div>
+        <h4 class="font-bold text-slate-900 mb-2">Deep Inspection</h4>
+        <p class="text-sm text-slate-500">Every packet is inspected in real time using signature matching, behavioral analysis, and ML threat scoring.</p>
+      </div>
+
+      <div class="reveal rv3 relative z-10 p-6 rounded-2xl bg-white border border-slate-200 text-center shadow-sm hover:-translate-y-1 transition-transform">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(239,68,68,.1);border:2px solid rgba(239,68,68,.2)">
+          <span class="material-symbols-outlined text-red-500 text-2xl">block</span>
+        </div>
+        <div class="text-3xl font-black text-primary mb-2">03</div>
+        <h4 class="font-bold text-slate-900 mb-2">Attack Dropped</h4>
+        <p class="text-sm text-slate-500">Malicious traffic is silently dropped at the scrubbing layer. No alert, no lag, no disruption to your services.</p>
+      </div>
+
+      <div class="reveal rv4 relative z-10 p-6 rounded-2xl bg-white border border-slate-200 text-center shadow-sm hover:-translate-y-1 transition-transform">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style="background:rgba(34,197,94,.1);border:2px solid rgba(34,197,94,.2)">
+          <span class="material-symbols-outlined text-green-600 text-2xl">verified</span>
+        </div>
+        <div class="text-3xl font-black text-primary mb-2">04</div>
+        <h4 class="font-bold text-slate-900 mb-2">Clean Delivery</h4>
+        <p class="text-sm text-slate-500">Only verified clean traffic reaches your infrastructure. Your users see zero latency increase.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES ══ -->
+<section class="py-16 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div class="reveal-left space-y-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/8 border border-primary/20">
+          <span class="text-primary text-xs font-bold uppercase tracking-widest">Infrastructure</span>
+        </div>
+        <h2 class="text-4xl font-black text-slate-900 leading-tight">Enterprise-Grade<br/><span class="shimmer-text">Scrubbing Infrastructure</span></h2>
+        <p class="text-slate-600 text-lg leading-relaxed">Our global network is purpose-built for DDoS mitigation — not repurposed from a CDN. Every node is a dedicated scrubbing center with hardware-accelerated packet processing.</p>
+        <ul class="space-y-5">
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5 bg-primary"><span class="material-symbols-outlined text-sm" style="font-size:16px">check</span></div>
+            <div><div class="font-bold text-slate-900">BGP Anycast Routing</div><div class="text-sm text-slate-600 mt-0.5">Traffic auto-routes to the nearest PoP — minimising latency while maximising throughput during attacks</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5 bg-primary"><span class="material-symbols-outlined text-sm" style="font-size:16px">check</span></div>
+            <div><div class="font-bold text-slate-900">GRE Tunnel / IP Transit</div><div class="text-sm text-slate-600 mt-0.5">Protect your own IP block via GRE tunnels or use our IP transit — no DNS changes required</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5 bg-primary"><span class="material-symbols-outlined text-sm" style="font-size:16px">check</span></div>
+            <div><div class="font-bold text-slate-900">Real-Time Dashboard</div><div class="text-sm text-slate-600 mt-0.5">Live traffic graphs, attack maps, and threat intelligence reports accessible from your control panel 24/7</div></div>
+          </li>
+          <li class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 mt-0.5 bg-primary"><span class="material-symbols-outlined text-sm" style="font-size:16px">check</span></div>
+            <div><div class="font-bold text-slate-900">Dedicated NOC Team</div><div class="text-sm text-slate-600 mt-0.5">24/7 Network Operations Center staffed by DDoS engineers who proactively tune mitigation rules</div></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Right: Feature grid -->
+      <div class="reveal-right grid grid-cols-2 gap-4">
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">public</span>
+          <h4 class="font-bold text-slate-900">25+ Global PoPs</h4>
+          <p class="text-sm text-slate-600">Scrubbing centers across Asia, Europe, Americas, and Middle East.</p>
+        </div>
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">speed</span>
+          <h4 class="font-bold text-slate-900">Hardware Acceleration</h4>
+          <p class="text-sm text-slate-600">FPGA-based packet processing at line rate — no CPU bottleneck.</p>
+        </div>
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">psychology</span>
+          <h4 class="font-bold text-slate-900">ML Threat Scoring</h4>
+          <p class="text-sm text-slate-600">Models trained on billions of attack signatures updated hourly.</p>
+        </div>
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">api</span>
+          <h4 class="font-bold text-slate-900">Full API Access</h4>
+          <p class="text-sm text-slate-600">Programmatically manage rules, view stats, and trigger actions.</p>
+        </div>
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">lock</span>
+          <h4 class="font-bold text-slate-900">IP Reputation DB</h4>
+          <p class="text-sm text-slate-600">Blocklist of 500M+ known malicious IPs updated in real time.</p>
+        </div>
+        <div class="feat-card p-6 rounded-2xl bg-white border border-slate-100 space-y-3">
+          <span class="material-symbols-outlined text-primary text-3xl feat-icon">notifications_active</span>
+          <h4 class="font-bold text-slate-900">Instant Alerts</h4>
+          <p class="text-sm text-slate-600">SMS, email, and webhook alerts the moment an attack is detected.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ INDUSTRIES ══ -->
+<section class="py-16" style="background:#f8f5ff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 bg-primary/8 border border-primary/20">
+        <span class="text-primary text-xs font-bold uppercase tracking-widest">Industry Solutions</span>
+      </div>
+      <h2 class="text-3xl md:text-4xl font-black text-slate-900 mb-4">Who Needs <span class="shimmer-text">DDoS Protection</span>?</h2>
+      <p class="text-slate-600 max-w-xl mx-auto">Every online business is a potential target. These industries face the highest attack frequency.</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 reveal rv2">
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">🏦</div>
+        <div class="text-sm font-bold text-slate-800">Fintech</div>
+        <div class="text-xs text-slate-500 mt-1">Banking & Trading</div>
+      </div>
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">🛒</div>
+        <div class="text-sm font-bold text-slate-800">E-commerce</div>
+        <div class="text-xs text-slate-500 mt-1">Online Retail</div>
+      </div>
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">🎮</div>
+        <div class="text-sm font-bold text-slate-800">Gaming</div>
+        <div class="text-xs text-slate-500 mt-1">Game Servers</div>
+      </div>
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">☁️</div>
+        <div class="text-sm font-bold text-slate-800">SaaS</div>
+        <div class="text-xs text-slate-500 mt-1">Cloud Apps</div>
+      </div>
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">📰</div>
+        <div class="text-sm font-bold text-slate-800">Media</div>
+        <div class="text-xs text-slate-500 mt-1">News & Streaming</div>
+      </div>
+      <div class="industry-chip p-5 rounded-2xl bg-white border border-slate-100 text-center cursor-default">
+        <div class="text-3xl mb-3">🏥</div>
+        <div class="text-sm font-bold text-slate-800">Healthcare</div>
+        <div class="text-xs text-slate-500 mt-1">Critical Systems</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PLANS ══ -->
+<section id="plans" class="py-24 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 bg-primary/8 border border-primary/20">
+        <span class="text-primary text-xs font-bold uppercase tracking-widest">Pricing</span>
+      </div>
+      <h2 class="text-3xl md:text-5xl font-black text-slate-900 mb-4">DDoS Protection <span class="shimmer-text">Plans</span></h2>
+      <p class="text-slate-600 text-lg max-w-2xl mx-auto">All plans include L3/L4/L7 protection, 24/7 support, and the same global scrubbing network.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <!-- Starter -->
+      <div class="plan-card reveal rv1 flex flex-col p-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="mb-3"><span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-600">🛡 SHIELD STARTER</span></div>
+        <div class="mb-8">
+          <h3 class="text-2xl font-black text-slate-900 mb-1">Shield S</h3>
+          <div class="flex items-baseline gap-1 mt-3"><span class="text-5xl font-black text-slate-900"><span class="price-amount" data-inr="2,499">₹2,499</span></span><span class="text-slate-500">/mo</span></div>
+          <p class="text-xs text-slate-500 mt-1.5">Up to 10 Gbps attack capacity</p>
+        </div>
+        <ul class="space-y-3 mb-8 flex-grow">
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>L3 + L4 Protection</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>2 Protected IPs</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>BGP Anycast Routing</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>Real-Time Dashboard</li>
+          <li class="flex items-center gap-3 text-sm text-slate-400 line-through"><span class="material-symbols-outlined text-lg">cancel</span>L7 WAF Protection</li>
+        </ul>
+        <button class="w-full py-3.5 rounded-xl font-bold text-sm border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all" onclick="location.href='/contact.html'">Select Shield S</button>
+      </div>
+
+      <!-- Pro (featured) -->
+      <div class="plan-featured reveal rv2 flex flex-col p-8 rounded-2xl border-2 border-primary bg-white shadow-2xl shadow-primary/15 relative">
+        <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black uppercase px-5 py-1.5 rounded-full whitespace-nowrap animate-pulse">Most Popular</div>
+        <div class="mb-3"><span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/25">⚡ SHIELD PRO</span></div>
+        <div class="mb-8">
+          <h3 class="text-2xl font-black text-slate-900 mb-1">Shield Pro</h3>
+          <div class="flex items-baseline gap-1 mt-3"><span class="text-5xl font-black shimmer-text"><span class="price-amount" data-inr="6,999">₹6,999</span></span><span class="text-slate-500">/mo</span></div>
+          <p class="text-xs text-slate-500 mt-1.5">Up to 100 Gbps attack capacity</p>
+        </div>
+        <ul class="space-y-3 mb-8 flex-grow">
+          <li class="flex items-center gap-3 text-sm font-semibold text-slate-900"><span class="material-symbols-outlined text-primary text-lg">check_circle</span>L3 + L4 + L7 Protection</li>
+          <li class="flex items-center gap-3 text-sm font-semibold text-slate-900"><span class="material-symbols-outlined text-primary text-lg">check_circle</span>10 Protected IPs</li>
+          <li class="flex items-center gap-3 text-sm font-semibold text-slate-900"><span class="material-symbols-outlined text-primary text-lg">check_circle</span>Full WAF + Bot Protection</li>
+          <li class="flex items-center gap-3 text-sm font-semibold text-slate-900"><span class="material-symbols-outlined text-primary text-lg">check_circle</span>GRE Tunnel Support</li>
+          <li class="flex items-center gap-3 text-sm font-semibold text-slate-900"><span class="material-symbols-outlined text-primary text-lg">check_circle</span>API Access + Alerts</li>
+        </ul>
+        <button class="w-full py-3.5 rounded-xl font-bold text-sm text-white btn-primary" onclick="location.href='/contact.html'">Get Shield Pro</button>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="plan-card reveal rv3 flex flex-col p-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="mb-3"><span class="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-purple-100 text-purple-700">👑 SHIELD ENTERPRISE</span></div>
+        <div class="mb-8">
+          <h3 class="text-2xl font-black text-slate-900 mb-1">Shield Max</h3>
+          <div class="flex items-baseline gap-1 mt-3"><span class="text-5xl font-black text-slate-900">Custom</span></div>
+          <p class="text-xs text-slate-500 mt-1.5">Unlimited attack capacity · 200+ Tbps</p>
+        </div>
+        <ul class="space-y-3 mb-8 flex-grow">
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>Full L3 + L4 + L7 Coverage</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>Unlimited Protected IPs</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>Dedicated NOC Engineer</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>Custom Mitigation Rules</li>
+          <li class="flex items-center gap-3 text-sm text-slate-700"><span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>SLA-backed Response &lt;30s</li>
+        </ul>
+        <button class="w-full py-3.5 rounded-xl font-bold text-sm border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all" onclick="location.href='/contact.html'">Contact Sales →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section class="py-24 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex flex-col lg:flex-row gap-16 items-start">
+      <div class="lg:w-80 flex-shrink-0 reveal rv1">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5 bg-primary/8 border border-primary/20">
+          <span class="text-primary text-xs font-bold uppercase tracking-widest">FAQ</span>
+        </div>
+        <h2 class="text-3xl font-black text-slate-900 leading-tight mb-5">Common <span class="shimmer-text">Questions</span></h2>
+        <p class="text-slate-600 text-sm leading-relaxed mb-8">Everything you need to know about DDoS protection. Our team is always online.</p>
+        <div class="rounded-2xl p-5 space-y-4 bg-primary/5 border border-primary/15">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary"><span class="material-symbols-outlined text-white text-lg">support_agent</span></div>
+            <div>
+              <div class="font-bold text-slate-900 text-sm">Under Attack Now?</div>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                <span class="text-xs text-red-500 font-semibold">Emergency line active</span>
+              </div>
+            </div>
+          </div>
+          <a href="/contact.html" class="w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-xl text-sm font-bold hover:brightness-110 transition-all btn-primary">
+            <span class="material-symbols-outlined text-sm">emergency</span> Emergency Support
+          </a>
+        </div>
+      </div>
+
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="faq-item reveal rv1 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">What is a DDoS protection service?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">A DDoS protection service monitors all incoming traffic and filters out malicious requests before they reach your servers. It acts as a shield between attackers and your infrastructure, absorbing traffic at the network, transport, and application layers so your services stay online.</div></div></div>
+        <div class="faq-item reveal rv2 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">How quickly can you stop an active attack?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Our system detects and begins blocking DDoS traffic from the very first malicious packet. Unlike traditional solutions that build baselines over time, our technology activates mitigation in under 1 second. Emergency response for existing customers is under 30 seconds.</div></div></div>
+        <div class="faq-item reveal rv3 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Will protection slow down my website?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">No. Our scrubbing centers are purpose-built to add zero latency to legitimate traffic. Clean requests pass through seamlessly. Most customers actually see improved response times due to reduced server load during attacks.</div></div></div>
+        <div class="faq-item reveal rv4 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">What size attacks can you handle?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Our global network has over 200 Tbps of filtering capacity. We regularly mitigate attacks exceeding 1 Tbps and have protected against some of the largest DDoS attacks on record. Infrastructure scales automatically based on threat size.</div></div></div>
+        <div class="faq-item reveal rv5 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Do I need to change my DNS or IP?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">It depends on your plan. For web-based protection, a simple DNS change routes traffic through our scrubbing centers. For infrastructure-level protection (servers, APIs), we use GRE tunnels or BGP announcements — no DNS changes required.</div></div></div>
+        <div class="faq-item reveal rv1 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Is DDoS protection included with hosting?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Basic L3/L4 DDoS mitigation is included free with all Crapplet VPS and Dedicated Server plans. For advanced L7 protection with WAF, bot filtering, and custom rules, you need a Shield Pro or Shield Max plan.</div></div></div>
+        <div class="faq-item reveal rv2 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I protect multiple servers or IPs?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. Shield S covers 2 protected IPs, Shield Pro covers 10, and Shield Max covers unlimited IPs including entire IP blocks (/24 and larger) via BGP announcement.</div></div></div>
+        <div class="faq-item reveal rv3 bg-white"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">How do I monitor active attacks?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">All plans include access to the Crapplet Shield Dashboard with live traffic graphs, attack maps, threat intelligence reports, and instant alerts via SMS, email, and webhooks. Pro and Max plans include full API access for custom integrations.</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ EMERGENCY CTA ══ -->
+<section class="py-24 relative overflow-hidden" style="background:linear-gradient(135deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%)">
+  <div class="absolute inset-0 opacity-10" style="background-image:radial-gradient(circle at 2px 2px,rgba(163,101,254,.5) 1px,transparent 0);background-size:28px 28px;"></div>
+  <div class="orb1 absolute top-0 left-1/3 w-96 h-96 rounded-full blur-3xl pointer-events-none opacity-15" style="background:radial-gradient(circle,#a365fe,transparent)"></div>
+
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 relative z-10 reveal rv1">
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-2" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3)">
+      <span class="relative flex h-2 w-2"><span class="ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
+      <span class="text-xs font-bold text-red-400 uppercase tracking-widest">Don't wait for the next attack</span>
+    </div>
+    <h2 class="text-4xl lg:text-5xl font-black text-white leading-tight">Start Protecting Your<br/><span class="shimmer-text">Infrastructure Today</span></h2>
+    <p class="text-slate-400 text-xl max-w-2xl mx-auto">Join thousands of businesses that trust Crapplet's DDoS shield. Activate in under 5 minutes.</p>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+      <input id="ctaEmail" type="email" placeholder="Enter your business email"
+        class="glow-input w-full sm:w-80 px-5 py-4 rounded-xl border text-sm bg-white/10 text-white placeholder:text-slate-500"
+        style="border-color:rgba(163,101,254,.4)"/>
+      <button id="deployBtn" class="btn-primary w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-lg">
+        🛡 Activate Shield
+      </button>
+    </div>
+    <p class="text-xs text-slate-500 mt-4">No credit card required · Setup in &lt;5 minutes · Cancel anytime</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Hosting</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Company</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h4 class="text-slate-900 font-bold">Support</h4>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+
+<!-- ④ SCRIPTS -->
+<script>
+/* Cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => { glow.style.left = e.clientX+'px'; glow.style.top = e.clientY+'px'; });
+
+/* Header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+/* Scroll reveal */
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.stat-card,.layer-card,.feat-card,.plan-card,.plan-featured,.industry-chip,.faq-item,.count-anim').forEach(el => obs.observe(el));
+
+/* Live attack counter */
+let base = 1284971;
+setInterval(() => {
+  base += Math.floor(Math.random() * 5) + 1;
+  const el = document.getElementById('attack-counter');
+  if (el) el.textContent = base.toLocaleString('en-IN');
+}, 1800);
+
+/* FAQ accordion */
+document.querySelectorAll('.faq-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const item = btn.closest('.faq-item');
+    const body = item.querySelector('.faq-body');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => {
+      i.classList.remove('open'); i.querySelector('.faq-body').classList.remove('open');
+      i.querySelector('.faq-sym').textContent = 'add';
+    });
+    if (!isOpen) { item.classList.add('open'); body.classList.add('open'); btn.querySelector('.faq-sym').textContent = 'close'; }
+  });
+});
+
+/* CTA deploy */
+const deployBtn = document.getElementById('deployBtn');
+const ctaEmail = document.getElementById('ctaEmail');
+if (deployBtn && ctaEmail) {
+  deployBtn.addEventListener('click', () => {
+    if (ctaEmail.value.trim()) {
+      deployBtn.textContent = '✓ Shield Activating…';
+      deployBtn.style.background = '#16a34a';
+      setTimeout(() => { deployBtn.textContent = '🛡 Activate Shield'; deployBtn.style.background = ''; ctaEmail.value = ''; }, 2200);
+    } else {
+      ctaEmail.style.borderColor = '#ef4444'; ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+      setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+    }
+  });
+}
+
+/* Newsletter */
+const footerSendBtn = document.getElementById('footerSendBtn');
+const footerEmail = document.getElementById('footerEmail');
+if (footerSendBtn && footerEmail) {
+  footerSendBtn.addEventListener('click', function() {
+    if (!footerEmail.value.trim()) {
+      footerEmail.style.borderColor = '#ef4444'; footerEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+      setTimeout(() => { footerEmail.style.borderColor = ''; footerEmail.style.boxShadow = ''; }, 1500);
+      return;
+    }
+    const orig = this.innerHTML;
+    this.innerHTML = '<span class="material-symbols-outlined">check</span>';
+    this.style.background = '#16a34a'; footerEmail.value = '';
+    setTimeout(() => { this.innerHTML = orig; this.style.background = ''; }, 2000);
+  });
+}
+
+/* ════════════════════════════════════════════
+   MOBILE DRAWER JAVASCRIPT
+════════════════════════════════════════════ */
+(function() {
+  const toggle  = document.getElementById('menu-toggle');
+  const drawer  = document.getElementById('mobile-drawer');
+  const overlay = document.getElementById('mobile-overlay');
+
+  function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+  function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+  toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+  overlay.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+    trigger.addEventListener('click', function() {
+      const subId = 'sub-' + this.id.replace('acc-', '');
+      const sub = document.getElementById(subId);
+      if (!sub) return;
+      const isOpen = sub.classList.contains('open');
+      document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+      document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+      if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+    });
+  });
+})();
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms & Conditions - Crapplet Infotech</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: { "primary": "#a365fe", "background-light": "#ffffff", "background-dark": "#101922" },
+                    fontFamily: { "display": ["Inter"] },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+        /* Dropdown */
+        .nav-dropdown:hover .dropdown-menu { display: block; }
+        .dropdown-menu { padding-top: 8px; top: 100%; }
+
+        /* Cursor glow */
+        #cursor-glow {
+            position: fixed; width: 340px; height: 340px; border-radius: 50%;
+            background: radial-gradient(circle, #8949ea29 0%, transparent 70%);
+            pointer-events: none; z-index: 9999; transform: translate(-50%, -50%);
+            transition: left .1s ease, top .1s ease;
+        }
+
+        /* Nav underline */
+        nav a { position: relative; }
+        nav a::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: #a365fe; border-radius: 2px; transition: width 0.3s ease; }
+        nav a:hover::after { width: 100%; }
+
+        /* Header scroll shadow */
+        header { transition: box-shadow 0.3s ease; }
+        header.scrolled { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+
+        /* Shimmer */
+        @keyframes shimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+        .shimmer-text {
+            background: linear-gradient(90deg, #a365fe, #a66aff, #6d4e9c, #a365fe);
+            background-size: 200% auto;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; animation: shimmer 3s linear infinite;
+        }
+
+        /* Sidebar active */
+        .active-link { color: #6209e9d7; border-left: 3px solid #6d24db90; background: #864edb37; }
+
+        /* Footer link hover */
+        footer ul a { transition: all 0.2s ease; }
+        footer ul a:hover { padding-left: 8px; }
+        .footer-link { transition: color .2s, padding-left .2s; display: inline-block; }
+        .footer-link:hover { color: #a365fe; padding-left: 5px; }
+
+        /* ════════════════════════════════════════════
+           MOBILE DRAWER — All CSS
+        ════════════════════════════════════════════ */
+        body.nav-open { overflow: hidden; }
+
+        #menu-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    /* ❌ REMOVE display:flex from here */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    z-index: 60;
+}
+    #menu-toggle .bar {
+        display: block; height: 2px; border-radius: 2px;
+        background: #1e293b;
+        transition: all .35s cubic-bezier(.22,1,.36,1);
+    }
+    #menu-toggle .bar-top { width: 22px; }
+    #menu-toggle .bar-mid { width: 16px; transform-origin: right center; }
+    #menu-toggle .bar-bot { width: 22px; }
+    #menu-toggle.open .bar-top { transform: translateY(7px) rotate(45deg); width: 22px; }
+    #menu-toggle.open .bar-mid { width: 0; opacity: 0; }
+    #menu-toggle.open .bar-bot { transform: translateY(-7px) rotate(-45deg); width: 22px; }
+
+        #mobile-overlay {
+            position: fixed; inset: 0;
+            background: rgba(10,5,25,.55);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            z-index: 59; opacity: 0; pointer-events: none;
+            transition: opacity .35s ease;
+        }
+        #mobile-overlay.show { opacity: 1; pointer-events: all; }
+
+        #mobile-drawer {
+            position: fixed; top: 0; right: 0; bottom: 0;
+            width: min(88vw, 360px);
+            background: linear-gradient(160deg, #0f0620 0%, #1a0a38 40%, #0d0118 100%);
+            z-index: 60; overflow-y: auto; overflow-x: hidden;
+            transform: translateX(100%);
+            transition: transform .4s cubic-bezier(.22,1,.36,1);
+            box-shadow: -20px 0 60px rgba(0,0,0,.5);
+        }
+        #mobile-drawer.open { transform: translateX(0); }
+
+        #mobile-drawer::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: .18;
+        }
+        #mobile-drawer::after {
+            content: ''; position: absolute; top: -80px; right: -60px;
+            width: 260px; height: 260px;
+            background: radial-gradient(circle, #a365fe44 0%, transparent 70%);
+            pointer-events: none; z-index: 0; border-radius: 50%;
+        }
+
+        .drawer-glow-bottom {
+            position: absolute; bottom: -60px; left: -40px;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, #6633cc33 0%, transparent 70%);
+            border-radius: 50%; pointer-events: none; z-index: 0;
+        }
+        .drawer-inner { position: relative; z-index: 1; }
+        .drawer-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid rgba(255,255,255,.07);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .nav-group-label {
+            font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            color: rgba(163,101,254,.6); padding: 20px 24px 8px;
+        }
+
+        .mob-nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 24px; cursor: pointer;
+            color: rgba(255,255,255,.8); font-size: 14px; font-weight: 600;
+            position: relative; text-decoration: none;
+            transition: background .2s ease, color .2s ease, padding-left .2s ease;
+        }
+        .mob-nav-item:hover { background: rgba(163,101,254,.12); color: #fff; padding-left: 30px; }
+        .mob-nav-item .item-icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0; transition: transform .25s ease;
+        }
+        .mob-nav-item:hover .item-icon { transform: scale(1.15) rotate(-5deg); }
+        .mob-nav-item .item-arrow { margin-left: auto; opacity: .4; font-size: 16px; transition: transform .2s ease, opacity .2s ease; }
+        .mob-nav-item:hover .item-arrow { transform: translateX(4px); opacity: .8; }
+
+        .mob-submenu { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.22,1,.36,1); background: rgba(0,0,0,.2); }
+        .mob-submenu.open { max-height: 500px; }
+        .mob-submenu-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 24px 10px 56px;
+            color: rgba(255,255,255,.6); font-size: 13px; font-weight: 500;
+            transition: color .2s, padding-left .2s; text-decoration: none;
+        }
+        .mob-submenu-item:hover { color: #a365fe; padding-left: 62px; }
+        .mob-submenu-item::before {
+            content: ''; width: 5px; height: 5px; border-radius: 50%;
+            background: #a365fe; opacity: .5; flex-shrink: 0;
+            transition: opacity .2s, transform .2s;
+        }
+        .mob-submenu-item:hover::before { opacity: 1; transform: scale(1.4); }
+
+        .mob-nav-item .chevron { transition: transform .3s ease; }
+        .mob-nav-item.sub-open .chevron { transform: rotate(180deg); }
+
+        .drawer-divider { height: 1px; background: rgba(255,255,255,.06); margin: 8px 24px; }
+        .drawer-cta { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+
+        .drawer-btn-support {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 12px; border-radius: 12px;
+            border: 1px solid rgba(163,101,254,.35);
+            color: rgba(255,255,255,.85); font-weight: 700; font-size: 14px;
+            background: transparent; cursor: pointer;
+            transition: background .2s, border-color .2s;
+        }
+        .drawer-btn-support:hover { background: rgba(163,101,254,.12); border-color: #a365fe; }
+
+        .drawer-btn-login {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 13px; border-radius: 12px;
+            background: linear-gradient(135deg, #a365fe, #7c3aed);
+            color: #fff; font-weight: 800; font-size: 14px;
+            border: none; cursor: pointer;
+            box-shadow: 0 6px 24px rgba(163,101,254,.4);
+            transition: filter .2s, transform .2s, box-shadow .2s;
+        }
+        .drawer-btn-login:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(163,101,254,.55); }
+
+        @keyframes slideInRight { from{opacity:0;transform:translateX(24px);} to{opacity:1;transform:translateX(0);} }
+        #mobile-drawer.open .drawer-inner > * { animation: slideInRight .4s cubic-bezier(.22,1,.36,1) both; }
+        #mobile-drawer.open .drawer-inner > *:nth-child(1){animation-delay:.05s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(2){animation-delay:.10s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(3){animation-delay:.15s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(4){animation-delay:.20s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(5){animation-delay:.25s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(6){animation-delay:.30s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(7){animation-delay:.35s}
+        #mobile-drawer.open .drawer-inner > *:nth-child(8){animation-delay:.40s}
+
+        .drawer-social { display: flex; gap: 10px; padding: 0 24px 24px; }
+        .drawer-social a {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+            display: flex; align-items: center; justify-content: center;
+            color: rgba(255,255,255,.5); text-decoration: none;
+            transition: background .2s, color .2s, transform .2s;
+        }
+        .drawer-social a:hover { background: rgba(163,101,254,.25); color: #a365fe; transform: translateY(-3px); }
+    </style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/terms-and-conditions.html">
+</head>
+
+<body class="bg-background-light text-slate-900 font-display">
+    <div id="cursor-glow"></div>
+    <div class="relative flex min-h-screen flex-col">
+
+        <!-- ① MOBILE OVERLAY -->
+        <div id="mobile-overlay"></div>
+
+       <!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+
+    <!-- Drawer Header -->
+    <div class="drawer-header">
+      <a href="/index.html">
+        <img alt="Crapplet" src="/Crapplet_logo.png" class="h-12 w-auto"
+             onerror="this.outerHTML='<span style=\'color:#a365fe;font-weight:900;font-size:18px;font-family:Inter,sans-serif\'>Crapplet</span>'"/>
+      </a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>
+      Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>
+        VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item" style="color:#a365fe;font-weight:700">★ Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div class="drawer-divider"></div>
+
+    <!-- Stats strip -->
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">25+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Regions</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">2 min</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+      <a href="/contact.html">
+        <button class="drawer-btn-support w-full">
+          <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+          Support
+        </button>
+      </a>
+      <a href="/clientarea/index.php?rp=/login">
+        <button class="drawer-btn-login w-full">
+          <span class="material-symbols-outlined" style="font-size:18px">login</span>
+          Login
+        </button>
+      </a>
+    </div>
+
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+        <!-- HERO -->
+        <section class="pt-10 pb-2 bg-surface-container-low">
+            <div class="max-w-7xl mx-auto px-8">
+                <div class="max-w-3xl">
+                    <h1 class="text-4xl font-headline font-extrabold tracking-tighter text-on-surface mb-2">Terms &
+                        <span class="shimmer-text">Conditions</span>
+                    </h1>
+                    <p class="pl-3 text-sm text-on-surface-variant leading-relaxed font-bold">
+                        Effective Date: October 24, 2023.
+                    </p>
+                    <p class="pl-3 text-md text-on-surface-variant leading-relaxed font-body">These terms govern your use of the Pulsar Infrastructure and Hosting services.</p>
+                    <p class="pl-3 text-md text-on-surface-variant leading-relaxed font-body">Please read them carefully to understand your rights and obligations.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN -->
+        <div class="max-w-7xl mx-auto px-6 py-10 flex gap-10">
+
+            <!-- SIDEBAR -->
+            <aside class="w-64 hidden md:block border-r border-primary/30">
+                <nav class="sticky top-24 space-y-2 text-sm font-medium">
+                    <h6 class="block px-3 py-2 sidebar-link text-primary font-semibold border-b border-primary/30">On This Page</h6>
+                    <a href="#about"       class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">About Terms</a>
+                    <a href="#customer"    class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Customer Agreement</a>
+                    <a href="#spam"        class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Spam Policy</a>
+                    <a href="#domain"      class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Domain Rules</a>
+                    <a href="#gst"         class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">GST</a>
+                    <a href="#bandwidth"   class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Bandwidth</a>
+                    <a href="#uptime"      class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Uptime Guarantee</a>
+                    <a href="#payment"     class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Late Payment or Non-Payment</a>
+                    <a href="#termination" class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Termination</a>
+                    <a href="#vpn"         class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">VPN</a>
+                    <a href="#thirdparty"  class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Third Party</a>
+                    <a href="#price"       class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Price Change</a>
+                    <a href="#tos"         class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Change of TOS</a>
+                    <a href="#law"         class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Jurisdiction</a>
+                    <a href="#contact"     class="block px-3 py-2 sidebar-link rounded-md hover:bg-primary/5 transition-all">Contact</a>
+                </nav>
+            </aside>
+
+            <!-- CONTENT (unchanged from original) -->
+            <main class="flex-1 space-y-5">
+
+                <section id="about" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">About Terms and Conditions</h3>
+                    <p>This agreement is made in the light of the service and the orders provided by the website to the user. Customers have to abide by the terms of the service and follow the agreement as of the customer's service activation date. This is done to provide a framework that will govern customers' purchases of Crapplet's Host services from third parties. Crapplet's Host reserves the right to reject any additional terms and conditions included in the customer's form if they differ from the set maintained by Crapplet's host in service descriptions, orders, or any other point in the terms of service.</p>
+                </section>
+
+                <section id="customer" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Customer Agreement</h3>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>The customer is responsible for ensuring the safety of the website by not displaying any materials on the web.</li>
+                        <li>Customers will not break, infringe, contravene, or violate any of the Indian laws or regulations.</li>
+                        <li>Users should not break or infringe Crapplet's Host's intellectual property rights or any of the third-party rights.</li>
+                        <li>Customers should not use any defamatory or libelous statements.</li>
+                        <li>Should not be threatening other users on the web or any harassing work.</li>
+                        <li>Users should not be discriminated against based on gender, age, or race, and do not promote fate.</li>
+                        <li>Customers should not violate any policy that is told and posted on the website.</li>
+                        <li>The system that the customers use should be virus-free so that it should not bring any damage to Crapplet's Host or any of the third parties.</li>
+                    </ul>
+                </section>
+
+                <section id="spam" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Unsolicited Commercial E-mail/Unsolicited bulk E-mail (SPAM)</h3>
+                    <ul class="list-disc pl-6 space-y-2">
+                        <li>On our server or hosting plan, unsolicited commercial email and bulk email are strictly prohibited.</li>
+                        <li>Violation of our spam policy will result in various other penalties.</li>
+                        <li>If any of the users are found to have violated our spam policy, we take strict action immediately like suspending or terminating the guilty hosting account.</li>
+                        <li>The customer should not use the services for sending and creating worms, internet viruses or Trojan horses. Also, not for flooding, male bonding, pinging, or any denial-in-service attacks are prohibited. Any destructive service carried on by the customer can result in the suspension or termination of their account.</li>
+                    </ul>
+                </section>
+
+                <section id="domain" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Domain Rules</h3>
+                    <p class="mb-2"><strong>Domain Registrations:</strong> Customers are required to confirm the successful registration of their domain within 2 hours. In the event that the domain registration fails due to software issues, network errors, API glitches, or any other technical complications, customers need to be contacted immediately by our support team via phone, live chat, or support ticket system to resolve the matter.</p>
+                    <p class="mb-2"><strong>Domain Locking / Suspension/Termination:</strong> Crapplet's Host is not responsible for the locking, suspension, and termination of the domain due to the following reasons:</p>
+                    <ul class="list-disc pl-6 space-y-2 mb-2">
+                        <li>If you purchase any domain that is related to trademark entities such as companies, banks, government organizations, brands, etc. (Example: amazonshop.com, flipkartsale.com, zeetv.com, and facebook.com.)</li>
+                        <li>If you providing incorrect KYC (name, address, and mobile number) details.</li>
+                        <li>If you spamming, using adult contents, phishing, cyber fraud, illegal work, or any other reasons.</li>
+                        <li>If the customer did not verified the email id.</li>
+                    </ul>
+                    <p><strong>Domain Renewal:</strong> Crapplet's Host will send you three reminders to renew your domain before the expiration date. For failure or delay in the renewal of your domain, Crapplet's Host will not be responsible, and once the domain is renewed, no refund will be provided.</p>
+                    <ul class="list-disc pl-6 space-y-2 mb-2">
+                        <li>The first reminder will be sent 30 days before the expiration date.</li>
+                        <li>The second reminder will be sent 7 days before the expiration date.</li>
+                        <li>The third reminder will be sent 1 day before the expiration date.</li>
+                    </ul>
+                    <p class="mb-2"><strong>Domain Transfer to Other Providers:</strong> Crapplet's Host prohibits the transfer of domain names to other providers without applicable transfer fees. The domain will not be released or provide an EPP code unless the transfer fees are paid. The domain transfer fee is Rs 1200 (INR).</p>
+                    <p class="mb-2"><strong>Domain Transfer to Crapplet's Host:</strong> If the customer wants to transfer their domain from another domain provider to Crapplet's Host, they should pay 1 year of domain transfer fees, which are according to our domain transfer fees.</p>
+                    <p class="mb-2"><strong>Domain infringement:</strong> Crapplet's Host is not allowed to register or transfer any domain that is similar to a trademark company, bank, government organisation, brand, or any other. Any person trying to register such a domain name will be held liable for infringement of a trademark. In the event that we receive any complaint on behalf of infringement, the domain will be suspended immediately without any notice, and a refund will not be given. Example: amazonshop.com, flipkartsale.com, zeetv.com, and facebook.com.</p>
+                    <p class="mb-2"><strong>Domain Refund:</strong> No refund is applicable once the domain is registered and their addons (Privacy Protection, DNS Management, Premium DNS, or any other addons).</p>
+                    <p class="mb-2"><strong>Free Domain Name With Linux Shared Hosting Service:</strong> If the customer cancels the Linux Shared Hosting service for any reason, the domain name will also be cancelled, and the customer cannot renew or transfer their domain to another provider.</p>
+                </section>
+
+                <section id="gst" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">GST (Goods and Services Tax)</h3>
+                    <p>All the prices of any services mentioned are without GST (Goods and Services Tax). To view the price with taxes, please use the tax calculator. 18% GST will be applied to the final invoice only for Indian customers; if you are outside India, GST will not apply. The GST amount is non-refundable.</p>
+                </section>
+
+                <section id="bandwidth" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Bandwidth</h3>
+                    <p>When the user account exceeds the bandwidth limit, we will send a notification to every user. If the user does not need to purchase additional bandwidth or upgrade the service in order to continue exceeding their limit, the account will be suspended until the user takes steps to ensure that the limit is not exceeded again, or until the account is upgraded, whichever comes first. The account would be reactivated within the following month.</p>
+                </section>
+
+                <section id="uptime" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Uptime Guarantee</h3>
+                    <p class="pb-2">In case of any service interruptions or downtime due to scheduled maintenance by Crapplet's Host, our network providers will not be counted towards the uptime guarantee. Crapplet's Host is not liable or responsible in any way for the failure of third-party services. Third-party services' responsibilities fall onto the customer, and Crapplet's Host will not be liable for failure or delay in performing its respective obligations in case such failure or delay is caused due to certain circumstances that are beyond its reasonable control, including but not limited to acts of any governmental body, war, fire, embargo, rebellion, sabotage, flood, strike, or any other labour disturbance, delay in unavailability, interruption or delay in telecommunications or third-party services (including DNS propagation), failure of third-party software or hardware, or inability to obtain raw materials, supplies, or power used in or equipment needed for the provision of the services.</p>
+                    <p>Servers down by firewalls caused by unauthorised access, failed login attempts, or an excessive number of connections from the customer's IP will not be covered in the uptime guarantee. In the event of a disaster, this will not be covered.</p>
+                </section>
+
+                <section id="payment" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Late Payment or Non-Payment</h3>
+                    <p class="mb-2"><strong>Linux Shared Hosting and Linux Reseller Hosting Service:</strong> If there is a delay in the payment for the Linux Shared Hosting service or the Linux Reseller hosting service, your service will be suspended after 2 days if you still haven't made the payment. The service was finally terminated after 15 days of expiration.</p>
+                    <p class="mb-2"><strong>Linux, Windows and Forex VPS Hosting Service:</strong> For Linux VPS hosting, Windows VPS hosting, or Forex VPS hosting, you need to pay before 5 days of expiration. Otherwise, your service will be terminated or cancelled at the end of its expiration date. Once your service is terminated or cancelled, you will be responsible for your data. Crapplet's Host cannot provide any backups of your data.</p>
+                    <p class="mb-2"><strong>Linux and Windows Dedicated Server Service:</strong> For the Linux and Windows dedicated server hosting service, you need to pay before 5 days of expiration. Otherwise, your service will be terminated or cancelled at the end of its expiration date. Once your service is terminated or cancelled, you will be responsible for your data. Crapplet's Host cannot provide any backups of your data.</p>
+                </section>
+
+                <section id="termination" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">At Crapplet's, your hosting account will be terminated for the following reasons:</h3>
+                    <ul class="list-disc pl-6 space-y-2 mb-2">
+                        <li>Cancellation Request</li>
+                        <li>Not Renew</li>
+                        <li>Suspected fraud</li>
+                        <li>You violate our Terms and conditions</li>
+                        <li>Dispute or ChargeBack</li>
+                    </ul>
+                </section>
+
+                <section id="vpn" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Usages of VPN</h3>
+                    <p>The use of a VPN (Virtual Private Network) on our platform is strictly prohibited. If customers find themselves purchasing any server or hosting plan using the VPN, Crapplet's will suspend or terminate the customer account without providing a refund.</p>
+                </section>
+
+                <section id="thirdparty" class="section">
+                    <h3 class="text-lg font-bold text-primary mb-3">Third-Party Services</h3>
+                    <p class="mb-3">When purchasing any third-party service from Crapplet's, the customer agrees to comply with all agreements, terms, and conditions of the respective third-party provider.</p>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>DigitalOcean:</strong> <a href="https://www.digitalocean.com/legal/terms-of-service-agreement/" class="text-primary text-sm hover:underline" target="_blank">https://www.digitalocean.com/legal/terms-of-service-agreement/</a></li>
+                        <li><strong>AWS:</strong> <a href="https://aws.amazon.com/service-terms/" class="text-primary text-sm hover:underline" target="_blank">https://aws.amazon.com/service-terms/</a></li>
+                        <li><strong>Microsoft 365:</strong> <a href="https://www.microsoft.com/en-us/legal/intellectualproperty/copyright/default" class="text-primary text-sm hover:underline" target="_blank">https://www.microsoft.com/en-us/legal/intellectualproperty/copyright/default</a></li>
+                        <li><strong>Google Workspace (G Suite):</strong> <a href="https://policies.google.com/terms" class="text-primary text-sm hover:underline" target="_blank">https://policies.google.com/terms</a></li>
+                        <li><strong>SpamExperts:</strong> <a href="https://www.spamexperts.com/software-services-agreement" class="text-primary text-sm hover:underline" target="_blank">https://www.spamexperts.com/software-services-agreement</a></li>
+                        <li><strong>LiteSpeed:</strong> <a href="https://www.litespeedtech.com/docs/webserver/license-enterprise" class="text-primary text-sm hover:underline" target="_blank">https://www.litespeedtech.com/docs/webserver/license-enterprise</a></li>
+                        <li><strong>cPanel & WHM:</strong> <a href="https://cpanel.net/legal-notices/" class="text-primary text-sm hover:underline" target="_blank">https://cpanel.net/legal-notices/</a></li>
+                        <li><strong>Plesk:</strong> <a href="https://www.plesk.com/legal/" class="text-primary text-sm hover:underline" target="_blank">https://www.plesk.com/legal/</a></li>
+                        <li><strong>Softaculous:</strong> <a href="https://softaculous.com/softaculous/tos" class="text-primary text-sm hover:underline" target="_blank">https://softaculous.com/softaculous/tos</a></li>
+                    </ul>
+                </section>
+
+                <section id="price" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Price Change</h3>
+                    <p>We keep the complete right to change the pricing details at any time. It's completely your responsibility to check pricing details from time to time while taking any services.</p>
+                </section>
+
+                <section id="tos" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Change of TOS</h3>
+                    <p>This is to be aware that we have a full right to change our term and policy anytime. We do not release and share any notification before changing our services. For updates, you may be in touch with us.</p>
+                </section>
+
+                <section id="law" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Jurisdiction</h3>
+                    <p>This Agreement shall be governed by and construed in accordance with the laws of India. Any disputes arising out of or relating to this Agreement shall be subject to the exclusive jurisdiction of the courts located in Gwalior Madhya Pradesh only.</p>
+                </section>
+
+                <section id="contact" class="section">
+                    <h3 class="text-lg font-bold mb-1 text-primary">Contact</h3>
+                    <p>If you have any questions or comments about these our Terms of Service, you can contact us at:</p>
+                    <div class="pl-2 mt-2">
+                        <strong class="text-sm">Crapplet Infotech Private Limited</strong>
+                        <p class="text-sm"><strong>Address:</strong> 303 Sadbhavna Apartment, City Center, Gwalior, Madhya Pradesh, India (474009).</p>
+                        <p class="text-sm"><strong>Email:</strong> info@crapplet.in</p>
+                        <p class="text-sm"><strong>Call:</strong> +91-7999122185 | 9752827710</p>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- ══ FOOTER ══ -->
+        <footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12">
+                <div class="flex flex-col gap-4">
+                    <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+                    <div class="flex flex-col gap-1">
+                        <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+                        <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <h4 class="text-slate-900 font-bold">Hosting</h4>
+                    <nav class="flex flex-col gap-2">
+                        <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+                        <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+                        <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+                        <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+                    </nav>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <h4 class="text-slate-900 font-bold">Company</h4>
+                    <nav class="flex flex-col gap-2">
+                        <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+                        <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+                        <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+                        <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+                    </nav>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <h4 class="text-slate-900 font-bold">Support</h4>
+                    <nav class="flex flex-col gap-2">
+                        <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+                        <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms &amp; Conditions</a>
+                        <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy &amp; Policy</a>
+                        <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+                <div class="flex gap-6">
+                    <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+                    <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+                    <a class="text-slate-400 hover:text-primary transition-colors hover:scale-110 inline-block" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ④ SCRIPTS -->
+    <script>
+        /* Cursor glow */
+        const glow = document.getElementById('cursor-glow');
+        document.addEventListener('mousemove', e => {
+            glow.style.left = e.clientX + 'px';
+            glow.style.top  = e.clientY + 'px';
+        });
+
+        /* Header shadow */
+        const header = document.getElementById('site-header');
+        window.addEventListener('scroll', () => { header.classList.toggle('scrolled', window.scrollY > 20); });
+
+        /* Sidebar scroll-spy */
+        const sections = document.querySelectorAll("section[id]");
+        const links    = document.querySelectorAll(".sidebar-link[href^='#']");
+        window.addEventListener("scroll", () => {
+            let current = "";
+            sections.forEach(section => {
+                if (scrollY >= section.offsetTop - 150) current = section.getAttribute("id");
+            });
+            links.forEach(link => {
+                link.classList.remove("active-link");
+                if (link.getAttribute("href") === `#${current}`) link.classList.add("active-link");
+            });
+        });
+
+        /* ════════════════════════════════════════════
+           MOBILE DRAWER JAVASCRIPT
+        ════════════════════════════════════════════ */
+        (function () {
+            const toggle  = document.getElementById('menu-toggle');
+            const drawer  = document.getElementById('mobile-drawer');
+            const overlay = document.getElementById('mobile-overlay');
+const closeBtn = document.getElementById('close-drawer');
+
+            function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+            function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+            toggle.addEventListener('click',   () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+            overlay.addEventListener('click',  closeDrawer);
+            closeBtn.addEventListener('click', closeDrawer); // ✅ THIS LINE FIXES IT
+
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+            document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+                trigger.addEventListener('click', function () {
+                    const subId  = 'sub-' + this.id.replace('acc-', '');
+                    const sub    = document.getElementById(subId);
+                    if (!sub) return;
+                    const isOpen = sub.classList.contains('open');
+                    document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+                    document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+                    if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+                });
+            });
+        })();
+    </script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

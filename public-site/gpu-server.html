@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link rel="icon" href="/Crapplet_Icon.png"/>
+<title>GPU Server Hosting India | Crapplet Infotech</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode:"class",
+    theme:{
+      extend:{
+        colors:{"primary":"#a365fe","background-light":"#ffffff","background-dark":"#101922"},
+        fontFamily:{"display":["Inter"]},
+        borderRadius:{"DEFAULT":"0.5rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"}
+      }
+    }
+  }
+</script>
+<style>
+body{font-family:'Inter',sans-serif;}
+.nav-dropdown:hover .dropdown-menu{display:block;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:#f1f5f9;border-radius:10px;}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#a365fe,#7c3aed);border-radius:10px;border:2px solid #f1f5f9;}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#7c3aed,#a365fe);}
+
+/* Cursor glow */
+#cursor-glow{position:fixed;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,#8949ea29 0%,transparent 70%);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:left .1s ease,top .1s ease;}
+
+/* Animations */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+.load{animation:fadeInUp .75s cubic-bezier(.22,1,.36,1) both;}
+.ld1{animation-delay:.07s}.ld2{animation-delay:.17s}.ld3{animation-delay:.27s}.ld4{animation-delay:.37s}.ld5{animation-delay:.47s}
+
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);}
+.reveal.visible{opacity:1;transform:translateY(0);}
+.rv1{transition-delay:.05s}.rv2{transition-delay:.15s}.rv3{transition-delay:.25s}.rv4{transition-delay:.35s}.rv5{transition-delay:.45s}
+.reveal-left{opacity:0;transform:translateX(-36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-left.visible{opacity:1;transform:translateX(0);}
+.reveal-right{opacity:0;transform:translateX(36px);transition:opacity .75s cubic-bezier(.22,1,.36,1),transform .75s cubic-bezier(.22,1,.36,1);}
+.reveal-right.visible{opacity:1;transform:translateX(0);}
+
+@keyframes shimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+.shimmer-text{background:linear-gradient(90deg,#a365fe,#c084fc,#7c3aed,#a365fe);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 3s linear infinite;}
+
+@keyframes orb1{0%,100%{transform:translate(0,0) scale(1);}40%{transform:translate(35px,-28px) scale(1.1);}70%{transform:translate(-18px,20px) scale(.93);}}
+@keyframes orb2{0%,100%{transform:translate(0,0);}50%{transform:translate(-45px,38px) scale(1.08);}}
+.orb1{animation:orb1 11s ease-in-out infinite;}
+.orb2{animation:orb2 15s ease-in-out infinite;}
+
+@keyframes pulseBadge{0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.5);}50%{box-shadow:0 0 0 8px rgba(163,101,254,0);}}
+.badge-pulse{animation:pulseBadge 2.5s ease-in-out infinite;}
+
+/* Ticker */
+@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.ticker-inner{display:flex;width:max-content;animation:ticker 22s linear infinite;}
+.ticker-inner:hover{animation-play-state:paused;}
+
+/* Plan cards */
+.plan-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.plan-card:hover{transform:translateY(-8px);box-shadow:0 20px 48px -12px rgba(0,0,0,.12);border-color:rgba(163,101,254,.4);}
+.plan-featured{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s;}
+.plan-featured:hover{transform:translateY(-10px) scale(1.02);box-shadow:0 28px 56px -12px rgba(163,101,254,.35);}
+
+/* Feature cards */
+.feat-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.feat-card:hover{transform:translateY(-6px);box-shadow:0 16px 36px -8px rgba(0,0,0,.1);border-color:rgba(163,101,254,.35);}
+.feat-icon-wrap{transition:transform .3s ease,background .2s;}
+.feat-card:hover .feat-icon-wrap{transform:scale(1.15) rotate(6deg);background:#a365fe !important;}
+.feat-card:hover .feat-icon-wrap .material-symbols-outlined{color:#fff !important;}
+
+/* GPU card glow */
+@keyframes gpuPulse{0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.3);}50%{box-shadow:0 0 28px 8px rgba(163,101,254,.12);}}
+.gpu-card-glow{animation:gpuPulse 3s ease-in-out infinite;}
+
+/* Terminal blink */
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+.cursor-blink{animation:blink 1s step-start infinite;}
+
+/* CTA section */
+@keyframes dotMove{0%{background-position:0 0;}100%{background-position:30px 30px;}}
+.cta-section{background-image:radial-gradient(circle,rgba(163,101,254,.08) 1px,transparent 0);background-size:30px 30px;animation:dotMove 6s linear infinite;}
+.glow-input{transition:box-shadow .3s,border-color .3s;}
+.glow-input:focus{outline:none;box-shadow:0 0 0 3px rgba(163,101,254,.2);border-color:#a365fe;}
+
+/* FAQ */
+.faq-item{transition:border-color .3s,box-shadow .3s;}
+.faq-content{transition:max-height .35s ease;}
+.faq-icon{transition:transform .3s ease,background .2s;}
+.faq-item.open .faq-icon{transform:rotate(45deg);background:#a365fe;}
+.faq-item.open .faq-icon .material-symbols-outlined{color:#fff;}
+
+/* Header */
+header{transition:box-shadow .3s;}
+header.scrolled{box-shadow:0 4px 20px rgba(0,0,0,.07);}
+nav a{position:relative;}
+nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:#a365fe;border-radius:2px;transition:width .3s ease;}
+nav a:hover::after{width:100%;}
+
+/* Footer */
+.footer-link{transition:color .2s,padding-left .2s;display:inline-block;}
+.footer-link:hover{color:#a365fe;padding-left:5px;}
+.social-icon{transition:color .2s,transform .3s ease;}
+.social-icon:hover{color:#a365fe;transform:rotate(15deg) scale(1.2);}
+
+/* Comparison table */
+.cmp-row{transition:background .2s;}
+.cmp-row:hover{background:#faf5ff;}
+
+/* Billing toggle */
+.toggle-pill{transition:left .25s cubic-bezier(.22,1,.36,1);}
+
+/* GPU chip hover */
+.gpu-chip{transition:transform .2s,border-color .2s,box-shadow .2s;}
+.gpu-chip:hover{transform:translateY(-3px);border-color:#a365fe;box-shadow:0 8px 20px rgba(163,101,254,.18);}
+
+/* Use-case cards */
+.use-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .3s;}
+.use-card:hover{transform:translateY(-6px);box-shadow:0 16px 36px -8px rgba(163,101,254,.18);border-color:rgba(163,101,254,.4);}
+
+/* ══ MOBILE DRAWER ══ */
+#menu-toggle{position:relative;width:40px;height:40px;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;z-index:60;}
+#menu-toggle .bar{display:block;height:2px;border-radius:2px;background:#1e293b;transition:all .35s cubic-bezier(.22,1,.36,1);}
+#menu-toggle .bar-top{width:22px;}
+#menu-toggle .bar-mid{width:16px;transform-origin:right center;}
+#menu-toggle .bar-bot{width:22px;}
+#menu-toggle.open .bar-top{transform:translateY(7px) rotate(45deg);width:22px;}
+#menu-toggle.open .bar-mid{width:0;opacity:0;}
+#menu-toggle.open .bar-bot{transform:translateY(-7px) rotate(-45deg);width:22px;}
+#mobile-overlay{position:fixed;inset:0;background:rgba(10,5,25,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:49;opacity:0;pointer-events:none;transition:opacity .35s ease;}
+#mobile-overlay.show{opacity:1;pointer-events:all;}
+#mobile-drawer{position:fixed;top:0;right:0;bottom:0;width:min(88vw,360px);background:linear-gradient(160deg,#0f0620 0%,#1a0a38 40%,#0d0118 100%);z-index:50;overflow-y:auto;overflow-x:hidden;transform:translateX(100%);transition:transform .4s cubic-bezier(.22,1,.36,1);box-shadow:-20px 0 60px rgba(0,0,0,.5);}
+#mobile-drawer.open{transform:translateX(0);}
+#mobile-drawer::after{content:'';position:absolute;top:-80px;right:-60px;width:260px;height:260px;background:radial-gradient(circle,#a365fe44 0%,transparent 70%);pointer-events:none;z-index:0;border-radius:50%;}
+.drawer-glow-bottom{position:absolute;bottom:-60px;left:-40px;width:200px;height:200px;background:radial-gradient(circle,#6633cc33 0%,transparent 70%);border-radius:50%;pointer-events:none;z-index:0;}
+.drawer-inner{position:relative;z-index:1;}
+.drawer-header{padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;}
+.mob-nav-item{display:flex;align-items:center;gap:12px;padding:11px 24px;cursor:pointer;color:rgba(255,255,255,.8);font-size:14px;font-weight:600;position:relative;transition:background .2s ease,color .2s ease,padding-left .2s ease;text-decoration:none;}
+.mob-nav-item:hover{background:rgba(163,101,254,.12);color:#fff;padding-left:30px;}
+.mob-nav-item .item-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:transform .25s ease;}
+.mob-nav-item:hover .item-icon{transform:scale(1.15) rotate(-5deg);}
+.mob-nav-item .item-arrow{margin-left:auto;opacity:.4;font-size:16px;transition:transform .2s ease,opacity .2s ease;}
+.mob-nav-item:hover .item-arrow{transform:translateX(4px);opacity:.8;}
+.mob-submenu{max-height:0;overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1);background:rgba(0,0,0,.2);}
+.mob-submenu.open{max-height:500px;}
+.mob-submenu-item{display:flex;align-items:center;gap:10px;padding:10px 24px 10px 56px;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:color .2s,padding-left .2s;text-decoration:none;}
+.mob-submenu-item:hover{color:#a365fe;padding-left:62px;}
+.mob-submenu-item::before{content:'';width:5px;height:5px;border-radius:50%;background:#a365fe;opacity:.5;flex-shrink:0;transition:opacity .2s,transform .2s;}
+.mob-submenu-item:hover::before{opacity:1;transform:scale(1.4);}
+.mob-nav-item .chevron{transition:transform .3s ease;}
+.mob-nav-item.sub-open .chevron{transform:rotate(180deg);}
+.drawer-divider{height:1px;background:rgba(255,255,255,.06);margin:8px 24px;}
+.drawer-cta{padding:20px 24px;display:flex;flex-direction:column;gap:10px;}
+.drawer-btn-support{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;border:1px solid rgba(163,101,254,.35);color:rgba(255,255,255,.85);font-weight:700;font-size:14px;transition:background .2s,border-color .2s;}
+.drawer-btn-support:hover{background:rgba(163,101,254,.12);border-color:#a365fe;}
+.drawer-btn-login{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:12px;background:linear-gradient(135deg,#a365fe,#7c3aed);color:#fff;font-weight:800;font-size:14px;box-shadow:0 6px 24px rgba(163,101,254,.4);transition:filter .2s,transform .2s,box-shadow .2s;}
+.drawer-btn-login:hover{filter:brightness(1.1);transform:translateY(-2px);box-shadow:0 10px 30px rgba(163,101,254,.55);}
+@keyframes slideInRight{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);}}
+#mobile-drawer.open .drawer-inner > *{animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both;}
+#mobile-drawer.open .drawer-inner > *:nth-child(1){animation-delay:.05s}
+#mobile-drawer.open .drawer-inner > *:nth-child(2){animation-delay:.10s}
+#mobile-drawer.open .drawer-inner > *:nth-child(3){animation-delay:.15s}
+#mobile-drawer.open .drawer-inner > *:nth-child(4){animation-delay:.20s}
+#mobile-drawer.open .drawer-inner > *:nth-child(5){animation-delay:.25s}
+#mobile-drawer.open .drawer-inner > *:nth-child(6){animation-delay:.30s}
+#mobile-drawer.open .drawer-inner > *:nth-child(7){animation-delay:.35s}
+.drawer-social{display:flex;gap:10px;padding:0 24px 24px;}
+.drawer-social a{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:14px;transition:background .2s,color .2s,transform .2s;}
+.drawer-social a:hover{background:rgba(163,101,254,.25);color:#a365fe;transform:translateY(-3px);}
+body.nav-open{overflow:hidden;}
+
+/* Flag dropdown */
+#flag-menu{padding-top:0;}
+.flag-item:hover{background:#f5eeff;color:#a365fe;}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+<link rel="canonical" href="https://crapplet.co.in/gpu-server.html">
+</head>
+<body class="bg-background-light font-display text-slate-900 antialiased overflow-x-hidden">
+
+<div id="cursor-glow"></div>
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+    <div class="drawer-header">
+      <a href="/index.html"><img alt="Crapplet" src="/Crapplet_logo.png" class="h-10 w-auto" onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px&quot;&gt;Crapplet&lt;/span&gt;'"/></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-primary/15"><span class="material-symbols-outlined text-primary" style="font-size:16px">home</span></span>Home
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>Hosting
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">cloud</span></span>VPS & Cloud
+        <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item">Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>Dedicated Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+      <span class="item-icon bg-violet-500/15"><span class="material-symbols-outlined text-violet-400" style="font-size:16px">developer_board</span></span>GPU Servers
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>Colocation
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>Domain
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+      <span class="item-icon bg-red-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+      DDoS Protection
+      <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+
+    <div class="drawer-divider"></div>
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div><div class="text-base font-black text-primary">H100</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">NVIDIA</div></div>
+      <div class="w-px bg-white/10"></div>
+      <div><div class="text-base font-black text-white">A100</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">80 GB</div></div>
+      <div class="w-px bg-white/10"></div>
+      <div><div class="text-base font-black text-green-400">1 min</div><div class="text-[10px] text-white/50 font-semibold mt-0.5">Deploy</div></div>
+    </div>
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+      <a href="/contact.html"><button class="drawer-btn-support w-full"><span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>Support</button></a>
+      <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+    </div>
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+  </div>
+</div>
+
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+<div class="layout-container flex h-full grow flex-col">
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li is-current" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-1">
+
+<!-- ══════════════════════════════════════════
+  SECTION 1 — HERO
+══════════════════════════════════════════ -->
+<section class="relative overflow-hidden bg-slate-50/50 py-16 md:py-16">
+  <div class="absolute inset-0 pointer-events-none -z-0">
+    <div class="orb1 absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" style="background:rgba(163,101,254,.1)"></div>
+    <div class="orb2 absolute -bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl" style="background:rgba(124,58,237,.08)"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none" style="background:rgba(163,101,254,.04)"></div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div class="flex flex-col gap-6">
+        <div class="load ld1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider w-fit badge-pulse">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          </span>
+          NVIDIA Certified Cloud
+        </div>
+        <h1 class="load ld2 text-2xl md:text-4xl lg:text-4xl font-black leading-[1.08] tracking-tight text-slate-900">
+          GPU Server Hosting<br/><span class="shimmer-text">in India</span>
+        </h1>
+        <p class="load ld3 text-slate-600 text-md leading-relaxed max-w-xl">
+          Rent NVIDIA H100, A100, L40S & RTX GPUs from <strong class="text-slate-800"><span class="price-amount" data-inr="39">₹39</span>/hr</strong>. Deploy in under 1 minute. No procurement delays. No lock-in. Raw NVIDIA compute, billed by the minute, hosted in India's tier-4 data centres.
+        </p>
+
+        <!-- Mini spec badges -->
+        <div class="load ld3 flex flex-wrap gap-3">
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">developer_board</span> NVIDIA H100 SXM5
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">memory</span> Up to 80 GB HBM3
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">bolt</span> NVLink + InfiniBand
+          </span>
+          <span class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary" style="font-size:14px">location_on</span> India Hosted
+          </span>
+        </div>
+
+        <div class="load ld4 flex flex-wrap gap-4 pt-2">
+          <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})" class="bg-[#a365fe] text-white px-8 py-2 rounded-xl font-bold text-base hover:brightness-110 hover:-translate-y-1 transition-all" style="box-shadow:0 6px 20px rgba(163,101,254,.35)">
+            View GPU Plans
+          </button>
+          <button class="bg-white border border-slate-200 px-8 py-2 rounded-xl font-bold text-base hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm hover:shadow-md" onclick="location.href='/contact.html'">
+            Talk to Expert
+          </button>
+        </div>
+
+        <!-- Rating -->
+        <div class="load ld5 flex items-center gap-2">
+          <div class="flex gap-0.5">
+            <span class="material-symbols-outlined text-amber-400" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
+            <span class="material-symbols-outlined text-amber-400" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
+            <span class="material-symbols-outlined text-amber-400" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
+            <span class="material-symbols-outlined text-amber-400" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
+            <span class="material-symbols-outlined text-amber-400" style="font-size:16px;font-variation-settings:'FILL' 1">star_half</span>
+          </div>
+          <p class="text-slate-500 text-sm">Rated <strong class="text-green-600">4.8</strong> by <strong class="text-green-600">5,000+</strong> AI/ML teams</p>
+        </div>
+      </div>
+
+      <!-- Right: GPU showcase card -->
+      <div class="load ld5 relative group">
+        <div class="absolute -inset-1 rounded-2xl blur opacity-20 group-hover:opacity-35 transition duration-700" style="background:linear-gradient(135deg,#a365fe,#7c3aed)"></div>
+        <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-2xl p-8">
+          <!-- GPU grid visual -->
+          <div class="grid grid-cols-4 gap-3 mb-6">
+            <div class="gpu-card-glow col-span-4 bg-gradient-to-br from-violet-900/80 to-slate-800 rounded-xl p-4 border border-violet-500/30 flex items-center justify-between">
+              <div>
+                <div class="text-white font-black text-lg">NVIDIA H100 SXM5</div>
+                <div class="text-violet-300 text-xs font-semibold mt-0.5">80 GB HBM3 · 3.35 TB/s Bandwidth</div>
+              </div>
+              <div class="text-right">
+                <div class="text-white font-black text-xl"><span class="price-amount" data-inr="249">₹249</span><span class="text-slate-400 text-sm font-normal">/hr</span></div>
+                <div class="text-green-400 text-xs font-bold flex items-center gap-1 justify-end"><span class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Available</div>
+              </div>
+            </div>
+            <div class="col-span-2 bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+              <div class="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">VRAM</div>
+              <div class="text-white font-black text-xl mt-0.5">80 GB</div>
+              <div class="text-slate-500 text-[10px]">HBM3</div>
+            </div>
+            <div class="col-span-2 bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+              <div class="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">Compute</div>
+              <div class="text-white font-black text-xl mt-0.5">3,958</div>
+              <div class="text-slate-500 text-[10px]">AI TOPS</div>
+            </div>
+            <div class="col-span-2 bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+              <div class="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">Network</div>
+              <div class="text-white font-black text-xl mt-0.5">3.2 Tb/s</div>
+              <div class="text-slate-500 text-[10px]">NVLink</div>
+            </div>
+            <div class="col-span-2 bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+              <div class="text-slate-400 text-[10px] font-semibold uppercase tracking-wide">Deploy</div>
+              <div class="text-green-400 font-black text-xl mt-0.5">&lt; 1 min</div>
+              <div class="text-slate-500 text-[10px]">Instant</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+            <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span></span>
+            <span class="text-green-400 text-xs font-bold">India Datacenter — All Systems Operational · 99.99% Uptime</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="bg-primary/5 border-y border-primary/10 py-3 overflow-hidden">
+  <div class="ticker-inner text-xs font-semibold text-primary uppercase tracking-widest">
+    <span class="mx-10">⚡ NVIDIA H100 · A100 · L40S · RTX 4090</span>
+    <span class="mx-10">   Hosted in India — Tier-4 Datacentres</span>
+    <span class="mx-10">🚀 Deploy in Under 60 Seconds</span>
+    <span class="mx-10">💰 Billed Per Minute — No Lock-in</span>
+    <span class="mx-10">🔒 ISO 27001 Certified Infrastructure</span>
+    <span class="mx-10">💬 24/7/365 Expert Support</span>
+    <span class="mx-10">⚡ NVIDIA H100 · A100 · L40S · RTX 4090</span>
+    <span class="mx-10">🇮🇳 Hosted in India — Tier-4 Datacentres</span>
+    <span class="mx-10">🚀 Deploy in Under 60 Seconds</span>
+    <span class="mx-10">💰 Billed Per Minute — No Lock-in</span>
+    <span class="mx-10">🔒 ISO 27001 Certified Infrastructure</span>
+    <span class="mx-10">💬 24/7/365 Expert Support</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  SECTION 2 — STATS BAR
+══════════════════════════════════════════ -->
+<section class="bg-white border-b border-slate-100 py-16">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 reveal rv1">
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">developer_board</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">GPU Models</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">10+</p>
+        <p class="text-xs text-primary font-bold">H100, A100, L40S…</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">bolt</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">Starting From</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight"><span class="price-amount" data-inr="39">₹39</span><span class="text-lg">/hr</span></p>
+        <p class="text-xs text-green-600 font-bold">Billed per minute</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">timer</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">Deploy Time</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">&lt; 1 min</p>
+        <p class="text-xs text-primary font-bold">Instant provisioning</p>
+      </div>
+      <div class="flex flex-col gap-1 items-center md:items-start p-6 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/30 hover:-translate-y-1 transition-all cursor-default">
+        <span class="material-symbols-outlined text-primary text-3xl">groups</span>
+        <p class="text-slate-500 text-xs font-semibold uppercase tracking-wide mt-1">AI Teams Served</p>
+        <p class="text-slate-900 text-3xl font-extrabold leading-tight">5,000+</p>
+        <p class="text-xs text-orange-600 font-bold">Researchers & startups</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 3 — GPU PLANS
+══════════════════════════════════════════ -->
+<section id="plans" class="py-16 bg-background-light">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-6 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">GPU Pricing</span>
+      <h2 class="text-2xl md:text-4xl font-black text-slate-900 tracking-tight">Choose Your <span class="shimmer-text">GPU Power</span></h2>
+      <p class="text-slate-600 text-md max-w-2xl mx-auto mt-4">From solo researchers to enterprise AI clusters — we have the right GPU for every workload. All plans include full root access and NVMe SSD storage.</p>
+    </div>
+
+    <!-- Billing toggle -->
+    <div class="flex justify-center items-center gap-3 mb-12 reveal rv2">
+      <span id="lbl-hourly" class="text-sm font-bold text-slate-900">Hourly</span>
+      <button id="billing-toggle" onclick="toggleBilling()" class="relative w-12 h-6 rounded-full bg-primary transition-all" style="box-shadow:0 2px 8px rgba(163,101,254,.4)">
+        <span id="toggle-knob" class="toggle-pill absolute top-0.5 w-5 h-5 bg-white rounded-full shadow left-0.5"></span>
+      </button>
+      <span id="lbl-monthly" class="text-sm font-bold text-slate-400">Monthly <span class="text-green-600 text-xs font-black ml-1">Save 20%</span></span>
+    </div>
+
+    <!-- GPU Plan Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+      <!-- RTX 4090 -->
+      <div class="plan-card reveal rv1 flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(163,101,254,.1)">
+            <span class="material-symbols-outlined text-primary" style="font-size:20px">developer_board</span>
+          </div>
+          <div>
+            <div class="font-black text-slate-900 text-sm">RTX 4090</div>
+            <div class="text-[10px] text-slate-400 font-semibold">Consumer · 24 GB GDDR6X</div>
+          </div>
+        </div>
+        <div class="mb-1">
+          <span class="text-4xl font-black text-slate-900" id="price-4090"><span class="price-amount" data-inr="39">₹39</span></span>
+          <span class="text-slate-500 text-sm" id="unit-4090">/hr</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-5">Ideal for inference, rendering & fine-tuning small models</p>
+        <ul class="space-y-2.5 mb-6 flex-1 text-sm text-slate-600">
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>24 GB GDDR6X VRAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>16 vCPU Cores</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>64 GB RAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>500 GB NVMe SSD</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>10 Gbps Network</li>
+          <li class="flex items-center gap-2 opacity-40"><span class="material-symbols-outlined" style="font-size:16px">close</span>NVLink</li>
+        </ul>
+        <button class="w-full py-3 rounded-xl border-2 border-slate-200 font-bold text-sm hover:bg-primary hover:text-white hover:border-primary text-slate-700 transition-all duration-300" onclick="location.href='/contact.html'">Deploy Now</button>
+      </div>
+
+      <!-- L40S -->
+      <div class="plan-card reveal rv2 flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(59,130,246,.1)">
+            <span class="material-symbols-outlined text-blue-500" style="font-size:20px">memory</span>
+          </div>
+          <div>
+            <div class="font-black text-slate-900 text-sm">L40S Ada</div>
+            <div class="text-[10px] text-slate-400 font-semibold">Professional · 48 GB GDDR6</div>
+          </div>
+        </div>
+        <div class="mb-1">
+          <span class="text-4xl font-black text-slate-900" id="price-l40s"><span class="price-amount" data-inr="89">₹89</span></span>
+          <span class="text-slate-500 text-sm" id="unit-l40s">/hr</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-5">Best for LLM inference, video AI & large batch jobs</p>
+        <ul class="space-y-2.5 mb-6 flex-1 text-sm text-slate-600">
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-blue-500" style="font-size:16px">check</span>48 GB GDDR6 VRAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-blue-500" style="font-size:16px">check</span>32 vCPU Cores</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-blue-500" style="font-size:16px">check</span>128 GB RAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-blue-500" style="font-size:16px">check</span>1 TB NVMe SSD</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-blue-500" style="font-size:16px">check</span>25 Gbps Network</li>
+          <li class="flex items-center gap-2 opacity-40"><span class="material-symbols-outlined" style="font-size:16px">close</span>NVLink</li>
+        </ul>
+        <button class="w-full py-3 rounded-xl border-2 border-slate-200 font-bold text-sm hover:bg-primary hover:text-white hover:border-primary text-slate-700 transition-all duration-300" onclick="location.href='/contact.html'">Deploy Now</button>
+      </div>
+
+      <!-- A100 - Popular -->
+      <div class="plan-featured reveal rv3 relative flex flex-col rounded-2xl border-2 border-primary bg-white p-6 shadow-2xl" style="transform:scale(1.03)">
+        <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black uppercase px-5 py-1.5 rounded-full tracking-widest whitespace-nowrap animate-pulse">Best Value</div>
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(163,101,254,.15)">
+            <span class="material-symbols-outlined text-primary" style="font-size:20px">graphic_eq</span>
+          </div>
+          <div>
+            <div class="font-black text-slate-900 text-sm">A100 SXM4</div>
+            <div class="text-[10px] text-primary font-semibold">Enterprise · 80 GB HBM2e</div>
+          </div>
+        </div>
+        <div class="mb-1">
+          <span class="text-4xl font-black text-primary" id="price-a100"><span class="price-amount" data-inr="149">₹149</span></span>
+          <span class="text-slate-500 text-sm" id="unit-a100">/hr</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-5">Ideal for LLM training, fine-tuning & ML pipelines at scale</p>
+        <ul class="space-y-2.5 mb-6 flex-1 text-sm text-slate-600">
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>80 GB HBM2e VRAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>64 vCPU Cores</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>512 GB RAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>2 TB NVMe RAID</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>NVLink 600 GB/s</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary" style="font-size:16px">check</span>100 Gbps InfiniBand</li>
+        </ul>
+        <button class="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm hover:brightness-110 transition-all shadow-lg" style="box-shadow:0 4px 16px rgba(163,101,254,.35)" onclick="location.href='/contact.html'">Deploy Now</button>
+      </div>
+
+      <!-- H100 -->
+      <div class="plan-card reveal rv4 flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(16,185,129,.1)">
+            <span class="material-symbols-outlined text-emerald-500" style="font-size:20px">rocket_launch</span>
+          </div>
+          <div>
+            <div class="font-black text-slate-900 text-sm">H100 SXM5</div>
+            <div class="text-[10px] text-emerald-600 font-semibold">Flagship · 80 GB HBM3</div>
+          </div>
+        </div>
+        <div class="mb-1">
+          <span class="text-4xl font-black text-slate-900" id="price-h100"><span class="price-amount" data-inr="249">₹249</span></span>
+          <span class="text-slate-500 text-sm" id="unit-h100">/hr</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-5">Maximum AI throughput for frontier model training & serving</p>
+        <ul class="space-y-2.5 mb-6 flex-1 text-sm text-slate-600">
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>80 GB HBM3 VRAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>96 vCPU Cores</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>768 GB RAM</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>4 TB NVMe RAID</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>NVLink 900 GB/s</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500" style="font-size:16px">check</span>400 Gbps InfiniBand</li>
+        </ul>
+        <button class="w-full py-3 rounded-xl border-2 border-slate-200 font-bold text-sm hover:bg-primary hover:text-white hover:border-primary text-slate-700 transition-all duration-300" onclick="location.href='/contact.html'">Deploy Now</button>
+      </div>
+
+    </div>
+
+    <!-- Multi-GPU cluster note -->
+    <div class="mt-10 p-6 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col md:flex-row items-center justify-between gap-4 reveal rv5">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-white text-2xl">hub</span>
+        </div>
+        <div>
+          <h4 class="font-black text-slate-900">Need an 8× or 16× GPU Cluster?</h4>
+          <p class="text-sm text-slate-500 mt-0.5">We provision multi-node InfiniBand-connected GPU clusters for large-scale LLM training, distributed workloads & AI research.</p>
+        </div>
+      </div>
+      <a href="/contact.html"><button class="flex-shrink-0 bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm hover:brightness-110 transition-all whitespace-nowrap" style="box-shadow:0 4px 14px rgba(163,101,254,.35)">Get a Custom Quote →</button></a>
+    </div>
+
+    <p class="text-center text-sm text-slate-400 mt-8 reveal rv5">All plans include <span class="font-bold text-slate-600">free migration</span>, <span class="font-bold text-slate-600">99.99% uptime SLA</span>, and <span class="font-bold text-slate-600">24/7 support</span>. <a href="/contact.html" class="text-primary font-bold hover:underline">Need a custom GPU cluster? →</a></p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 4 — USE CASES
+══════════════════════════════════════════ -->
+<section class="py-24 bg-slate-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">What You Can Build</span>
+      <h2 class="text-3xl md:text-4xl font-black text-slate-900">GPU Servers Powering <span class="shimmer-text">Every AI Workload</span></h2>
+      <p class="text-slate-600 mt-3 max-w-2xl mx-auto">From training frontier models to running real-time inference — Crapplet GPU servers handle it all.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <div class="use-card reveal rv1 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-violet-600 text-2xl">psychology</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">LLM Training</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Train GPT-style, LLaMA or Mistral-based models from scratch using multi-GPU clusters with NVLink & InfiniBand.</p>
+        </div>
+      </div>
+
+      <div class="use-card reveal rv2 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-blue-600 text-2xl">tune</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">Fine-Tuning</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Fine-tune pre-trained models on your dataset using QLoRA, LoRA or full-parameter methods with fast NVMe throughput.</p>
+        </div>
+      </div>
+
+      <div class="use-card reveal rv3 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-amber-600 text-2xl">bolt</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">Real-Time Inference</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Serve LLMs, image generation models & embedding models with ultra-low latency using vLLM, TGI or Triton.</p>
+        </div>
+      </div>
+
+      <div class="use-card reveal rv1 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-green-600 text-2xl">image</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">Image & Video AI</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Run Stable Diffusion, SDXL, Sora-style video generation and ComfyUI pipelines at massive scale.</p>
+        </div>
+      </div>
+
+      <div class="use-card reveal rv2 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-cyan-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-cyan-600 text-2xl">science</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">Scientific Computing</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Accelerate simulations, drug discovery, genomics analysis and physics engines with CUDA-optimised workloads.</p>
+        </div>
+      </div>
+
+      <div class="use-card reveal rv3 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-start gap-4">
+        <div class="feat-icon-wrap w-12 h-12 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+          <span class="material-symbols-outlined text-rose-600 text-2xl">sports_esports</span>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-900 mb-1">Rendering & VFX</h4>
+          <p class="text-sm text-slate-500 leading-relaxed">Power Blender, Unreal Engine, OctaneRender and DaVinci Resolve workflows with multiple high-VRAM GPUs.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 5 — WHY CRAPPLET GPU + TERMINAL
+══════════════════════════════════════════ -->
+<section class="bg-white py-24">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+      <div class="flex flex-col gap-8 reveal-left">
+        <h2 class="text-4xl font-black tracking-tight leading-tight text-slate-900">
+          Why Choose <span class="shimmer-text">Crapplet GPU?</span>
+        </h2>
+        <div class="space-y-5">
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">location_on</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">Made in India, for India</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">All GPU servers are hosted in Tier-4 India data centres — your data never leaves the country. GST invoices generated automatically.</p>
+            </div>
+          </div>
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">currency_rupee</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">Pay Only for What You Use</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">Billed per minute with no minimum commitment. Spin up for an experiment, pay only for the runtime — no reserved instance lock-in.</p>
+            </div>
+          </div>
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">speed</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">Bare-Metal GPU Performance</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">Single-tenant GPU instances with PCIe Gen 4 NVMe, NVLink fabric, and dedicated InfiniBand interconnects — no shared hypervisor overhead.</p>
+            </div>
+          </div>
+          <div class="feat-card flex gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div class="feat-icon-wrap flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-primary">inventory_2</span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold mb-1 text-slate-900">Pre-Installed ML Stack</h4>
+              <p class="text-slate-600 text-sm leading-relaxed">CUDA, cuDNN, PyTorch, TensorFlow, Jupyter, Docker and conda pre-installed. Your environment is ready the moment you SSH in.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="reveal-right">
+        <div class="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xl">
+          <div class="bg-slate-900 rounded-xl p-8 font-mono text-sm leading-relaxed overflow-hidden">
+            <div class="flex gap-2 mb-5">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <span class="ml-3 text-slate-500 text-xs">crapplet — gpu-h100-in01</span>
+            </div>
+            <div class="space-y-2 text-blue-400">
+              <p><span class="text-slate-500">$</span> crapplet gpu deploy --type h100 --count 1</p>
+              <p class="text-white">Provisioning GPU instance...</p>
+              <p class="text-green-400">[OK] Instance gpu-h100-in01 is LIVE</p>
+              <p class="text-slate-600">————————————————————————————</p>
+              <p>GPU: <span class="text-white">NVIDIA H100 SXM5 (80 GB HBM3)</span></p>
+              <p>CUDA: <span class="text-white">12.4 · cuDNN 9.0</span></p>
+              <p>CPU: <span class="text-white">AMD EPYC 9654 (96 vCores)</span></p>
+              <p>RAM: <span class="text-white">768 GB DDR5</span></p>
+              <p>DISK: <span class="text-white">4 TB NVMe RAID-0</span></p>
+              <p>NET: <span class="text-white">400 Gbps InfiniBand HDR</span></p>
+              <p class="text-slate-600">————————————————————————————</p>
+              <p><span class="text-yellow-400">PyTorch: </span><span class="text-white">2.3.0+cu124 ✓</span></p>
+              <p><span class="text-yellow-400">TensorFlow: </span><span class="text-white">2.16.1 ✓</span></p>
+              <p><span class="text-yellow-400">Jupyter: </span><span class="text-white">Running at :8888 ✓</span></p>
+              <p class="text-slate-600">————————————————————————————</p>
+              <p><span class="text-primary">Rate: </span><span class="text-green-400"><span class="price-amount" data-inr="249">₹249</span>/hr · billed per minute</span></p>
+              <p class="text-primary cursor-blink">█</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 6 — GPU COMPARISON TABLE
+══════════════════════════════════════════ -->
+<section class="py-24 bg-slate-50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">GPU Comparison</span>
+      <h2 class="text-3xl md:text-4xl font-black text-slate-900">Pick the Right <span class="shimmer-text">GPU for Your Job</span></h2>
+    </div>
+    <div class="reveal rv2 rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100 bg-slate-50">
+              <th class="text-left px-6 py-4 font-black text-slate-700 text-xs uppercase tracking-wide">Specification</th>
+              <th class="px-6 py-4 font-black text-slate-700 text-xs uppercase tracking-wide text-center">RTX 4090</th>
+              <th class="px-6 py-4 font-black text-slate-700 text-xs uppercase tracking-wide text-center">L40S Ada</th>
+              <th class="px-6 py-4 font-black text-primary text-xs uppercase tracking-wide text-center bg-primary/5">A100 SXM4 ⭐</th>
+              <th class="px-6 py-4 font-black text-slate-700 text-xs uppercase tracking-wide text-center">H100 SXM5</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">VRAM</td>
+              <td class="px-6 py-4 text-center text-slate-600">24 GB GDDR6X</td>
+              <td class="px-6 py-4 text-center text-slate-600">48 GB GDDR6</td>
+              <td class="px-6 py-4 text-center font-bold text-primary bg-primary/5">80 GB HBM2e</td>
+              <td class="px-6 py-4 text-center text-slate-600">80 GB HBM3</td>
+            </tr>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">Memory Bandwidth</td>
+              <td class="px-6 py-4 text-center text-slate-600">1,008 GB/s</td>
+              <td class="px-6 py-4 text-center text-slate-600">864 GB/s</td>
+              <td class="px-6 py-4 text-center font-bold text-primary bg-primary/5">2,000 GB/s</td>
+              <td class="px-6 py-4 text-center text-slate-600">3,350 GB/s</td>
+            </tr>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">FP16 Performance</td>
+              <td class="px-6 py-4 text-center text-slate-600">165 TFLOPS</td>
+              <td class="px-6 py-4 text-center text-slate-600">362 TFLOPS</td>
+              <td class="px-6 py-4 text-center font-bold text-primary bg-primary/5">312 TFLOPS</td>
+              <td class="px-6 py-4 text-center text-slate-600">989 TFLOPS</td>
+            </tr>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">NVLink</td>
+              <td class="px-6 py-4 text-center text-slate-400">—</td>
+              <td class="px-6 py-4 text-center text-slate-400">—</td>
+              <td class="px-6 py-4 text-center bg-primary/5"><span class="material-symbols-outlined text-primary" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span></td>
+              <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-green-500" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span></td>
+            </tr>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">InfiniBand</td>
+              <td class="px-6 py-4 text-center text-slate-400">—</td>
+              <td class="px-6 py-4 text-center text-slate-400">—</td>
+              <td class="px-6 py-4 text-center bg-primary/5"><span class="material-symbols-outlined text-primary" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span></td>
+              <td class="px-6 py-4 text-center"><span class="material-symbols-outlined text-green-500" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span></td>
+            </tr>
+            <tr class="cmp-row border-b border-slate-50">
+              <td class="px-6 py-4 font-semibold text-slate-700">Best For</td>
+              <td class="px-6 py-4 text-center text-xs text-slate-500">Inference, Rendering</td>
+              <td class="px-6 py-4 text-center text-xs text-slate-500">LLM Inference, Video</td>
+              <td class="px-6 py-4 text-center text-xs font-bold text-primary bg-primary/5">Training, Fine-Tuning</td>
+              <td class="px-6 py-4 text-center text-xs text-slate-500">Frontier AI, Clusters</td>
+            </tr>
+            <tr class="cmp-row">
+              <td class="px-6 py-4 font-semibold text-slate-700">Price</td>
+              <td class="px-6 py-4 text-center font-black text-slate-900"><span class="price-amount" data-inr="39">₹39</span>/hr</td>
+              <td class="px-6 py-4 text-center font-black text-slate-900"><span class="price-amount" data-inr="89">₹89</span>/hr</td>
+              <td class="px-6 py-4 text-center font-black text-primary bg-primary/5"><span class="price-amount" data-inr="149">₹149</span>/hr</td>
+              <td class="px-6 py-4 text-center font-black text-slate-900"><span class="price-amount" data-inr="249">₹249</span>/hr</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 7 — SOFTWARE STACK
+══════════════════════════════════════════ -->
+<section class="py-24 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div class="reveal-right order-2 lg:order-1 space-y-5">
+        <h3 class="text-xl font-black text-slate-900 mb-2">Pre-Installed Software Stack</h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">🐍</span><span class="text-sm font-semibold text-slate-700">Python 3.11 + Conda / Pip</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">⚡</span><span class="text-sm font-semibold text-slate-700">PyTorch 2.3 + CUDA 12.4</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">🧠</span><span class="text-sm font-semibold text-slate-700">TensorFlow 2.16 + Keras</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">🐳</span><span class="text-sm font-semibold text-slate-700">Docker + NVIDIA Container Toolkit</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">📓</span><span class="text-sm font-semibold text-slate-700">JupyterLab + VS Code Server</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">🔁</span><span class="text-sm font-semibold text-slate-700">Hugging Face Transformers + Diffusers</span></div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">Included</span>
+          </div>
+          <div class="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200 shadow-sm hover:border-primary/40 transition-all">
+            <div class="flex items-center gap-3"><span class="text-lg">🚀</span><span class="text-sm font-semibold text-slate-700">vLLM + Triton Inference Server</span></div>
+            <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">Optional</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="order-1 lg:order-2 flex flex-col gap-8 reveal-left">
+        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider w-fit">Ready to Run</span>
+        <h2 class="text-4xl font-black tracking-tight leading-tight text-slate-900">
+          Your ML Stack, <span class="shimmer-text">Ready in 60 Seconds</span>
+        </h2>
+        <p class="text-slate-600 leading-relaxed">No more fighting with CUDA drivers, Python version conflicts or package dependencies. Every Crapplet GPU instance comes with a complete, battle-tested ML environment pre-configured and ready to use from the moment you connect.</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center hover:border-primary/30 hover:-translate-y-0.5 transition-all">
+            <div class="text-2xl font-black text-primary">CUDA 12.4</div>
+            <div class="text-xs text-slate-500 font-semibold mt-1">Latest Drivers</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center hover:border-primary/30 hover:-translate-y-0.5 transition-all">
+            <div class="text-2xl font-black text-slate-900">10+</div>
+            <div class="text-xs text-slate-500 font-semibold mt-1">Pre-installed Frameworks</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center hover:border-primary/30 hover:-translate-y-0.5 transition-all">
+            <div class="text-2xl font-black text-green-600">&lt;60s</div>
+            <div class="text-xs text-slate-500 font-semibold mt-1">To SSH Access</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center hover:border-primary/30 hover:-translate-y-0.5 transition-all">
+            <div class="text-2xl font-black text-slate-900">Any OS</div>
+            <div class="text-xs text-slate-500 font-semibold mt-1">Ubuntu / Debian / Custom</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+  SECTION 8 — FAQ
+══════════════════════════════════════════ -->
+<section class="py-24 bg-slate-50">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider mb-4">FAQ</span>
+      <h2 class="text-3xl font-black text-slate-900">Frequently Asked <span class="shimmer-text">Questions</span></h2>
+      <p class="text-slate-600 mt-3 max-w-xl mx-auto">Everything you need to know about GPU server hosting with Crapplet.</p>
+    </div>
+    <div class="space-y-3 reveal rv2">
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">How is billing calculated?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">GPU instances are billed per minute based on the hourly rate. You're only charged for the exact time your instance is running. There are no minimum commitment periods, no setup fees, and no hidden charges. Monthly plans offer a 20% discount over the hourly rate.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Can I use my own Docker image or custom OS?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Yes. You can bring your own Docker image via Docker Hub or a private registry. For OS-level customisation, we support Ubuntu, Debian, Rocky Linux, and custom ISOs. Contact our team for bare-metal ISO deployments on dedicated GPU nodes.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">How do I connect to my GPU instance?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Once deployed, you receive SSH credentials and a public IP instantly. You can connect via standard SSH, access JupyterLab at port 8888 in your browser, or use VS Code Remote SSH. All connections are secured with your SSH key pair.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Is my data stored when the instance is stopped?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">When you stop (not terminate) an instance, your NVMe storage is preserved and billed at a reduced storage-only rate. When you terminate an instance, data is deleted. We recommend using our persistent volume add-on for long-term dataset or model storage.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Can I run multi-GPU distributed training?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Absolutely. A100 and H100 plans support multi-GPU configurations (2×, 4×, 8× GPUs per node) connected via NVLink. For multi-node training, we provision InfiniBand-connected GPU clusters. Contact us for cluster pricing and setup assistance with PyTorch DDP, DeepSpeed, or Megatron-LM.</p>
+        </div>
+      </div>
+
+      <div class="faq-item border border-slate-200 rounded-xl overflow-hidden bg-white hover:border-primary/30 hover:shadow-sm">
+        <button class="faq-trigger w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors">
+          <span class="font-bold text-slate-800 text-sm">Do you support GST invoicing for Indian businesses?</span>
+          <div class="faq-icon w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-500" style="font-size:18px">add</span>
+          </div>
+        </button>
+        <div class="faq-content max-h-0 overflow-hidden bg-white">
+          <p class="p-5 pt-3 text-slate-500 text-sm leading-relaxed border-t border-slate-100">Yes. All Indian customers receive GST-compliant tax invoices automatically. We accept UPI, Net Banking, and Debit/Credit Cards (Visa, Mastercard, RuPay). International customers can pay via Visa, Mastercard, Amex, or PayPal.</p>
+        </div>
+      </div>
+
+    </div>
+    <div class="mt-10 text-center reveal rv3">
+      <p class="text-slate-500 text-sm mb-4">Still have questions?</p>
+      <a href="/contact.html" class="inline-flex items-center gap-2 bg-primary text-white px-7 py-3 rounded-xl font-bold text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all" style="box-shadow:0 4px 14px rgba(163,101,254,.35)">
+        <span class="material-symbols-outlined" style="font-size:16px">chat</span> Chat with an Expert
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA ══ -->
+<section class="cta-section py-16 border-t border-primary/10">
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 reveal rv1">
+    <h2 class="text-3xl font-bold text-slate-900">Start Training on <span class="shimmer-text">India's Fastest GPUs</span></h2>
+    <p class="text-slate-600 text-lg">Join 5,000+ AI teams running on Crapplet GPU infrastructure. Deploy in under a minute.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <input id="ctaEmail" class="glow-input w-full sm:w-80 px-4 py-3 rounded-xl border border-slate-300 bg-white text-sm" placeholder="Enter your email address" type="email"/>
+      <button id="ctaBtn" class="w-full sm:w-auto px-8 py-3 bg-primary text-white font-bold rounded-xl shadow-lg text-sm hover:brightness-110 hover:-translate-y-0.5 transition-all" style="box-shadow:0 6px 20px rgba(163,101,254,.35)">
+        Get Started Free
+      </button>
+    </div>
+    <p class="text-xs text-slate-400">No credit card required · <span class="price-amount" data-inr="500">₹500</span> free credits on signup · Billed per minute</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-0">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+    <div class="flex flex-col gap-4">
+      <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain" onerror="this.outerHTML='&lt;span style=&quot;font-weight:900;font-size:22px;color:#a365fe&quot;&gt;Crapplet&lt;/span&gt;'"/>
+      <div class="flex flex-col gap-1">
+        <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain" onerror="this.style.display='none'"/>
+        <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain" onerror="this.style.display='none'"/>
+      </div>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">GPU & Servers</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/gpu-server.html">GPU Server Hosting</a>
+        <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+        <a class="footer-link text-sm text-slate-500" href="/colocation.html">Colocation</a>
+      </nav>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">Company</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+      </nav>
+    </div>
+    <div class="flex flex-col gap-4">
+      <h4 class="text-slate-900 font-bold">Support</h4>
+      <nav class="flex flex-col gap-2">
+        <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+        <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+        <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+        <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+      </nav>
+    </div>
+  </div>
+  <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+    <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+    <div class="flex gap-6">
+      <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+      <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+      <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+    </div>
+  </div>
+</footer>
+
+</div>
+</div>
+
+<script>
+/* Cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => { glow.style.left = e.clientX+'px'; glow.style.top = e.clientY+'px'; });
+
+/* Header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+/* Scroll reveal */
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.plan-card,.plan-featured,.use-card,.feat-card').forEach(el => obs.observe(el));
+
+/* FAQ */
+document.querySelectorAll('.faq-trigger').forEach(trigger => {
+  trigger.addEventListener('click', () => {
+    const item = trigger.closest('.faq-item');
+    const content = trigger.nextElementSibling;
+    const icon = trigger.querySelector('.faq-icon .material-symbols-outlined');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => {
+      i.classList.remove('open');
+      i.querySelector('.faq-content').style.maxHeight = '0px';
+      const ic = i.querySelector('.faq-icon .material-symbols-outlined');
+      if (ic) { ic.textContent = 'add'; ic.style.color = '#64748b'; }
+      i.querySelector('.faq-icon').style.background = '#f1f5f9';
+    });
+    if (!isOpen) {
+      item.classList.add('open');
+      content.style.maxHeight = content.scrollHeight + 'px';
+      icon.textContent = 'close'; icon.style.color = '#fff';
+      trigger.querySelector('.faq-icon').style.background = '#a365fe';
+    }
+  });
+});
+
+/* CTA */
+const ctaBtn = document.getElementById('ctaBtn');
+const ctaEmail = document.getElementById('ctaEmail');
+ctaBtn.addEventListener('click', () => {
+  if (ctaEmail.value.trim()) {
+    ctaBtn.textContent = '✓ We\'ll be in touch!'; ctaBtn.style.background = '#16a34a';
+    setTimeout(() => { ctaBtn.textContent = 'Get Started Free'; ctaBtn.style.background = ''; ctaEmail.value = ''; }, 2500);
+  } else {
+    ctaEmail.style.borderColor = '#ef4444'; ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+    setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+  }
+});
+
+/* Billing toggle */
+let isMonthly = false;
+const prices = {
+  '4090': { h: '39', m: '22,320' },
+  'l40s': { h: '89', m: '51,000' },
+  'a100': { h: '149', m: '85,440' },
+  'h100': { h: '249', m: '1,42,848' }
+};
+function toggleBilling() {
+  isMonthly = !isMonthly;
+  const knob = document.getElementById('toggle-knob');
+  const lblH = document.getElementById('lbl-hourly');
+  const lblM = document.getElementById('lbl-monthly');
+  knob.style.left = isMonthly ? '26px' : '2px';
+  lblH.classList.toggle('text-slate-900', !isMonthly); lblH.classList.toggle('text-slate-400', isMonthly);
+  lblM.classList.toggle('text-slate-900', isMonthly); lblM.classList.toggle('text-slate-400', !isMonthly);
+  for (const [key, val] of Object.entries(prices)) {
+    const p = document.getElementById('price-' + key);
+    const u = document.getElementById('unit-' + key);
+    if (p) p.innerHTML = '<span class="price-amount" data-inr="' + (isMonthly ? val.m : val.h) + '"></span>';
+    if (u) u.textContent = isMonthly ? '/mo' : '/hr';
+  }
+  if (window.CrappletCurrency) window.CrappletCurrency.refresh();
+}
+
+/* ══ MOBILE DRAWER ══ */
+const toggle = document.getElementById('menu-toggle');
+const drawer = document.getElementById('mobile-drawer');
+const overlay = document.getElementById('mobile-overlay');
+const closeBtn = document.getElementById('close-drawer');
+function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+overlay.addEventListener('click', closeDrawer);
+if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+document.querySelectorAll('[id^="acc-"]').forEach(t => {
+  t.addEventListener('click', function () {
+    const sub = document.getElementById('sub-' + this.id.replace('acc-', ''));
+    if (!sub) return;
+    const isOpen = sub.classList.contains('open');
+    document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+    document.querySelectorAll('[id^="acc-"]').forEach(x => x.classList.remove('sub-open'));
+    if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+  });
+});
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>

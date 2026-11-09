@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Minecraft VPS Hosting - Low Latency Game Servers | Crapplet</title>
+<meta name="description" content="Deploy a Minecraft VPS server in under 60 seconds on ultra-fast Enterprise SSD hardware. Supports Vanilla, Paper, Spigot, Forge, Fabric, Bedrock &amp; BungeeCord with low-latency nodes across India, DDoS protection, and 24/7 support."/>
+<link rel="canonical" href="https://crapplet.co.in/minecraft-vps-hosting.html">
+<link rel="icon" href="/Crapplet_Icon.png"/>
+<link rel="apple-touch-icon" href="/Crapplet_Icon.png"/>
+
+<!-- Open Graph -->
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="Minecraft VPS Hosting - Low Latency Game Servers | Crapplet"/>
+<meta property="og:description" content="Deploy a Minecraft VPS server in under 60 seconds on ultra-fast Enterprise SSD hardware. Supports Vanilla, Paper, Spigot, Forge, Fabric, Bedrock &amp; BungeeCord with low-latency nodes across India."/>
+<meta property="og:image" content="https://crapplet.co.in/minecraft-hero-banner.gif"/>
+<meta property="og:url" content="https://crapplet.co.in/minecraft-vps-hosting.html"/>
+<meta property="og:site_name" content="Crapplet"/>
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Minecraft VPS Hosting - Low Latency Game Servers | Crapplet"/>
+<meta name="twitter:description" content="Deploy a Minecraft VPS server in under 60 seconds on ultra-fast Enterprise SSD hardware with low-latency nodes across India, DDoS protection, and 24/7 support."/>
+<meta name="twitter:image" content="https://crapplet.co.in/minecraft-hero-banner.gif"/>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script>
+tailwind.config = {
+  darkMode:"class",
+  theme:{
+    extend:{
+      colors:{
+        primary:"#a365fe",
+        "mc-green":"#5aac44",
+        "mc-dark":"#0d0d1a",
+        "mc-darker":"#070710",
+        "mc-dirt":"#8B6914",
+        "mc-grass":"#5aac44",
+        "mc-stone":"#9ca3af",
+        "mc-purple":"#a365fe",
+      },
+      fontFamily:{
+        pixel:["'Press Start 2P'","monospace"],
+        body:["Inter","sans-serif"],
+      },
+    },
+  },
+}
+</script>
+<style>
+  :root {
+    --primary: #a365fe;
+    --primary-glow: rgba(163,101,254,0.35);
+    --primary-faint: rgba(163,101,254,0.08);
+    --mc-dark: #0d0d1a;
+    --mc-darker: #070710;
+    --mc-green: #5aac44;
+    --mc-dirt: #8B6914;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', sans-serif; background: #ffffff; color: #1e293b; overflow-x: hidden; }
+  .plan-card, .plan-featured { scroll-margin-top: 90px; }
+
+  .pixel-border {
+    image-rendering: pixelated;
+    border: 3px solid var(--primary);
+    box-shadow: 0 0 0 3px var(--mc-darker), 0 0 0 6px var(--primary), inset 0 0 0 2px rgba(163,101,254,.3);
+  }
+  .pixel-border-green {
+    border: 3px solid var(--mc-green);
+    box-shadow: 0 0 0 3px var(--mc-darker), 0 0 0 6px var(--mc-green), inset 0 0 0 2px rgba(90,172,68,.3);
+  }
+
+  .block-texture {
+    background-image:
+      linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  #cursor-glow {
+    position:fixed; width:300px; height:300px; border-radius:50%;
+    background:radial-gradient(circle,rgba(163,101,254,.12) 0%,transparent 70%);
+    pointer-events:none; z-index:9999; transform:translate(-50%,-50%);
+    transition:left .08s ease,top .08s ease;
+  }
+
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(30px);} to{opacity:1;transform:translateY(0);} }
+  .load { animation: fadeInUp .7s cubic-bezier(.22,1,.36,1) both; }
+  .ld1{animation-delay:.05s} .ld2{animation-delay:.15s} .ld3{animation-delay:.25s}
+  .ld4{animation-delay:.35s} .ld5{animation-delay:.45s}
+
+  .reveal { opacity:0; transform:translateY(28px); transition: opacity .65s cubic-bezier(.22,1,.36,1), transform .65s cubic-bezier(.22,1,.36,1); }
+  .reveal.visible { opacity:1; transform:translateY(0); }
+  .rv1{transition-delay:.05s} .rv2{transition-delay:.15s} .rv3{transition-delay:.25s} .rv4{transition-delay:.35s} .rv5{transition-delay:.45s}
+  .reveal-left{opacity:0;transform:translateX(-32px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);}
+  .reveal-left.visible{opacity:1;transform:translateX(0);}
+  .reveal-right{opacity:0;transform:translateX(32px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1);}
+  .reveal-right.visible{opacity:1;transform:translateX(0);}
+
+  @keyframes pixelShimmer { 0%{background-position:-200% center;} 100%{background-position:200% center;} }
+  .shimmer-mc {
+    background: linear-gradient(90deg, #a365fe, #c084fc, #7c3aed, #a365fe);
+    background-size: 200% auto;
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; animation: pixelShimmer 3s linear infinite;
+  }
+
+  @keyframes floatBlock { 0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-12px) rotate(2deg);} }
+  .float-block { animation: floatBlock 4s ease-in-out infinite; }
+  .float-block-2 { animation: floatBlock 5s ease-in-out infinite; animation-delay: 1s; }
+  .float-block-3 { animation: floatBlock 6s ease-in-out infinite; animation-delay: 2s; }
+
+  @keyframes pulseBadge { 0%,100%{box-shadow:0 0 0 0 rgba(163,101,254,.5);} 50%{box-shadow:0 0 0 8px rgba(163,101,254,0);} }
+  .badge-pulse { animation: pulseBadge 2.5s ease-in-out infinite; }
+
+  @keyframes badgePop { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.06);} }
+  .popular-badge { animation: badgePop 2.5s ease-in-out infinite; }
+
+  @keyframes hpBlink { 0%,100%{opacity:1;} 50%{opacity:.6;} }
+  .hp-val { animation: hpBlink 1.5s ease-in-out infinite; }
+
+  @keyframes ticker { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  .ticker-inner { display:flex; width:max-content; animation: ticker 25s linear infinite; }
+  .ticker-inner:hover { animation-play-state:paused; }
+
+  .pixel-btn {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%);
+    border: 2px solid #a365fe;
+    box-shadow: 0 4px 0 #3b0764, 0 6px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2);
+    font-family: 'Press Start 2P', monospace; font-size: 10px; color: white;
+    padding: 14px 28px; cursor: pointer; text-transform: uppercase;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .pixel-btn:hover { background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%); }
+  .pixel-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #3b0764, 0 3px 0 rgba(0,0,0,.5); }
+  .pixel-btn-green {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 50%, #166534 100%);
+    border-color: #22c55e;
+    box-shadow: 0 4px 0 #052e16, 0 6px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .pixel-btn-green:hover { background: linear-gradient(180deg, #22c55e 0%, #16a34a 50%, #15803d 100%); }
+
+  /* ══════════ MC ITEM-TOOLTIP PRICING SYSTEM ══════════ */
+  :root{
+    --tier-dirt-a:#8bc34a;   --tier-dirt-b:#4e7a2b;   --tier-dirt-txt:#c8f0a0;
+    --tier-iron-a:#eef1f6;   --tier-iron-b:#9aa1ad;   --tier-iron-txt:#f4f6fa;
+    --tier-gold-a:#ffd95a;   --tier-gold-b:#c8930c;   --tier-gold-txt:#ffe9a3;
+    --tier-diamond-a:#7bf3ec; --tier-diamond-b:#12a6a0; --tier-diamond-txt:#a6fff8;
+    --tier-netherite-a:#5a4766; --tier-netherite-b:#1c1420; --tier-netherite-txt:#d8b4fe;
+    --tier-bedrock-a:#4a4a5c;  --tier-bedrock-b:#0f0f16;  --tier-bedrock-txt:#c4b5fd;
+  }
+
+  /* Hotbar tier selector */
+  .mc-hotbar { display:flex; justify-content:center; gap:8px; padding:14px 16px; border-radius:14px; background:#1a1a2e; border:3px solid #000; box-shadow:0 8px 0 rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.06); flex-wrap:wrap; }
+  .mc-hotbar-slot { position:relative; width:52px; height:52px; border-radius:6px; background:linear-gradient(180deg,#3a3a52,#26263a); border:2px solid #55557a; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .15s, border-color .2s, box-shadow .2s; }
+  .mc-hotbar-slot:hover { transform:translateY(-4px); border-color:var(--primary); box-shadow:0 6px 16px rgba(163,101,254,.4); }
+  .mc-hotbar-slot .mc-key { position:absolute; top:2px; left:4px; font-family:'Press Start 2P',monospace; font-size:7px; color:rgba(255,255,255,.55); }
+  .mc-hotbar-slot .mc-mini-block { width:26px; height:26px; border-radius:3px; }
+
+  /* Isometric-feel pixel block icon */
+  .mc-block-icon { width:60px; height:60px; margin:0 auto 16px; border-radius:6px; position:relative; background-size:10px 10px; background-position:0 0, 5px 5px;
+    background-image: linear-gradient(45deg, rgba(0,0,0,.08) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.08) 75%),
+                       linear-gradient(45deg, rgba(0,0,0,.08) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.08) 75%);
+    box-shadow: inset 7px 7px 0 rgba(255,255,255,.32), inset -7px -7px 0 rgba(0,0,0,.4), 0 10px 18px -4px rgba(0,0,0,.3);
+  }
+  [data-tier="dirt"]      .mc-block-icon, [data-tier="dirt"] .mc-mini-block      { background-color: var(--tier-dirt-a); }
+  [data-tier="iron"]      .mc-block-icon, [data-tier="iron"] .mc-mini-block      { background-color: var(--tier-iron-a); }
+  [data-tier="gold"]      .mc-block-icon, [data-tier="gold"] .mc-mini-block      { background-color: var(--tier-gold-a); }
+  [data-tier="diamond"]   .mc-block-icon, [data-tier="diamond"] .mc-mini-block   { background-color: var(--tier-diamond-a); }
+  [data-tier="netherite"] .mc-block-icon, [data-tier="netherite"] .mc-mini-block { background-color: var(--tier-netherite-a); }
+  [data-tier="bedrock"]   .mc-block-icon, [data-tier="bedrock"] .mc-mini-block   { background-color: var(--tier-bedrock-a); }
+
+  /* Card chrome — styled like an item tooltip */
+  .plan-card, .plan-featured {
+    position:relative; background:#12121f; border-radius:14px; overflow:hidden;
+    border:2px solid rgba(255,255,255,.08);
+    box-shadow: 0 4px 0 rgba(0,0,0,.45), 0 20px 40px -18px rgba(0,0,0,.6);
+    transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s, border-color .3s;
+  }
+  .plan-card::before, .plan-featured::before { content:''; position:absolute; top:0; left:0; right:0; height:5px; background:linear-gradient(90deg, var(--tier-a), var(--tier-b)); }
+  [data-tier="dirt"]      { --tier-a:var(--tier-dirt-a);      --tier-b:var(--tier-dirt-b); }
+  [data-tier="iron"]      { --tier-a:var(--tier-iron-a);      --tier-b:var(--tier-iron-b); }
+  [data-tier="gold"]      { --tier-a:var(--tier-gold-a);      --tier-b:var(--tier-gold-b); }
+  [data-tier="diamond"]   { --tier-a:var(--tier-diamond-a);   --tier-b:var(--tier-diamond-b); }
+  [data-tier="netherite"] { --tier-a:var(--tier-netherite-a); --tier-b:var(--tier-netherite-b); }
+  [data-tier="bedrock"]   { --tier-a:var(--tier-bedrock-a);   --tier-b:var(--tier-bedrock-b); }
+
+  .plan-card:hover { transform: translateY(-6px); border-color: rgba(255,255,255,.18); box-shadow: 0 4px 0 rgba(0,0,0,.45), 0 28px 56px -18px rgba(0,0,0,.7); }
+
+  .plan-featured { border-color: rgba(163,101,254,.5); box-shadow: 0 4px 0 rgba(0,0,0,.45), 0 0 0 1px rgba(163,101,254,.25), 0 28px 60px -16px rgba(163,101,254,.35); }
+  .plan-featured::after { content:''; position:absolute; inset:0; pointer-events:none; background:
+      radial-gradient(circle at 18% 20%, rgba(163,101,254,.35), transparent 40%),
+      radial-gradient(circle at 82% 78%, rgba(163,101,254,.22), transparent 45%); }
+  .plan-featured:hover { transform: translateY(-8px) scale(1.015); box-shadow: 0 4px 0 rgba(0,0,0,.45), 0 0 0 1px rgba(163,101,254,.4), 0 36px 72px -16px rgba(163,101,254,.5); }
+
+  /* Enchanted shimmer sweep for the featured card */
+  @keyframes enchantSweep { 0%{ transform:translateX(-120%) rotate(20deg);} 100%{ transform:translateX(220%) rotate(20deg);} }
+  .plan-featured .mc-shimmer { position:absolute; top:-40%; left:0; width:35%; height:180%; background:linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent); animation: enchantSweep 3.2s ease-in-out infinite; pointer-events:none; }
+
+  .mc-tier-label { font-family:'Press Start 2P',monospace; font-size:8px; letter-spacing:.5px; text-align:center; margin-bottom:10px; color: var(--tier-a); text-shadow:0 2px 0 rgba(0,0,0,.5); }
+  .mc-plan-name { font-size:22px; font-weight:900; color:#fff; text-align:center; margin-bottom:2px; }
+  .mc-plan-tagline { font-size:12px; color:#8b8ba3; text-align:center; margin-bottom:16px; }
+  .mc-price-row { display:flex; align-items:baseline; justify-content:center; gap:4px; margin-bottom:4px; }
+  .mc-price { font-size:34px; font-weight:900; color:#fff; }
+  .mc-price-sub { font-size:13px; color:#8b8ba3; font-weight:600; }
+
+  /* Capacity gauge (durability-bar styled, repurposed for player capacity) */
+  .mc-capacity { margin: 16px 0 18px; }
+  .mc-capacity-label { display:flex; justify-content:space-between; font-size:10px; color:#8b8ba3; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+  .mc-capacity-track { height:8px; border-radius:4px; background:#000; box-shadow:inset 0 0 0 2px rgba(255,255,255,.06); overflow:hidden; }
+  .mc-capacity-fill { height:100%; border-radius:4px; background:linear-gradient(90deg, var(--tier-b), var(--tier-a)); box-shadow:0 0 10px var(--tier-a); }
+
+  .mc-spec-list { list-style:none; padding:0; margin:0 0 20px; display:flex; flex-direction:column; gap:11px; }
+  .mc-spec-list li { display:flex; align-items:center; gap:10px; font-size:13.5px; color:#c5c5da; }
+  .mc-spec-list .mc-spec-icon { width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+
+  .mc-select-btn { width:100%; padding:13px; border-radius:9px; font-weight:800; font-size:13.5px; text-align:center; cursor:pointer; border:2px solid; transition:transform .15s, box-shadow .2s, filter .2s; }
+  .mc-select-btn.disabled { background:rgba(255,255,255,.04); color:#65657d; border-color:rgba(255,255,255,.08); cursor:not-allowed; }
+  .mc-select-btn.primary { background:linear-gradient(180deg, var(--tier-a), var(--tier-b)); color:#0d0d1a; border-color:rgba(255,255,255,.25); box-shadow:0 4px 0 rgba(0,0,0,.35); }
+  .mc-select-btn.primary:hover:not(.disabled) { transform:translateY(-2px); box-shadow:0 6px 0 rgba(0,0,0,.35), 0 10px 22px -6px var(--tier-a); }
+
+  @keyframes specIn { from{opacity:0;transform:translateX(-10px);} to{opacity:1;transform:translateX(0);} }
+  .mc-spec-list li { opacity:0; }
+  .plan-card.visible .mc-spec-list li, .plan-featured.visible .mc-spec-list li { animation: specIn .4s cubic-bezier(.22,1,.36,1) both; }
+  .mc-spec-list li:nth-child(1){animation-delay:.06s} .mc-spec-list li:nth-child(2){animation-delay:.12s}
+  .mc-spec-list li:nth-child(3){animation-delay:.18s} .mc-spec-list li:nth-child(4){animation-delay:.24s}
+  .mc-spec-list li:nth-child(5){animation-delay:.30s} .mc-spec-list li:nth-child(6){animation-delay:.36s}
+
+  .mc-ribbon { position:absolute; top:18px; right:-34px; transform:rotate(45deg); background:linear-gradient(180deg,#a365fe,#7c3aed); color:#fff; font-family:'Press Start 2P',monospace; font-size:7px; padding:6px 40px; box-shadow:0 3px 8px rgba(0,0,0,.4); z-index:2; }
+
+  .select-btn { transition: background .2s, color .2s, transform .15s, box-shadow .2s; }
+  .select-btn:hover { background: var(--primary); color: white; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(163,101,254,.5); }
+  .select-primary { transition: filter .2s, transform .15s, box-shadow .2s; }
+  .select-primary:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,101,254,.55); }
+
+  .feat-card {
+    background: #fafafa; border: 2px solid rgba(163,101,254,.15);
+    transition: transform .3s, box-shadow .3s, border-color .2s;
+  }
+  .feat-card:hover { transform: translateY(-5px); box-shadow: 0 16px 36px -8px rgba(163,101,254,.2); border-color: rgba(163,101,254,.4); }
+  .feat-icon { transition: transform .3s ease; }
+  .feat-card:hover .feat-icon { transform: scale(1.2) rotate(-5deg); }
+
+  .game-chip {
+    background: #fafafa; border: 2px solid rgba(163,101,254,.2);
+    transition: transform .25s, box-shadow .25s, border-color .2s;
+  }
+  .game-chip:hover { transform: translateY(-4px); box-shadow: 0 10px 28px -6px rgba(163,101,254,.3); border-color: var(--primary); }
+
+  @keyframes dotMoveMc { 0%{background-position:0 0;} 100%{background-position:16px 16px;} }
+  .cta-section {
+    background-image: radial-gradient(circle, rgba(163,101,254,.08) 1px, transparent 0);
+    background-size: 16px 16px; animation: dotMoveMc 4s linear infinite;
+  }
+
+  .glow-input { transition: box-shadow .3s, border-color .3s; background: #0f0f1e; border-color: rgba(163,101,254,.3); color: #e2e8f0; }
+  .glow-input::placeholder { color: #64748b; }
+  .glow-input:focus { outline:none; box-shadow: 0 0 0 3px rgba(163,101,254,.2); border-color: var(--primary); }
+
+  .footer-link { transition: color .2s, padding-left .2s; display:inline-block; }
+  .footer-link:hover { color: var(--primary); padding-left: 5px; }
+  .social-icon { transition: color .2s, transform .3s ease; }
+  .social-icon:hover { color: var(--primary); transform: rotate(15deg) scale(1.2); }
+
+  header { transition: box-shadow .3s, background .3s; }
+  header.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,.6); }
+
+  /* ══ NEW HEADER ══ */
+  #site-header {
+    background: linear-gradient(180deg, rgba(9,9,20,.92) 0%, rgba(12,12,26,.92) 100%);
+    border-bottom: 1px solid rgba(163,101,254,.18);
+    position: relative;
+  }
+  #site-header::after {
+    content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(163,101,254,.9), transparent);
+    opacity:.7;
+  }
+  .hdr-logo-wrap { position:relative; }
+  .hdr-logo-wrap::after {
+    content:''; position:absolute; inset:-8px; border-radius:10px;
+    background: radial-gradient(circle, rgba(163,101,254,.25), transparent 70%);
+    opacity:0; transition: opacity .3s; pointer-events:none; z-index:-1;
+  }
+  .hdr-logo-wrap:hover::after { opacity:1; }
+  .hdr-logo-wrap img { filter: drop-shadow(0 0 10px rgba(163,101,254,.35)); }
+
+  .hdr-link { color: rgba(226,232,240,.82); font-weight:600; font-size:13.5px; transition: color .2s; }
+  .hdr-link:hover { color: #fff; }
+  .hdr-link::after { background:#a365fe; }
+
+  .hdr-dropdown-btn { color: rgba(226,232,240,.82); font-weight:600; font-size:13.5px; transition: color .2s; }
+  .hdr-dropdown-btn:hover { color: #fff; }
+
+  .hdr-dropdown-menu {
+    background: #12121a;
+    border: 1px solid rgba(163,101,254,.25);
+    box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 24px 48px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(163,101,254,.08);
+  }
+  .hdr-dropdown-menu a { color: rgba(226,232,240,.75); }
+  .hdr-dropdown-menu a:hover { background: rgba(163,101,254,.1); color:#c084fc; }
+
+  .hdr-status-pill {
+    display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:8px;
+    background: rgba(163,101,254,.08); border:1px solid rgba(163,101,254,.25);
+    font-family:'Press Start 2P',monospace; font-size:7px; color:#c084fc; white-space:nowrap;
+  }
+
+  .hdr-support-link { color: rgba(226,232,240,.75); font-weight:600; font-size:13.5px; transition: color .2s; }
+  .hdr-support-link:hover { color:#fff; }
+
+  .hdr-login-btn {
+    font-family:'Press Start 2P',monospace; font-size:9px; color:#fff; text-transform:uppercase;
+    background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 55%, #5b21b6 100%);
+    border: 2px solid #a365fe;
+    box-shadow: 0 3px 0 #3b0764, 0 5px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2);
+    padding: 9px 18px; border-radius: 6px; cursor:pointer;
+    transition: transform .1s, box-shadow .1s, background .2s;
+  }
+  .hdr-login-btn:hover { background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 55%, #6d28d9 100%); }
+  .hdr-login-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #3b0764, 0 2px 0 rgba(0,0,0,.5); }
+
+  #menu-toggle .bar { background:#e2e8f0; }
+
+  .faq-item { background: #ffffff; border: 2px solid rgba(163,101,254,.15); border-radius: 12px; overflow: hidden; transition: border-color .25s, box-shadow .25s; }
+  .faq-item:hover { border-color: rgba(163,101,254,.4); box-shadow: 0 8px 24px -6px rgba(163,101,254,.15); }
+  .faq-item.open { border-color: var(--primary); box-shadow: 0 12px 32px -8px rgba(163,101,254,.25); }
+  .faq-trigger { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:18px 22px; background:transparent; border:none; cursor:pointer; text-align:left; transition:background .2s; }
+  .faq-trigger:hover { background: rgba(163,101,254,.04); }
+  .faq-item.open .faq-trigger { background: rgba(163,101,254,.06); }
+  .faq-icon { width:30px; height:30px; border-radius:6px; background:rgba(163,101,254,.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .2s, transform .3s; }
+  .faq-item.open .faq-icon { background: var(--primary); transform:rotate(45deg); }
+  .faq-sym { font-size:17px; color: #64748b; transition: color .2s; }
+  .faq-item.open .faq-sym { color:#fff; }
+  .faq-body { max-height:0; overflow:hidden; transition:max-height .4s cubic-bezier(.22,1,.36,1); }
+  .faq-body.open { max-height:280px; }
+  .faq-inner { padding:0 22px 18px; color:#64748b; font-size:14px; line-height:1.75; border-top:1px solid rgba(163,101,254,.1); }
+
+  /* ── MOBILE DRAWER ── */
+     /* Hamburger button */
+#menu-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    /* ❌ REMOVE display:flex from here */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    z-index: 60;
+}  
+   #menu-toggle .bar { display:block; height:2px; border-radius:2px; background:#1e293b; transition:all .35s cubic-bezier(.22,1,.36,1); }
+        #menu-toggle .bar-top    { width:22px; }
+        #menu-toggle .bar-mid    { width:16px; transform-origin:right center; }
+        #menu-toggle .bar-bot    { width:22px; }
+        #menu-toggle.open .bar-top { transform:translateY(7px) rotate(45deg); width:22px; }
+        #menu-toggle.open .bar-mid { width:0; opacity:0; }
+        #menu-toggle.open .bar-bot { transform:translateY(-7px) rotate(-45deg); width:22px; }
+#mobile-overlay { position:fixed; inset:0; background:rgba(5,3,15,.7); backdrop-filter:blur(6px); z-index:59; opacity:0; pointer-events:none; transition:opacity .35s ease; }
+  #mobile-overlay.show { opacity:1; pointer-events:all; }
+  #mobile-drawer { position:fixed; top:0; right:0; bottom:0; width:min(88vw,360px); background:linear-gradient(160deg,#0a0318 0%,#150530 40%,#080115 100%); z-index:60; overflow-y:auto; overflow-x:hidden; transform:translateX(100%); transition:transform .4s cubic-bezier(.22,1,.36,1); box-shadow:-20px 0 60px rgba(0,0,0,.8); }
+  #mobile-drawer.open { transform:translateX(0); }
+  #mobile-drawer::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); opacity:.15; }
+  #mobile-drawer::after { content:''; position:absolute; top:-80px; right:-60px; width:260px; height:260px; background:radial-gradient(circle,rgba(163,101,254,.35) 0%,transparent 70%); pointer-events:none; z-index:0; border-radius:50%; }
+  .drawer-glow-bottom { position:absolute; bottom:-60px; left:-40px; width:200px; height:200px; background:radial-gradient(circle,rgba(90,172,68,.2) 0%,transparent 70%); border-radius:50%; pointer-events:none; z-index:0; }
+  .drawer-inner { position:relative; z-index:1; }
+  .drawer-header { padding:20px 24px 16px; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; justify-content:space-between; }
+  .mob-nav-item { display:flex; align-items:center; gap:12px; padding:11px 24px; cursor:pointer; color:rgba(255,255,255,.8); font-size:14px; font-weight:600; transition:background .2s ease,color .2s ease,padding-left .2s ease; text-decoration:none; }
+  .mob-nav-item:hover { background:rgba(163,101,254,.12); color:#fff; padding-left:30px; }
+  .mob-nav-item .item-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:transform .25s ease; }
+  .mob-nav-item:hover .item-icon { transform:scale(1.15) rotate(-5deg); }
+  .mob-nav-item .item-arrow { margin-left:auto; opacity:.4; font-size:16px; transition:transform .2s,opacity .2s; }
+  .mob-nav-item:hover .item-arrow { transform:translateX(4px); opacity:.8; }
+  .mob-submenu { max-height:0; overflow:hidden; transition:max-height .35s cubic-bezier(.22,1,.36,1); background:rgba(0,0,0,.2); }
+  .mob-submenu.open { max-height:500px; }
+  .mob-submenu-item { display:flex; align-items:center; gap:10px; padding:10px 24px 10px 56px; color:rgba(255,255,255,.6); font-size:13px; font-weight:500; transition:color .2s,padding-left .2s; text-decoration:none; }
+  .mob-submenu-item:hover { color:#a365fe; padding-left:62px; }
+  .mob-submenu-item::before { content:''; width:5px; height:5px; border-radius:50%; background:#a365fe; opacity:.5; flex-shrink:0; transition:opacity .2s,transform .2s; }
+  .mob-submenu-item:hover::before { opacity:1; transform:scale(1.4); }
+  .mob-nav-item .chevron { transition:transform .3s ease; }
+  .mob-nav-item.sub-open .chevron { transform:rotate(180deg); }
+  .drawer-divider { height:1px; background:rgba(255,255,255,.06); margin:8px 24px; }
+  .drawer-cta { padding:20px 24px; display:flex; flex-direction:column; gap:10px; }
+  .drawer-btn-support { display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; border-radius:10px; border:1px solid rgba(163,101,254,.35); color:rgba(255,255,255,.85); font-weight:700; font-size:14px; transition:background .2s,border-color .2s; background:transparent; cursor:pointer; }
+  .drawer-btn-support:hover { background:rgba(163,101,254,.12); border-color:#a365fe; }
+  .drawer-btn-login { display:flex; align-items:center; justify-content:center; gap:8px; padding:13px; border-radius:10px; background:linear-gradient(135deg,#a365fe,#7c3aed); color:#fff; font-weight:800; font-size:14px; border:none; cursor:pointer; box-shadow:0 6px 24px rgba(163,101,254,.4); transition:filter .2s,transform .2s; }
+  .drawer-btn-login:hover { filter:brightness(1.1); transform:translateY(-2px); }
+  @keyframes slideInRight { from{opacity:0;transform:translateX(24px);} to{opacity:1;transform:translateX(0);} }
+  #mobile-drawer.open .drawer-inner>* { animation:slideInRight .4s cubic-bezier(.22,1,.36,1) both; }
+  #mobile-drawer.open .drawer-inner>*:nth-child(1){animation-delay:.05s} #mobile-drawer.open .drawer-inner>*:nth-child(2){animation-delay:.10s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(3){animation-delay:.15s} #mobile-drawer.open .drawer-inner>*:nth-child(4){animation-delay:.20s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(5){animation-delay:.25s} #mobile-drawer.open .drawer-inner>*:nth-child(6){animation-delay:.30s}
+  #mobile-drawer.open .drawer-inner>*:nth-child(7){animation-delay:.35s} #mobile-drawer.open .drawer-inner>*:nth-child(8){animation-delay:.40s}
+  .drawer-social { display:flex; gap:10px; padding:0 24px 24px; }
+  .drawer-social a { width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.5); font-size:14px; transition:background .2s,color .2s,transform .2s; text-decoration:none; }
+  .drawer-social a:hover { background:rgba(163,101,254,.25); color:#a365fe; transform:translateY(-3px); }
+  body.nav-open { overflow:hidden; }
+
+  @keyframes orb1{0%,100%{transform:translate(0,0);}50%{transform:translate(30px,-20px);}}
+  @keyframes orb2{0%,100%{transform:translate(0,0);}50%{transform:translate(-40px,30px);}}
+  .mc-orb1{animation:orb1 12s ease-in-out infinite;}
+  .mc-orb2{animation:orb2 16s ease-in-out infinite;}
+
+  @keyframes pingDot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.8);}}
+  .ping-dot{animation:pingDot 1.6s ease-in-out infinite;}
+
+  @keyframes barFill{from{width:0;}to{width:var(--w);}}
+  .stat-bar-fill{animation:barFill 1.5s cubic-bezier(.22,1,.36,1) .3s both;}
+
+  @keyframes xpGlow{0%,100%{box-shadow:0 0 6px rgba(163,101,254,.5);}50%{box-shadow:0 0 16px rgba(163,101,254,.9);}}
+  .xp-bar-inner{animation:xpGlow 2s ease-in-out infinite;}
+
+  nav a{position:relative;}
+  nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;background:#a365fe;border-radius:2px;transition:width .3s ease;}
+  nav a:hover::after{width:100%;}
+
+  .nav-dropdown:hover .dropdown-menu{display:block;}
+
+  .tab-pill{transition:background .25s,color .25s,box-shadow .25s;}
+  .tab-pill:hover:not(.active-tab){background:rgba(163,101,254,.15);color:#a365fe;}
+  .tab-pill.active-tab{background:#a365fe;color:#fff;box-shadow:0 4px 14px rgba(163,101,254,.5);}
+
+  /* ── Image showcase hover scale ── */
+  .mc-img-thumb img { transition: transform .5s cubic-bezier(.22,1,.36,1); }
+  .mc-img-thumb:hover img { transform: scale(1.12); }
+  .mc-img-main img { transition: transform .7s cubic-bezier(.22,1,.36,1); }
+  .mc-img-main:hover img { transform: scale(1.04); }
+
+  /* ══════════ NEW HORIZONTAL PLAN ROWS (image-inspired) ══════════ */
+  .hp-row {
+    display:flex; align-items:stretch; gap:0; border-radius:16px; overflow:hidden;
+    background:#12121f; border:1px solid rgba(163,101,254,.18);
+    box-shadow: 0 10px 30px -14px rgba(0,0,0,.6);
+    transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s, border-color .25s;
+  }
+  .hp-row:hover { transform: translateY(-4px); border-color: rgba(163,101,254,.5); box-shadow: 0 20px 44px -14px rgba(163,101,254,.35); }
+  .hp-name-box {
+    flex: 0 0 240px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    padding: 26px 20px; position:relative; overflow:hidden;
+  }
+  .hp-name-box::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.18), transparent 55%); pointer-events:none; }
+  .hp-name-box .hp-name { font-weight:900; font-size:22px; color:#fff; letter-spacing:.5px; text-shadow:0 2px 6px rgba(0,0,0,.35); }
+  .hp-name-box .hp-tag { font-size:12px; color:rgba(13,13,26,.75); font-weight:700; margin-top:4px; }
+  .hp-specs {
+    flex:1; display:grid; grid-template-columns: repeat(4, 1fr); align-items:center; padding: 0 24px;
+  }
+  .hp-spec-cell { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding: 18px 14px; border-left:1px solid rgba(255,255,255,.07); }
+  .hp-spec-cell:first-child { border-left:none; }
+  .hp-spec-top { display:flex; align-items:center; gap:6px; font-weight:800; font-size:15px; color:#fff; }
+  .hp-spec-label { font-size:11px; color:#8b8ba3; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+  .hp-cpu-note { font-size:10.5px; color:#8b8ba3; margin-top:1px; }
+  .hp-price-box { flex:0 0 210px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:20px; border-left:1px solid rgba(255,255,255,.07); }
+  .hp-price { font-size:24px; font-weight:900; color:#fff; }
+  .hp-price-sub { font-size:12px; color:#8b8ba3; font-weight:600; }
+  .hp-order-btn { width:100%; text-align:center; padding:10px 14px; border-radius:9px; font-weight:800; font-size:13px; color:#fff;
+    background: linear-gradient(180deg, #7c3aed, #5b21b6); border:1px solid rgba(163,101,254,.6);
+    box-shadow: 0 4px 0 rgba(59,7,100,.6); cursor:pointer; transition: transform .15s, box-shadow .15s, filter .15s; text-decoration:none; display:inline-block;
+  }
+  .hp-order-btn:hover { filter:brightness(1.12); transform:translateY(-2px); }
+  .hp-order-btn:active { transform:translateY(1px); box-shadow:0 1px 0 rgba(59,7,100,.6); }
+
+  @media (max-width: 900px) {
+    .hp-row { flex-direction:column; }
+    .hp-name-box { flex:none; padding:20px; }
+    .hp-specs { grid-template-columns: repeat(2,1fr); padding:8px 16px; }
+    .hp-spec-cell { border-left:none; border-top:1px solid rgba(255,255,255,.07); }
+    .hp-spec-cell:nth-child(1), .hp-spec-cell:nth-child(2) { border-top:none; }
+    .hp-price-box { flex:none; border-left:none; border-top:1px solid rgba(255,255,255,.07); padding:20px; }
+  }
+  /* ══════════ PROMO POPUP MODAL ══════════ */
+  #promo-overlay {
+    position:fixed; inset:0; z-index:200; background:rgba(4,3,12,.78); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    opacity:0; pointer-events:none; transition:opacity .35s ease;
+  }
+  #promo-overlay.show { opacity:1; pointer-events:all; }
+  #promo-modal {
+    position:relative; width:100%; max-width:480px; border-radius:20px; overflow:hidden;
+    background:linear-gradient(160deg,#150a2e 0%,#1a0f3d 45%,#0a0618 100%);
+    border:2px solid rgba(163,101,254,.4);
+    box-shadow: 0 4px 0 rgba(0,0,0,.5), 0 40px 90px -20px rgba(163,101,254,.5), 0 0 0 1px rgba(163,101,254,.15);
+    transform:scale(.92) translateY(14px); opacity:0; transition:transform .4s cubic-bezier(.22,1,.36,1), opacity .4s ease;
+    padding:38px 34px 30px;
+  }
+  #promo-overlay.show #promo-modal { transform:scale(1) translateY(0); opacity:1; }
+  #promo-modal::before {
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(163,101,254,.35), transparent 45%),
+      radial-gradient(circle at 90% 88%, rgba(90,172,68,.18), transparent 50%);
+  }
+  .promo-inner { position:relative; z-index:1; text-align:center; }
+  .promo-close {
+    position:absolute; top:16px; right:16px; width:34px; height:34px; border-radius:9px; z-index:2;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.15); color:rgba(255,255,255,.7);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .2s,color .2s,transform .2s;
+  }
+  .promo-close:hover { background:rgba(239,68,68,.25); color:#fff; transform:rotate(90deg); }
+  .promo-badge {
+    display:inline-flex; align-items:center; gap:7px; padding:7px 16px; border-radius:999px; margin-bottom:22px;
+    background:rgba(163,101,254,.15); border:1px solid rgba(163,101,254,.45); color:#c084fc;
+    font-family:'Press Start 2P',monospace; font-size:8px; letter-spacing:.5px;
+  }
+  .promo-badge .promo-dot { width:6px; height:6px; border-radius:50%; background:#c084fc; animation:pingDot 1.4s ease-in-out infinite; }
+  .promo-title { font-size:27px; font-weight:900; color:#fff; line-height:1.25; margin-bottom:12px; text-shadow:0 3px 0 rgba(0,0,0,.4); }
+  .promo-title .shimmer-mc { display:inline; }
+  .promo-sub { color:#a8a8c0; font-size:14px; line-height:1.65; max-width:380px; margin:0 auto 26px; }
+  .promo-code-row { display:flex; align-items:stretch; gap:10px; margin-bottom:22px; }
+  .promo-code-box {
+    flex:1; text-align:left; padding:12px 18px; border-radius:12px;
+    background:rgba(0,0,0,.35); border:2px dashed rgba(163,101,254,.55);
+  }
+  .promo-code-label { font-size:9px; color:#8b8ba3; font-weight:800; letter-spacing:.8px; text-transform:uppercase; margin-bottom:3px; }
+  .promo-code-value { font-family:'Press Start 2P',monospace; font-size:15px; letter-spacing:1px; background:linear-gradient(90deg,#a365fe,#5aac44); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .promo-copy-btn {
+    flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:0 20px; border-radius:12px; border:none; cursor:pointer;
+    background:linear-gradient(180deg,#7c3aed,#5b21b6); color:#fff; font-weight:800; font-size:13px;
+    box-shadow:0 4px 0 rgba(59,7,100,.6); transition:transform .15s,box-shadow .15s,filter .15s;
+  }
+  .promo-copy-btn:hover { filter:brightness(1.12); transform:translateY(-2px); }
+  .promo-copy-btn:active { transform:translateY(1px); box-shadow:0 1px 0 rgba(59,7,100,.6); }
+  .promo-countdown { display:flex; justify-content:center; gap:10px; margin-bottom:24px; }
+  .promo-count-cell { width:64px; padding:10px 0; border-radius:10px; background:rgba(255,255,255,.05); border:1px solid rgba(163,101,254,.25); }
+  .promo-count-num { font-family:'Press Start 2P',monospace; font-size:16px; color:#fff; }
+  .promo-count-label { font-size:8px; color:#8b8ba3; text-transform:uppercase; letter-spacing:.4px; margin-top:5px; font-weight:700; }
+  .promo-claim-btn {
+    display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:15px; border-radius:12px;
+    background:linear-gradient(90deg,#7c3aed,#a365fe,#5aac44); background-size:200% auto; color:#fff; font-weight:900; font-size:14.5px;
+    border:1px solid rgba(163,101,254,.6); cursor:pointer; text-decoration:none;
+    box-shadow:0 4px 0 rgba(0,0,0,.35), 0 14px 34px -12px rgba(163,101,254,.6);
+    transition:transform .15s, box-shadow .15s, background-position .4s;
+  }
+  .promo-claim-btn:hover { background-position:right center; transform:translateY(-2px); box-shadow:0 6px 0 rgba(0,0,0,.35), 0 18px 40px -12px rgba(163,101,254,.7); }
+  .promo-claim-btn:active { transform:translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.35); }
+  .promo-fine { font-size:11.5px; color:#6b6b85; margin-top:14px; }
+  .promo-copy-toast {
+    position:absolute; top:-10px; left:50%; transform:translateX(-50%) translateY(0); opacity:0; pointer-events:none;
+    background:#16a34a; color:#fff; font-size:11px; font-weight:800; padding:5px 12px; border-radius:7px;
+    transition:opacity .25s, transform .25s;
+  }
+  .promo-copy-toast.show { opacity:1; transform:translateX(-50%) translateY(-16px); }
+  @media (max-width:480px) {
+    #promo-modal { padding:30px 20px 24px; }
+    .promo-title { font-size:22px; }
+    .promo-count-cell { width:52px; padding:8px 0; }
+    .promo-code-row { flex-direction:column; }
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="/header.css">
+</head>
+<body>
+
+<div id="cursor-glow"></div>
+
+<!-- ══ PROMO POPUP ══ -->
+<div id="promo-overlay">
+  <div id="promo-modal">
+    <button class="promo-close" id="promo-close" aria-label="Close offer">
+      <span class="material-symbols-outlined" style="font-size:19px;">close</span>
+    </button>
+    <div class="promo-inner">
+      <span class="promo-badge"><span class="promo-dot"></span>⛏ LOOT DROP EVENT</span>
+      <h3 class="promo-title">Get <span class="shimmer-mc">25% OFF</span><br/>Your Minecraft Server</h3>
+      <p class="promo-sub">Use the code below at checkout to save on any Crapplet Minecraft VPS plan — Sapling to Ascendant, all tiers included.</p>
+
+      <div class="promo-code-row" style="position:relative;">
+        <span class="promo-copy-toast" id="promo-toast">Copied!</span>
+        <div class="promo-code-box">
+          <div class="promo-code-label">Your Code</div>
+          <div class="promo-code-value" id="promo-code">GAME25</div>
+        </div>
+        <button class="promo-copy-btn" id="promo-copy-btn">
+          <span class="material-symbols-outlined" style="font-size:16px;">content_copy</span>Copy
+        </button>
+      </div>
+
+      <div class="promo-countdown" id="promo-countdown">
+        <div class="promo-count-cell"><div class="promo-count-num" id="promo-days">--</div><div class="promo-count-label">Days</div></div>
+        <div class="promo-count-cell"><div class="promo-count-num" id="promo-hours">--</div><div class="promo-count-label">Hrs</div></div>
+        <div class="promo-count-cell"><div class="promo-count-num" id="promo-mins">--</div><div class="promo-count-label">Min</div></div>
+        <div class="promo-count-cell"><div class="promo-count-num" id="promo-secs">--</div><div class="promo-count-label">Sec</div></div>
+      </div>
+
+      <a href="#plans" id="promo-claim-btn" class="promo-claim-btn">⛏ Claim Offer <span class="material-symbols-outlined" style="font-size:17px;">arrow_forward</span></a>
+      <p class="promo-fine">Applies automatically at checkout · No credit card required to view plans</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MOBILE OVERLAY ══ -->
+<div id="mobile-overlay"></div>
+
+<!-- ══ MOBILE DRAWER ══ -->
+<div id="mobile-drawer">
+  <div class="drawer-glow-bottom"></div>
+  <div class="drawer-inner">
+    <div class="drawer-header">
+      <a href="/index.html">
+      <img alt="Crapplet" src="/Crapplet_logo.png"
+           class="h-10 w-auto"
+           onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
+      /></a>
+      <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
+        <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+      </button>
+    </div>
+    <a href="/index.html" class="mob-nav-item">
+      <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400" style="font-size:16px">home</span></span>
+      Home <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <div>
+      <div class="mob-nav-item" id="acc-hosting">
+        <span class="item-icon bg-blue-500/15"><span class="material-symbols-outlined text-blue-400" style="font-size:16px">dns</span></span>
+        Hosting <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-hosting">
+        <a href="/reseller-hosting.html" class="mob-submenu-item">Reseller Hosting</a>
+        <a href="/shared-hosting.html" class="mob-submenu-item">Shared Hosting</a>
+        <a href="/wordpress-hosting.html" class="mob-submenu-item">WordPress Hosting</a>
+      </div>
+    </div>
+    <div>
+      <div class="mob-nav-item" id="acc-vps">
+        <span class="item-icon" style="background:rgba(163,101,254,.15)"><span class="material-symbols-outlined" style="color:#a365fe;font-size:16px">cloud</span></span>
+        VPS &amp; Cloud <span class="material-symbols-outlined chevron" style="margin-left:auto;opacity:.5;font-size:18px">expand_more</span>
+      </div>
+      <div class="mob-submenu" id="sub-vps">
+        <a href="/linux-vps-hosting.html" class="mob-submenu-item">Linux VPS Hosting</a>
+        <a href="/windows-vps-hosting.html" class="mob-submenu-item">Windows VPS Hosting</a>
+        <a href="/forex-vps-hosting.html" class="mob-submenu-item">Forex VPS Hosting</a>
+        <a href="/n8n-vps-hosting.html" class="mob-submenu-item">N8N VPS Hosting</a>
+        <a href="/minecraft-vps-hosting.html" class="mob-submenu-item" style="color:#a365fe">⛏ Minecraft VPS Hosting</a>
+        <a href="/gold-vps-hosting.html" class="mob-submenu-item">Gold VPS Hosting</a>
+        <a href="/tally-on-cloud.html" class="mob-submenu-item">Tally on Cloud</a>
+      </div>
+    </div>
+    <a href="/dedicated-hosting.html" class="mob-nav-item">
+      <span class="item-icon bg-orange-500/15"><span class="material-symbols-outlined text-orange-400" style="font-size:16px">storage</span></span>
+      Dedicated Servers <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/gpu-server.html" class="mob-nav-item">
+                <span class="item-icon bg-purple-500/15"><span class="material-symbols-outlined text-purple-400"
+                        style="font-size:16px">gpu</span></span>
+                GPU Servers
+                <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+            </a>
+    <a href="/colocation.html" class="mob-nav-item">
+      <span class="item-icon bg-cyan-500/15"><span class="material-symbols-outlined text-cyan-400" style="font-size:16px">hub</span></span>
+      Colocation <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/domain.html" class="mob-nav-item">
+      <span class="item-icon bg-green-500/15"><span class="material-symbols-outlined text-green-400" style="font-size:16px">language</span></span>
+      Domain <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <a href="/ddos-protection.html" class="mob-nav-item">
+            <span class="item-icon bg-pink-500/15"><span class="material-symbols-outlined text-red-400" style="font-size:16px">security</span></span>
+            DDos Protection
+            <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+        </a>
+    <a href="/contact.html" class="mob-nav-item">
+      <span class="item-icon bg-pink-500/15"><span class="material-symbols-outlined text-pink-400" style="font-size:16px">mail</span></span>
+      Contact <span class="material-symbols-outlined item-arrow">arrow_forward_ios</span>
+    </a>
+    <div class="drawer-divider"></div>
+    <div class="mx-6 my-4 rounded-2xl bg-white/5 border border-white/8 p-4 flex justify-around text-center">
+      <div>
+        <div class="text-base font-black text-primary">99.99%</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Uptime</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-white">25+</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Regions</div>
+      </div>
+      <div class="w-px bg-white/10"></div>
+      <div>
+        <div class="text-base font-black text-green-400">2 min</div>
+        <div class="text-[10px] text-white/50 font-semibold mt-0.5">Support</div>
+      </div>
+    </div>
+    <!-- Currency toggle -->
+<div class="cur-row"><span class="cur-row-label">Currency</span><div class="cur-toggle cur-toggle--dark" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div></div>
+    <div class="drawer-cta">
+<a href="/contact.html" >
+      <button class="drawer-btn-support w-full">
+                <span class="material-symbols-outlined" style="font-size:18px">headset_mic</span>
+                Support
+            </button></a>      
+                  <a href="/clientarea/index.php?rp=/login"><button class="drawer-btn-login w-full"><span class="material-symbols-outlined" style="font-size:18px">login</span>Login</button></a>
+    </div>
+    <div class="drawer-social">
+      <a href="/index.html"><span class="material-symbols-outlined" style="font-size:16px">public</span></a>
+      <a href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined" style="font-size:16px">terminal</span></a>
+      <a href="/privacy-and-policy.html"><span class="material-symbols-outlined" style="font-size:16px">shield</span></a>
+      <span class="ml-auto text-[10px] text-white/25 font-semibold self-center">© 2026 Crapplet</span>
+    </div>
+  </div>
+</div>
+
+<div class="flex min-h-screen flex-col">
+
+<!-- ══ HEADER ══ -->
+<header id="site-header" class="chdr">
+  <div class="chdr-top"><div class="chdr-wrap">
+    <a class="chdr-offer" href="/linux-vps-hosting.html"><span class="chdr-pill">OFFER</span><span class="ms" style="font-size:17px">sell</span><span class="chdr-offer-text">15% off Linux &amp; Windows VPS &middot; code <b>SPECIAL15</b></span></a>
+    <div class="chdr-top-links">
+      <span><i class="chdr-dot"></i>99.99% Uptime SLA</span>
+      <a href="/contact.html"><span class="ms">support_agent</span>24/7 Support</a>
+      <a href="/contact.html"><span class="ms">mail</span>Contact</a>
+      <a href="/clientarea/index.php?rp=/login"><span class="ms">account_circle</span>Client Area</a>
+    </div>
+  </div></div>
+  <div class="chdr-main"><div class="chdr-wrap">
+    <div class="chdr-row1">
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <div class="chdr-search" role="search">
+        <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
+        <div class="chdr-results" role="listbox"></div>
+      </div>
+      <div class="chdr-actions">
+        <div class="cur-toggle" role="group" aria-label="Currency"><button type="button" class="cur-btn is-active" data-currency="INR" aria-pressed="true">&#8377; INR</button><button type="button" class="cur-btn" data-currency="USD" aria-pressed="false">$ USD</button></div>
+        <a class="chdr-support" href="/contact.html"><span class="ms">support_agent</span><span>Support</span></a>
+        <a class="chdr-cta" href="/clientarea/index.php?rp=/login">Login <span class="ms">arrow_forward</span></a>
+        <button id="menu-toggle" type="button" aria-label="Open menu"><span class="bar bar-top"></span><span class="bar bar-mid"></span><span class="bar bar-bot"></span></button>
+      </div>
+    </div>
+    <div class="chdr-row2">
+      <span class="chdr-badge chdr-badge--left"><span class="ms">verified</span>99.99% Uptime SLA</span>
+      <nav class="chdr-nav" aria-label="Main"><div class="chdr-item"><a class="chdr-link" href="/index.html"><span class="ms">home</span>Home</a></div><div class="chdr-item" data-menu="hosting"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">cloud</span>Hosting<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">rocket_launch</span></span><h4>Launch your site fast</h4><p>Free SSL and NVMe storage on every hosting plan.</p><div class="chdr-chips"><span>Free SSL</span><span>NVMe storage</span></div><a class="chdr-explore" href="/shared-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:1"><a class="chdr-li" href="/shared-hosting.html"><span class="chdr-li-icon"><span class="ms">cloud</span></span><span><b>Shared Hosting</b><small>Affordable hosting for websites &amp; blogs</small></span></a><a class="chdr-li" href="/reseller-hosting.html"><span class="chdr-li-icon"><span class="ms">storefront</span></span><span><b>Reseller Hosting</b><small>Start your own hosting business</small></span></a><a class="chdr-li" href="/wordpress-hosting.html"><span class="chdr-li-icon"><span class="ms">web</span></span><span><b>WordPress Hosting</b><small>Fast, secure hosting tuned for WordPress</small></span></a></div></div></div><div class="chdr-item" data-menu="vps"><button type="button" class="chdr-link is-current" aria-expanded="false" aria-haspopup="true"><span class="ms">dns</span>VPS &amp; Cloud<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">sell</span></span><h4>15% off Linux &amp; Windows VPS</h4><p>Use code <b>SPECIAL15</b> at checkout.</p><div class="chdr-chips"><span>Root / RDP access</span><span>Instant setup</span></div><a class="chdr-explore" href="/linux-vps-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/linux-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">terminal</span></span><span><b>Linux VPS<span class="chdr-tag">15% OFF</span></b><small>Full root access, SSD &amp; instant setup</small></span></a><a class="chdr-li" href="/windows-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">desktop_windows</span></span><span><b>Windows VPS<span class="chdr-tag">15% OFF</span></b><small>Full RDP access with SSD storage</small></span></a><a class="chdr-li" href="/forex-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">candlestick_chart</span></span><span><b>Forex VPS</b><small>Low-latency VPS for trading platforms</small></span></a><a class="chdr-li" href="/n8n-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">account_tree</span></span><span><b>n8n VPS</b><small>Self-host n8n with unlimited workflows</small></span></a><a class="chdr-li is-current" href="/minecraft-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">sports_esports</span></span><span><b>Minecraft VPS</b><small>Game servers live in under 60 seconds</small></span></a><a class="chdr-li" href="/gold-vps-hosting.html"><span class="chdr-li-icon"><span class="ms">workspace_premium</span></span><span><b>Gold VPS</b><small>Premium high-performance VPS plans</small></span></a><a class="chdr-li" href="/tally-on-cloud.html"><span class="chdr-li-icon"><span class="ms">calculate</span></span><span><b>Tally on Cloud</b><small>Access Tally securely from anywhere</small></span></a></div></div></div><div class="chdr-item" data-menu="servers"><button type="button" class="chdr-link" aria-expanded="false" aria-haspopup="true"><span class="ms">storage</span>Servers<span class="ms chev">expand_more</span></button><div class="chdr-mega" role="menu"><div class="chdr-feature"><span class="chdr-ficon"><span class="ms">apartment</span></span><h4>Enterprise infrastructure</h4><p>Dedicated, GPU and colocation from our Tier III data centre in Gwalior.</p><div class="chdr-chips"><span>DDoS protected</span><span>24/7 support</span></div><a class="chdr-explore" href="/dedicated-hosting.html">Explore <span class="ms">arrow_forward</span></a></div><div class="chdr-list" style="--cols:2"><a class="chdr-li" href="/dedicated-hosting.html"><span class="chdr-li-icon"><span class="ms">dns</span></span><span><b>Dedicated Servers</b><small>Bare-metal servers, fully yours</small></span></a><a class="chdr-li" href="/gpu-server.html"><span class="chdr-li-icon"><span class="ms">memory</span></span><span><b>GPU Servers</b><small>NVIDIA H100, A100, L40S &amp; RTX GPUs</small></span></a><a class="chdr-li" href="/colocation.html"><span class="chdr-li-icon"><span class="ms">hub</span></span><span><b>Colocation</b><small>Tier III data centre in Gwalior</small></span></a><a class="chdr-li" href="/ddos-protection.html"><span class="chdr-li-icon"><span class="ms">security</span></span><span><b>DDoS Protection</b><small>Always-on protection for your services</small></span></a></div></div></div><div class="chdr-item"><a class="chdr-link" href="/domain.html"><span class="ms">language</span>Domains</a></div></nav>
+      <span class="chdr-badge chdr-badge--right"><span class="ms">location_on</span>Tier III data centre, Gwalior</span>
+    </div>
+  </div>
+  <div class="chdr-mpanel"><a href="/index.html">Home</a><a href="/shared-hosting.html">Shared Hosting</a><a href="/reseller-hosting.html">Reseller Hosting</a><a href="/wordpress-hosting.html">WordPress Hosting</a><a href="/linux-vps-hosting.html">Linux VPS</a><a href="/windows-vps-hosting.html">Windows VPS</a><a href="/forex-vps-hosting.html">Forex VPS</a><a href="/n8n-vps-hosting.html">n8n VPS</a><a href="/minecraft-vps-hosting.html">Minecraft VPS</a><a href="/gold-vps-hosting.html">Gold VPS</a><a href="/tally-on-cloud.html">Tally on Cloud</a><a href="/dedicated-hosting.html">Dedicated Servers</a><a href="/gpu-server.html">GPU Servers</a><a href="/colocation.html">Colocation</a><a href="/ddos-protection.html">DDoS Protection</a><a href="/domain.html">Domains</a><a href="/contact.html">Contact</a><a href="/clientarea/index.php?rp=/login">Login</a></div>
+  </div>
+</header>
+
+<main class="flex-grow">
+
+<!-- ══ HERO ══ -->
+<section class="relative min-h-[90vh] flex items-center overflow-hidden block-texture" style="background:linear-gradient(180deg,#07071a 0%,#0d0d2e 60%,#0a1a0a 100%)">
+
+  <div class="absolute inset-0 pointer-events-none overflow-hidden">
+    <div class="mc-orb1 absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl" style="background:rgba(163,101,254,.12)"></div>
+    <div class="mc-orb2 absolute bottom-20 right-10 w-64 h-64 rounded-full blur-3xl" style="background:rgba(90,172,68,.08)"></div>
+    <div class="float-block absolute top-[15%] right-[8%] w-12 h-12 rounded-sm opacity-60" style="background:linear-gradient(135deg,#7c3aed,#a365fe);border:2px solid rgba(163,101,254,.5);box-shadow:0 0 20px rgba(163,101,254,.4)"></div>
+    <div class="float-block-2 absolute top-[35%] left-[5%] w-8 h-8 rounded-sm opacity-40" style="background:linear-gradient(135deg,#5aac44,#3a7a2a);border:2px solid rgba(90,172,68,.5)"></div>
+    <div class="float-block-3 absolute bottom-[25%] right-[15%] w-10 h-10 rounded-sm opacity-30" style="background:linear-gradient(135deg,#f59e0b,#b45309);border:2px solid rgba(245,158,11,.5)"></div>
+    <div class="float-block absolute top-[65%] left-[12%] w-6 h-6 rounded-sm opacity-25" style="background:linear-gradient(135deg,#06b6d4,#0891b2);border:2px solid rgba(6,182,212,.5)"></div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-16">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+
+      <!-- Left Text -->
+      <div class="space-y-2 text-center lg:text-left">
+        <div class="load ld1 inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider badge-pulse" style="background:rgba(163,101,254,.15);border:2px solid rgba(163,101,254,.4);color:#c084fc;font-family:'Press Start 2P',monospace;font-size:8px">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-400"></span>
+          </span>
+          ⛏ Game Server Online
+        </div>
+
+        <h1 class="load ld2 font-pixel text-2xl lg:text-3xl leading-snug" style="color:#fff;text-shadow:0 0 30px rgba(192, 150, 255, 0.391),0 4px 0 rgba(55, 55, 55, 0.8)">
+          <span class="shimmer-mc">Minecraft</span><br/>
+          <span style="color:#e2e8f0">VPS Hosting.</span>
+          <span class="block mt-3 normal-case tracking-normal text-slate-400" style="font-family:'Inter',sans-serif;font-size:15px;font-weight:600;">Low-Latency Game Server Hosting, Built for Minecraft.</span>
+        </h1>
+
+        <p class="load ld3 text-slate-400 max-w-xl text-base leading-relaxed" style="font-family:'Inter',sans-serif">
+          Launch your Minecraft server in under 60 seconds on ultra-fast Enterprise SSD VPS. Supports Vanilla, Spigot, Paper, Forge, Fabric, Bedrock &amp; BungeeCord. Low-latency nodes across India — your players will notice the difference.
+        </p>
+
+        <div class="load ld3 inline-flex items-center gap-4 px-4 py-2 rounded-lg text-xs" style="background:rgba(255,255,255,.04);border:1px solid rgba(163,101,254,.2);font-family:'Press Start 2P',monospace;font-size:8px">
+          <span class="flex items-center gap-2 text-green-400"><span class="ping-dot inline-block w-2 h-2 rounded-full bg-green-400"></span>ONLINE</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-purple-300">play.crapplet.gg</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-slate-400">47/100 <span class="text-purple-400">players</span></span>
+        </div>
+
+        <div class="load ld4 flex flex-wrap justify-center lg:justify-start gap-4">
+          <button onclick="document.getElementById('plans').scrollIntoView({behavior:'smooth'})" class="pixel-btn text-xs">⛏ Get Your Server</button>
+          <button class="pixel-btn pixel-btn-green text-xs" onclick="location.href='#plans'">🎮 See Server Types</button>
+        </div>
+
+        <div class="load ld5 flex flex-wrap justify-center lg:justify-start gap-2 pt-10">
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(163,101,254,.15);border:1px solid rgba(163,101,254,.3);color:#c084fc">⚡ Paper MC</span>
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(90,172,68,.12);border:1px solid rgba(90,172,68,.3);color:#86efac">🌿 Vanilla</span>
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fcd34d">🔧 Forge</span>
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:#67e8f9">🌐 BungeeCord</span>
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5">🎮 Bedrock</span>
+          <span class="px-2 py-1 rounded text-xs font-bold" style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:#d8b4fe">🧵 Fabric</span>
+        </div>
+      </div>
+
+      <!-- Right — Minecraft Image Showcase (REPLACES terminal card) -->
+      <div class="load ld5">
+        <div class="relative">
+          <!-- Floating pixel blocks -->
+          <div class="float-block absolute -top-6 -right-4 w-10 h-10 rounded-sm z-20" style="background:linear-gradient(135deg,#a365fe,#7c3aed);border:2px solid rgba(163,101,254,.6);box-shadow:0 0 20px rgba(163,101,254,.5)"></div>
+          <div class="float-block-2 absolute -bottom-4 -left-5 w-8 h-8 rounded-sm z-20" style="background:linear-gradient(135deg,#5aac44,#3a7a2a);border:2px solid rgba(90,172,68,.6);box-shadow:0 0 16px rgba(90,172,68,.4)"></div>
+          <div class="float-block-3 absolute top-1/2 -right-3 w-6 h-6 rounded-sm z-20" style="background:linear-gradient(135deg,#f59e0b,#b45309);border:2px solid rgba(245,158,11,.5);box-shadow:0 0 12px rgba(245,158,11,.4)"></div>
+
+          <div class="rounded-xl overflow-hidden" style="background:#080812;border:2px solid rgba(163,101,254,.3);box-shadow:0 0 60px rgba(163,101,254,.2),0 0 120px rgba(163,101,254,.08)">
+
+            <!-- Card title bar -->
+            <div class="flex items-center gap-2 px-4 py-3 border-b" style="background:rgba(163,101,254,.12);border-color:rgba(163,101,254,.2)">
+              <div class="flex gap-1.5">
+                <div class="w-3 h-3 rounded-full bg-red-500 opacity-80"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-400 opacity-80"></div>
+                <div class="w-3 h-3 rounded-full bg-green-400 opacity-80"></div>
+              </div>
+              <span class="font-pixel text-xs ml-2" style="color:#a365fe;font-size:8px">🎮 YOUR MINECRAFT WORLD</span>
+              <span class="ml-auto font-pixel text-xs" style="color:#22c55e;font-size:7px">● LIVE</span>
+            </div>
+
+            <!-- Main featured screenshot -->
+            <div class="mc-img-main relative overflow-hidden" style="height:230px;background:linear-gradient(135deg,#0a1f0a 0%,#1a3d1a 40%,#0d2a2a 100%)">
+              <img
+                src="/minecraft-hero-banner.gif"
+                alt="Minecraft World"
+                class="w-full h-full object-cover"
+                onerror="this.style.display='none'"
+              />
+              <!-- Overlay -->
+              <div class="absolute inset-0 pointer-events-none" style="background:linear-gradient(to top,rgba(8,8,18,.95) 0%,rgba(8,8,18,.1) 45%,transparent 100%)"></div>
+              <!-- Fallback decorative when image missing -->
+              <div class="absolute inset-0 flex items-center justify-center pointer-events-none" id="mc-fallback" style="display:none!important">
+                <div class="text-center space-y-3">
+                  <div class="text-6xl">⛏</div>
+                  <div class="font-pixel text-purple-400" style="font-size:10px">MINECRAFT WORLD</div>
+                </div>
+              </div>
+              <!-- Live badge -->
+              <div class="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-md z-10" style="background:rgba(0,0,0,.75);border:1px solid rgba(163,101,254,.45);backdrop-filter:blur(6px)">
+                <span class="ping-dot w-2 h-2 rounded-full bg-green-400 inline-block"></span>
+                <span class="font-pixel text-xs text-green-400" style="font-size:7px">SERVER LIVE</span>
+              </div>
+              <!-- Version badge -->
+              <div class="absolute top-3 left-3 px-2.5 py-1 rounded-md z-10" style="background:rgba(0,0,0,.75);border:1px solid rgba(90,172,68,.4);backdrop-filter:blur(6px)">
+                <span class="font-pixel text-xs" style="font-size:7px;color:#86efac">⛏ MC 1.21.4</span>
+              </div>
+              <!-- Server info at bottom -->
+              <div class="absolute bottom-0 left-0 right-0 px-4 py-3 z-10">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="font-pixel text-white mb-0.5" style="font-size:9px">play.crapplet.gg</div>
+                    <div class="text-slate-400 text-xs">Paper MC · Survival SMP</div>
+                  </div>
+                  <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style="background:rgba(163,101,254,.2);border:1px solid rgba(163,101,254,.4)">
+                    <span class="text-purple-300 font-pixel" style="font-size:8px">47/100 👤</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 Thumbnail screenshots -->
+            <div class="grid grid-cols-3 gap-1.5 p-1.5" style="background:#060610">
+
+              <!-- Thumb 1: Landscape / Survival -->
+              <div class="mc-img-thumb relative overflow-hidden rounded-lg cursor-pointer group" style="height:90px;background:linear-gradient(135deg,#0d1f0d,#1a3a1a)">
+                <img
+                  src="/minecraft-game1.jpg"
+                  alt="Minecraft Landscape"
+                  class="w-full h-full object-cover"
+                  onerror="this.style.display='none'"
+                />
+                <div class="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100" style="background:rgba(163,101,254,.28)"></div>
+                <div class="absolute inset-0 pointer-events-none" style="background:linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 55%)"></div>
+                <!-- Fallback icon -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
+                  <span style="font-size:24px">🌲</span>
+                </div>
+                <div class="absolute bottom-1.5 left-2 font-pixel text-white" style="font-size:6px;text-shadow:0 1px 4px rgba(0,0,0,1)">🌲 Survival</div>
+              </div>
+
+              <!-- Thumb 2: Underground / Mining -->
+              <div class="mc-img-thumb relative overflow-hidden rounded-lg cursor-pointer group" style="height:90px;background:linear-gradient(135deg,#1a0a30,#0d0820)">
+                <img
+                  src="/minecraft-game2.jpg"
+                  alt="Minecraft Cave"
+                  class="w-full h-full object-cover"
+                  onerror="this.style.display='none'"
+                />
+                <div class="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100" style="background:rgba(163,101,254,.28)"></div>
+                <div class="absolute inset-0 pointer-events-none" style="background:linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 55%)"></div>
+                <div class="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
+                  <span style="font-size:24px">⛏</span>
+                </div>
+                <div class="absolute bottom-1.5 left-2 font-pixel text-white" style="font-size:6px;text-shadow:0 1px 4px rgba(0,0,0,1)">⛏ Mining</div>
+              </div>
+
+              <!-- Thumb 3: Builds / City -->
+              <div class="mc-img-thumb relative overflow-hidden rounded-lg cursor-pointer group" style="height:90px;background:linear-gradient(135deg,#0d1530,#1a2040)">
+                <img
+                  src="/minecraft-game3.jpg"
+                  alt="Minecraft Build"
+                  class="w-full h-full object-cover"
+                  onerror="this.style.display='none'"
+                />
+                <div class="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100" style="background:rgba(163,101,254,.28)"></div>
+                <div class="absolute inset-0 pointer-events-none" style="background:linear-gradient(to top,rgba(0,0,0,.8) 0%,transparent 55%)"></div>
+                <div class="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
+                  <span style="font-size:24px">🏰</span>
+                </div>
+                <div class="absolute bottom-1.5 left-2 font-pixel text-white" style="font-size:6px;text-shadow:0 1px 4px rgba(0,0,0,1)">🏰 Builds</div>
+              </div>
+
+            </div>
+
+            <!-- Bottom status bar -->
+            <div class="px-4 py-2.5 flex flex-wrap items-center gap-3 border-t" style="background:rgba(163,101,254,.06);border-color:rgba(163,101,254,.15)">
+              <span class="flex items-center gap-1.5 font-pixel text-xs" style="font-size:8px;color:#22c55e">
+                <span class="ping-dot w-2 h-2 rounded-full bg-green-400 inline-block"></span> SERVER ONLINE
+              </span>
+              <span class="text-slate-600">·</span>
+              <span class="font-pixel text-purple-400" style="font-size:7px">UPTIME: 99.99%</span>
+              <span class="text-slate-600">·</span>
+              <span class="font-pixel text-slate-500" style="font-size:7px">PING: &lt;5ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Grass ground strip -->
+  <div class="absolute bottom-0 left-0 right-0 h-6" style="background:linear-gradient(180deg,#3a7a2a 0%,#2a5a1a 100%);box-shadow:0 -4px 0 rgba(90,172,68,.3)">
+    <div class="h-full" style="background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0,rgba(255,255,255,.05) 1px,transparent 1px,transparent 16px)"></div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="border-y py-3 overflow-hidden" style="background:#f5f0ff;border-color:rgba(163,101,254,.2)">
+  <div class="ticker-inner text-xs font-bold uppercase tracking-widest" style="color:#7c3aed;font-family:'Press Start 2P',monospace;font-size:8px">
+    <span class="mx-8">⛏ Enterprise SSD Storage</span>
+    <span class="mx-8">🎮 Paper · Spigot · Forge · Fabric</span>
+    <span class="mx-8">⚡ &lt;5ms Ping</span>
+    <span class="mx-8">🛡 DDoS Protection</span>
+    <span class="mx-8">🔧 Full Root Access</span>
+    <span class="mx-8">🌐 Free Subdomain</span>
+    <span class="mx-8">📦 1-Click Modpack Install</span>
+    <span class="mx-8">⛏ Enterprise SSD Storage</span>
+    <span class="mx-8">🎮 Paper · Spigot · Forge · Fabric</span>
+    <span class="mx-8">⚡ &lt;5ms Ping</span>
+    <span class="mx-8">🛡 DDoS Protection</span>
+    <span class="mx-8">🔧 Full Root Access</span>
+    <span class="mx-8">🌐 Free Subdomain</span>
+    <span class="mx-8">📦 1-Click Modpack Install</span>
+  </div>
+</div>
+
+<!-- ══ STATS ══ -->
+<section class="py-12 border-b" style="background:#fafafa;border-color:#e2e8f0">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 reveal rv1">
+      <div class="text-center p-6 rounded-xl" style="background:#f5f0ff;border:2px solid rgba(163,101,254,.25)"><div class="font-pixel text-2xl mb-2" style="color:#7c3aed;font-size:20px">99.99%</div><div class="text-sm text-slate-600 font-medium">Uptime SLA</div></div>
+      <div class="text-center p-6 rounded-xl" style="background:#f5f0ff;border:2px solid rgba(163,101,254,.25)"><div class="font-pixel text-2xl mb-2" style="color:#7c3aed;font-size:20px">&lt;5ms</div><div class="text-sm text-slate-600 font-medium">Server Ping</div></div>
+      <div class="text-center p-6 rounded-xl" style="background:#f5f0ff;border:2px solid rgba(163,101,254,.25)"><div class="font-pixel text-2xl mb-2" style="color:#7c3aed;font-size:20px">20 TPS</div><div class="text-sm text-slate-600 font-medium">Guaranteed</div></div>
+      <div class="text-center p-6 rounded-xl" style="background:#f5f0ff;border:2px solid rgba(163,101,254,.25)"><div class="font-pixel text-2xl mb-2" style="color:#7c3aed;font-size:20px">24/7</div><div class="text-sm text-slate-600 font-medium">Expert Support</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES ══ -->
+<section class="py-16" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider mb-4" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.25);color:#a365fe;font-family:'Press Start 2P',monospace;font-size:8px">⚔ Why Choose Us</span>
+      <h2 class="text-3xl font-black text-slate-900 mt-4">Built for <span class="shimmer-mc">Serious Gamers</span></h2>
+      <p class="text-slate-600 mt-3 max-w-xl mx-auto">Enterprise hardware with a gamer's soul. Our Minecraft VPS servers are engineered for zero lag, maximum TPS, and infinite fun.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="feat-card reveal rv1 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl" style="background:rgba(163,101,254,.15);border:2px solid rgba(163,101,254,.3)">⚡</div><h3 class="font-bold text-slate-900">Anti-Lag Guarantee</h3><p class="text-sm text-slate-600 leading-relaxed">Dedicated CPU threads and Enterprise SSD storage ensure rock-solid 20 TPS even with 100+ players and heavy mods.</p></div>
+      <div class="feat-card reveal rv2 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(90,172,68,.15);border:2px solid rgba(90,172,68,.3)">🛡</div><h3 class="font-bold text-slate-900">DDoS Shield</h3><p class="text-sm text-slate-600 leading-relaxed">Always-on Layer 3/4/7 DDoS mitigation. Griefers and attack bots won't take your server offline.</p></div>
+      <div class="feat-card reveal rv3 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(245,158,11,.12);border:2px solid rgba(245,158,11,.2)">📦</div><h3 class="font-bold text-slate-900">1-Click Modpacks</h3><p class="text-sm text-slate-600 leading-relaxed">Install Paper, Spigot, Forge, Fabric, ATM9, RLCraft, and 50+ popular modpacks with a single click.</p></div>
+      <div class="feat-card reveal rv4 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(6,182,212,.1);border:2px solid rgba(6,182,212,.2)">🔧</div><h3 class="font-bold text-slate-900">Full Root Access</h3><p class="text-sm text-slate-600 leading-relaxed">SSH access, custom JVM flags, plugin management — complete control over your server environment.</p></div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-5">
+      <div class="feat-card reveal rv1 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.2)">🌐</div><h3 class="font-bold text-slate-900">Free Server Domain</h3><p class="text-sm text-slate-600 leading-relaxed">Every plan includes a free <code style="color:#a365fe">yourname.crapplet.gg</code> subdomain so players can join easily.</p></div>
+      <div class="feat-card reveal rv2 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(239,68,68,.1);border:2px solid rgba(239,68,68,.2)">📊</div><h3 class="font-bold text-slate-900">Live Server Panel</h3><p class="text-sm text-slate-600 leading-relaxed">Monitor TPS, RAM, player count, and chunk loading in real-time from a sleek web dashboard.</p></div>
+      <div class="feat-card reveal rv3 p-6 rounded-xl space-y-4"><div class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl feat-icon" style="background:rgba(234,179,8,.1);border:2px solid rgba(234,179,8,.2)">⚙️</div><h3 class="font-bold text-slate-900">Custom JVM Flags</h3><p class="text-sm text-slate-600 leading-relaxed">Aikar's flags pre-configured out of the box. Fine-tune GC settings for maximum performance.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PLANS ══ -->
+<section id="plans" class="py-24 block-texture relative overflow-hidden" style="background:linear-gradient(180deg,#0a0a16 0%,#0d0d1f 100%)">
+  <div class="mc-orb1 absolute top-10 right-[10%] w-72 h-72 rounded-full blur-3xl pointer-events-none" style="background:rgba(163,101,254,.1)"></div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="text-center mb-10 reveal rv1">
+      <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider mb-4" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.3);color:#c084fc;font-family:'Press Start 2P',monospace;font-size:8px">🎒 Inventory</span>
+      <h2 class="font-pixel text-xl text-white mb-4" style="font-size:18px">Choose Your <span class="shimmer-mc">Realm</span></h2>
+      <p class="text-slate-400 max-w-2xl mx-auto">Every plan includes DDoS protection, Enterprise SSD storage, free subdomain, and full root access.</p>
+    </div>
+
+    <!-- Horizontal plan rows -->
+    <div class="flex flex-col gap-5 max-w-5xl mx-auto reveal rv2">
+
+      <!-- Sapling -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#a9793f,#6b4a1f)">
+          <div class="hp-name">Sapling</div>
+          <div class="hp-tag" style="color:rgba(255,255,255,.75)">Small Survival · up to 10 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 2 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 4 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 50 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="989">₹989</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting/sapling-4gb" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Sprout -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#b9c0c9,#7a828d)">
+          <div class="hp-name" style="color:#1a1a2e">Sprout</div>
+          <div class="hp-tag" style="color:rgba(26,26,46,.7)">Friend Group SMP · up to 20 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 3 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 6 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 75 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="1,319">₹1,319</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting/sprout-6gb" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Miner -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#eef1f6,#9aa1ad)">
+          <div class="hp-name" style="color:#1a1a2e">Miner</div>
+          <div class="hp-tag" style="color:rgba(26,26,46,.7)">SMP Servers · up to 30 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 4 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 8 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 100 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="1,704">₹1,704</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting/miner-8gb" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Explorer -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#ffd95a,#c8930c)">
+          <div class="hp-name" style="color:#3a2a00">Explorer</div>
+          <div class="hp-tag" style="color:rgba(58,42,0,.75)">Modded Servers · up to 45 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 5 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 12 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 150 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="2,364">₹2,364</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting/explorer-12gb" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Builder (Most Popular / Best Value) -->
+      <div class="hp-row" style="border-color:rgba(163,101,254,.55);box-shadow:0 0 0 1px rgba(163,101,254,.35),0 20px 44px -14px rgba(163,101,254,.4);">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#7bf3ec,#12a6a0)">
+          <div class="hp-name" style="color:#062725">Builder</div>
+          <div class="hp-tag" style="color:rgba(6,39,37,.75)">Large Communities · up to 60 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 6 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 16 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 200 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="3,024">₹3,024</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting/builder-16gb" class="hp-order-btn" style="background:linear-gradient(180deg,#12a6a0,#0a6b66);border-color:rgba(123,243,236,.6);">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Warden -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#5fd88f,#1f8a4d)">
+          <div class="hp-name">Warden</div>
+          <div class="hp-tag" style="color:rgba(255,255,255,.8)">Heavy Modpacks · up to 80 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 7 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 24 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 300 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🌐 20 TB</div><div class="hp-spec-label">Unmetered*</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="4,344">₹4,344</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Overlord -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#5a4766,#1c1420)">
+          <div class="hp-name">Overlord</div>
+          <div class="hp-tag" style="color:rgba(255,255,255,.65)">Big Modpacks · up to 100 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 8 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 32 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 400 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🔧 Dedicated IP</div><div class="hp-spec-label">+ Priority Support</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="5,939">₹5,939</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Titan -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#8b3fd6,#3d1466)">
+          <div class="hp-name">Titan</div>
+          <div class="hp-tag" style="color:rgba(255,255,255,.75)">Networks &amp; BungeeCord · up to 150 players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 9 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 48 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 600 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🔧 Dedicated IP</div><div class="hp-spec-label">BungeeCord Ready</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="8,304">₹8,304</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+      <!-- Ascendant -->
+      <div class="hp-row">
+        <div class="hp-name-box" style="background:linear-gradient(135deg,#4a4a5c,#0f0f16)">
+          <div class="hp-name">Ascendant</div>
+          <div class="hp-tag" style="color:rgba(255,255,255,.65)">Enterprise Networks · unlimited players</div>
+        </div>
+        <div class="hp-specs">
+          <div class="hp-spec-cell">
+            <div class="hp-spec-top">⚡ 10 vCPU</div>
+            <div class="hp-cpu-note">Intel Xeon Gold 6136 @ 3.0 Ghz</div>
+          </div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">💾 64 GB</div><div class="hp-spec-label">RAM</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🗄️ 800 GB</div><div class="hp-spec-label">Enterprise SSD</div></div>
+          <div class="hp-spec-cell"><div class="hp-spec-top">🔧 Dedicated IP</div><div class="hp-spec-label">BungeeCord Ready</div></div>
+        </div>
+        <div class="hp-price-box">
+          <div><span class="hp-price"><span class="price-amount" data-inr="10,559">₹10,559</span></span> <span class="hp-price-sub">/mo</span></div>
+          <a href="/clientarea/index.php?rp=/store/minecraft-vps-hosting" class="hp-order-btn">Deploy</a>
+        </div>
+      </div>
+
+    </div>
+    <p class="text-center text-xs text-slate-500 mt-4">*Unmetered bandwidth is fair-use up to the listed 20 TB monthly allowance.</p>
+
+    <p class="text-center text-sm text-slate-400 mt-10 reveal rv5">Need a custom server build? <a href="/contact.html" class="font-bold hover:underline" style="color:#c084fc">Talk to our team →</a></p>
+  </div>
+</section>
+
+<!-- ══ SUPPORTED SOFTWARE ══ -->
+<section class="py-16" style="background:#ffffff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14 reveal rv1">
+      <h2 class="text-3xl font-black text-slate-900">Supported <span class="shimmer-mc">Server Software</span></h2>
+      <p class="text-slate-600 mt-3 max-w-xl mx-auto">From vanilla survival to mega-networks — every server type runs perfectly on Crapplet VPS infrastructure.</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 reveal rv2">
+      <a href="https://www.minecraft.net/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">🌿</div><div class="text-sm font-bold text-slate-900">Vanilla</div><div class="text-xs text-slate-500 mt-1">1.8 – 1.21.4</div></a>
+      <a href="https://papermc.io/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">📄</div><div class="text-sm font-bold text-slate-900">Paper MC</div><div class="text-xs text-slate-500 mt-1">Optimised Fork</div></a>
+      <a href="https://www.spigotmc.org/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">🕷️</div><div class="text-sm font-bold text-slate-900">Spigot</div><div class="text-xs text-slate-500 mt-1">Plugin Support</div></a>
+      <a href="https://files.minecraftforge.net/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">🔧</div><div class="text-sm font-bold text-slate-900">Forge</div><div class="text-xs text-slate-500 mt-1">Mod Support</div></a>
+      <a href="https://fabricmc.net/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">🧵</div><div class="text-sm font-bold text-slate-900">Fabric</div><div class="text-xs text-slate-500 mt-1">Lightweight Mods</div></a>
+      <a href="https://www.spigotmc.org/wiki/bungeecord/" target="_blank" rel="noopener noreferrer" class="game-chip p-4 rounded-xl text-center block"><div class="text-3xl mb-2">🌐</div><div class="text-sm font-bold text-slate-900">BungeeCord</div><div class="text-xs text-slate-500 mt-1">Multi-server</div></a>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">⚡</div><div class="text-sm font-bold text-slate-900">Velocity</div><div class="text-xs text-slate-500 mt-1">Modern Proxy</div></div>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">🎮</div><div class="text-sm font-bold text-slate-900">Bedrock</div><div class="text-xs text-slate-500 mt-1">GeyserMC</div></div>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">🔮</div><div class="text-sm font-bold text-slate-900">Purpur</div><div class="text-xs text-slate-500 mt-1">Performance Fork</div></div>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">🧨</div><div class="text-sm font-bold text-slate-900">Mohist</div><div class="text-xs text-slate-500 mt-1">Forge + Bukkit</div></div>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">🪄</div><div class="text-sm font-bold text-slate-900">Arclight</div><div class="text-xs text-slate-500 mt-1">Forge Hybrid</div></div>
+      <div class="game-chip p-4 rounded-xl text-center cursor-default"><div class="text-3xl mb-2">📦</div><div class="text-sm font-bold text-slate-900">Custom JAR</div><div class="text-xs text-slate-500 mt-1">Any .jar File</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW TO GET STARTED ══ -->
+<section class="py-16" style="background:#f8f5ff">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16 reveal rv1">
+      <h2 class="font-pixel text-xl text-slate-900 mb-4" style="font-size:16px">Your Server in <span class="shimmer-mc">4 Steps</span></h2>
+      <p class="text-slate-600 max-w-xl mx-auto">From checkout to playing with your friends in under 5 minutes. No command-line knowledge needed.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+      <div class="hidden md:block absolute top-14 left-[12.5%] right-[12.5%] h-0.5" style="background:linear-gradient(to right,rgba(163,101,254,.1),rgba(163,101,254,.6),rgba(163,101,254,.1));z-index:0;"></div>
+      <div class="reveal rv1 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.2);box-shadow:0 4px 20px rgba(163,101,254,.08)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.3)">🛒</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">01</div><h3 class="font-bold text-slate-900 mb-2">Choose Realm</h3><p class="text-sm text-slate-600">Pick Vanilla, Modded, or Network plan based on your player count and needs.</p></div>
+      <div class="reveal rv2 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.15);box-shadow:0 4px 20px rgba(163,101,254,.06)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(59,130,246,.1);border:2px solid rgba(59,130,246,.2)">💳</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">02</div><h3 class="font-bold text-slate-900 mb-2">Quick Checkout</h3><p class="text-sm text-slate-600">Pay via UPI, card or net banking. Server deploys automatically in 60 seconds.</p></div>
+      <div class="reveal rv3 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.15);box-shadow:0 4px 20px rgba(163,101,254,.06)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(90,172,68,.1);border:2px solid rgba(90,172,68,.2)">⚙️</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">03</div><h3 class="font-bold text-slate-900 mb-2">Configure</h3><p class="text-sm text-slate-600">Choose your Minecraft version, server software, and install plugins from the web panel.</p></div>
+      <div class="reveal rv4 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.15);box-shadow:0 4px 20px rgba(163,101,254,.06)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(234,179,8,.1);border:2px solid rgba(234,179,8,.2)">🎮</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">04</div><h3 class="font-bold text-slate-900 mb-2">Play!</h3><p class="text-sm text-slate-600">Share your <code style="color:#a365fe">yourname.crapplet.gg</code> with friends and start your adventure.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES DEEP DIVE ══ -->
+<section class="py-16" style="background:#0a0a1e">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div class="reveal-left space-y-6">
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.25);color:#a365fe;font-family:'Press Start 2P',monospace;font-size:8px">⚙ INFRASTRUCTURE</span>
+        <h2 class="text-4xl font-black text-white leading-tight">Maximum TPS.<br/><span class="shimmer-mc">Zero Compromise.</span></h2>
+        <p class="text-slate-400 text-base leading-relaxed">Our Minecraft VPS servers run on dedicated KVM hypervisors with pinned CPU threads. Every server gets its own guaranteed resources — no overselling, no shared lag spikes from neighbours.</p>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3"><span class="mt-0.5 text-green-400 font-bold text-lg">✓</span><div><span class="font-bold text-white">Aikar's JVM Flags Pre-configured</span> — optimal garbage collection settings for smooth gameplay out of the box</div></li>
+          <li class="flex items-start gap-3"><span class="mt-0.5 text-green-400 font-bold text-lg">✓</span><div><span class="font-bold text-white">Enterprise SSD Storage</span> — world loading is 10x faster than traditional HDDs, meaning instant chunk generation</div></li>
+          <li class="flex items-start gap-3"><span class="mt-0.5 text-green-400 font-bold text-lg">✓</span><div><span class="font-bold text-white">10 Gbps Network Port</span> — handles hundreds of simultaneous player connections with sub-5ms latency across India</div></li>
+        </ul>
+      </div>
+      <div class="reveal-right">
+        <div class="rounded-xl overflow-hidden p-6 space-y-5" style="background:#080812;border:2px solid rgba(163,101,254,.25);box-shadow:0 0 40px rgba(163,101,254,.1)">
+          <div class="font-pixel text-xs mb-4" style="color:#a365fe;font-size:9px">📊 LIVE SERVER STATS</div>
+          <div><div class="flex justify-between text-xs font-semibold mb-1.5"><span class="text-slate-400">TPS (Ticks Per Second)</span><span class="text-green-400 font-pixel" style="font-size:9px">20.0 / 20</span></div><div class="h-4 rounded-sm overflow-hidden" style="background:rgba(255,255,255,.06)"><div class="h-full rounded-sm stat-bar-fill" style="--w:100%;background:linear-gradient(90deg,#22c55e,#4ade80);box-shadow:0 0 8px rgba(34,197,94,.5)"></div></div></div>
+          <div><div class="flex justify-between text-xs font-semibold mb-1.5"><span class="text-slate-400">RAM Usage</span><span class="text-purple-400 font-pixel" style="font-size:9px">2.1 GB / 4 GB</span></div><div class="h-4 rounded-sm overflow-hidden" style="background:rgba(255,255,255,.06)"><div class="h-full rounded-sm stat-bar-fill" style="--w:52%;width:52%;background:linear-gradient(90deg,#7c3aed,#a365fe);box-shadow:0 0 8px rgba(163,101,254,.5);animation-delay:.2s"></div></div></div>
+          <div><div class="flex justify-between text-xs font-semibold mb-1.5"><span class="text-slate-400">CPU Usage</span><span class="text-blue-400 font-pixel" style="font-size:9px">31%</span></div><div class="h-4 rounded-sm overflow-hidden" style="background:rgba(255,255,255,.06)"><div class="h-full rounded-sm stat-bar-fill" style="--w:31%;width:31%;background:linear-gradient(90deg,#2563eb,#60a5fa);box-shadow:0 0 8px rgba(96,165,250,.4);animation-delay:.4s"></div></div></div>
+          <div class="mt-2 pt-4 border-t" style="border-color:rgba(163,101,254,.15)"><div class="flex items-center justify-between mb-2"><span class="font-pixel text-xs" style="color:#a365fe;font-size:8px">XP BAR · UPTIME</span><span class="font-pixel text-xs text-green-400" style="font-size:8px">99.99%</span></div><div class="h-3 rounded-sm overflow-hidden" style="background:rgba(255,255,255,.06)"><div class="xp-bar-inner h-full rounded-sm stat-bar-fill" style="--w:99.99%;width:99.99%;background:linear-gradient(90deg,#a365fe,#c084fc,#a365fe);animation:barFill 2s cubic-bezier(.22,1,.36,1) .5s both,xpGlow 2s ease-in-out 2.5s infinite"></div></div></div>
+          <div class="grid grid-cols-3 gap-3 mt-2">
+            <div class="rounded-lg p-3 text-center" style="background:rgba(163,101,254,.08);border:1px solid rgba(163,101,254,.15)"><div class="font-pixel text-sm font-black text-white" style="font-size:12px">47</div><div class="text-[10px] text-slate-500 mt-0.5">Online</div></div>
+            <div class="rounded-lg p-3 text-center" style="background:rgba(163,101,254,.08);border:1px solid rgba(163,101,254,.15)"><div class="font-pixel text-sm font-black text-white" style="font-size:12px">100</div><div class="text-[10px] text-slate-500 mt-0.5">Slots</div></div>
+            <div class="rounded-lg p-3 text-center" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2)"><div class="font-pixel text-sm font-black text-green-400" style="font-size:12px">3ms</div><div class="text-[10px] text-slate-500 mt-0.5">Avg Ping</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section class="py-24" style="background:#fafafa">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex flex-col lg:flex-row gap-16 items-start">
+      <div class="lg:w-80 flex-shrink-0 reveal rv1">
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider mb-5" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.25);color:#a365fe;font-family:'Press Start 2P',monospace;font-size:7px">❓ FAQ</span>
+        <h2 class="text-3xl font-black text-slate-900 leading-tight mb-5">Got <span class="shimmer-mc">Questions?</span></h2>
+        <p class="text-slate-600 text-sm leading-relaxed mb-8">Everything you need to know about Minecraft hosting on Crapplet. Our team is live 24/7.</p>
+        <div class="rounded-xl p-5 space-y-4" style="background:#f5f0ff;border:2px solid rgba(163,101,254,.25)">
+          <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#a365fe"><span class="material-symbols-outlined text-white text-lg">support_agent</span></div><div><div class="font-bold text-slate-900 text-sm">Need Help?</div><div class="flex items-center gap-1.5 mt-0.5"><span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span><span class="text-xs text-green-400 font-semibold">Support online 24/7</span></div></div></div>
+          <a href="/contact.html" class="w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-lg text-sm font-bold hover:brightness-110 hover:-translate-y-0.5 transition-all" style="background:#a365fe;box-shadow:0 4px 14px rgba(163,101,254,.4)"><span class="material-symbols-outlined text-sm">chat</span> Chat with Us</a>
+        </div>
+      </div>
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="faq-item reveal rv1"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Which Minecraft versions are supported?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">We support <strong>all versions from 1.8 to 1.21.4</strong> including Java Edition and Bedrock via GeyserMC. You can switch versions from the control panel — your world data is preserved.</div></div></div>
+        <div class="faq-item reveal rv2"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I install plugins and mods?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Absolutely. You get full SSH root access and a web file manager. Upload any plugin JAR, Forge mod, or Fabric mod directly. Popular plugins like EssentialsX, WorldEdit, and LuckPerms can be installed in one click.</div></div></div>
+        <div class="faq-item reveal rv3"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">How many players can join my server?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">It depends on your plan. Our plans support 10 to unlimited concurrent players. For vanilla/survival servers, 4 GB RAM handles ~10 players comfortably. Heavy modpacks need more RAM — we recommend 16+ GB for 70+ modded players.</div></div></div>
+        <div class="faq-item reveal rv4"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Will my server run 24/7 even when I'm offline?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. Your Minecraft VPS runs continuously, 24 hours a day, 7 days a week. Players can join anytime even if you're not logged in. Automated restarts and watchdog keep the server running smoothly.</div></div></div>
+        <div class="faq-item reveal rv5"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I migrate my existing world?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes! Upload your existing world folder via SFTP or our web file manager. We also offer a free server migration service — open a support ticket and our team will transfer everything at zero cost.</div></div></div>
+        <div class="faq-item reveal rv1"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">What is the server location / data center?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Our primary Minecraft VPS nodes are located in <strong>Mumbai, India</strong> for the lowest latency to Indian players. International nodes are available in Singapore and Frankfurt on request. Average ping: &lt;5ms.</div></div></div>
+        <div class="faq-item reveal rv2"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Is DDoS protection included?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes — every plan includes always-on <strong>Layer 3/4 DDoS mitigation</strong> with up to 1 Tbps scrubbing capacity. Your server IP is protected at the network edge so attack traffic never reaches your server.</div></div></div>
+        <div class="faq-item reveal rv3"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Can I upgrade my plan later?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. Scale RAM and CPU from the client portal with one click. A brief reboot (~60 seconds) applies the new resources. Your world data, plugins, and configurations are fully preserved.</div></div></div>
+        <div class="faq-item reveal rv5"><button class="faq-trigger"><span class="text-sm font-bold text-slate-800 flex-1 text-left">Do you provide a control panel?</span><div class="faq-icon"><span class="material-symbols-outlined faq-sym">add</span></div></button><div class="faq-body"><div class="faq-inner">Yes. All plans include access to a <strong>Pterodactyl-based web control panel</strong> where you can start/stop/restart the server, view live console output, manage files, monitor CPU/RAM, and schedule tasks.</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA ══ -->
+<section class="cta-section py-16 relative overflow-hidden" style="border-top:2px solid rgba(163,101,254,.2)">
+  <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(163,101,254,.8),transparent)"></div>
+  <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl" style="background:rgba(163,101,254,.12)"></div>
+  <div class="max-w-4xl mx-auto px-4 text-center space-y-8 relative z-10 reveal rv1">
+    <div class="flex justify-center gap-3 mb-6">
+      <div class="w-8 h-8 rounded-sm float-block" style="background:linear-gradient(135deg,#a365fe,#7c3aed);border:2px solid rgba(163,101,254,.6)"></div>
+      <div class="w-8 h-8 rounded-sm float-block-2" style="background:linear-gradient(135deg,#5aac44,#3a7a2a);border:2px solid rgba(90,172,68,.6)"></div>
+      <div class="w-8 h-8 rounded-sm float-block-3" style="background:linear-gradient(135deg,#f59e0b,#b45309);border:2px solid rgba(245,158,11,.6)"></div>
+      <div class="w-8 h-8 rounded-sm float-block" style="background:linear-gradient(135deg,#06b6d4,#0891b2);border:2px solid rgba(6,182,212,.6);animation-delay:0.5s"></div>
+    </div>
+    <h2 class="font-pixel text-xl text-white" style="font-size:18px;text-shadow:0 0 30px rgba(163,101,254,.6)">Ready to Build<br/><span class="shimmer-mc">Your World?</span></h2>
+    <p class="text-slate-400 text-lg">Join thousands of Minecraft players who run their servers on Crapplet. Deploy in under 60 seconds.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <input id="ctaEmail" class="glow-input w-full sm:w-80 px-4 py-3 rounded-lg border text-sm" placeholder="Enter your email address" type="email"/>
+      <button id="deployBtn" class="pixel-btn w-full sm:w-auto">🚀 LAUNCH MY SERVER</button>
+    </div>
+    <p class="text-xs text-slate-600">No setup fee. Cancel anytime. 24/7 support included.</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ══ FOOTER ══ -->
+<footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
+      <div class="flex flex-col gap-4">
+        <img src="/Crapplet_logo.png" alt="Crapplet Logo" class="h-10 w-auto object-contain"/>
+        <div class="flex flex-col gap-1">
+          <img src="/Payment1.png" alt="Payment" class="h-16 w-auto object-contain"/>
+          <img src="/Payment2.png" alt="Payment" class="h-16 w-auto object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h3 class="text-slate-900 font-bold">Hosting</h3>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/shared-hosting.html">Shared Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">Cloud Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/linux-vps-hosting.html">VPS Hosting</a>
+          <a class="footer-link text-sm text-slate-500" href="/dedicated-hosting.html">Dedicated Servers</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h3 class="text-slate-900 font-bold">Company</h3>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/index.html">About Us</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Contact</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Careers</a>
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Network Status</a>
+        </nav>
+      </div>
+      <div class="flex flex-col gap-4">
+        <h3 class="text-slate-900 font-bold">Support</h3>
+        <nav class="flex flex-col gap-2">
+          <a class="footer-link text-sm text-slate-500" href="/contact.html">Help Center</a>
+          <a class="footer-link text-sm text-slate-500" href="/terms-and-conditions.html">Terms & Conditions</a>
+          <a class="footer-link text-sm text-slate-500" href="/privacy-and-policy.html">Privacy & Policy</a>
+          <a class="footer-link text-sm text-slate-500" href="/refund-policy.html">Refund Policy</a>
+        </nav>
+      </div>
+    </div>
+    <div class="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 reveal rv5">
+      <p class="text-sm text-slate-500">© 2026 Crapplet Infotech Pvt. Ltd. All rights reserved. | GSTIN:- 23AAHCC8426G1ZR</p>
+      <div class="flex gap-6">
+        <a class="social-icon text-slate-400" href="/index.html"><span class="material-symbols-outlined">public</span></a>
+        <a class="social-icon text-slate-400" href="/clientarea/index.php?rp=/login"><span class="material-symbols-outlined">terminal</span></a>
+        <a class="social-icon text-slate-400" href="/privacy-and-policy.html"><span class="material-symbols-outlined">shield</span></a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* Cursor glow */
+const glow = document.getElementById('cursor-glow');
+document.addEventListener('mousemove', e => { glow.style.left = e.clientX+'px'; glow.style.top = e.clientY+'px'; });
+
+/* Header shadow */
+const hdr = document.getElementById('site-header');
+window.addEventListener('scroll', () => hdr.classList.toggle('scrolled', window.scrollY > 20));
+
+/* Scroll reveal */
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .plan-card, .plan-featured, .feat-card, .faq-item').forEach(el => obs.observe(el));
+
+/* Tab switching */
+const tabMap = { 'tab-vanilla':'plans-vanilla', 'tab-modded':'plans-modded', 'tab-network':'plans-network' };
+document.querySelectorAll('.tab-pill').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab-pill').forEach(t => {
+      t.classList.remove('active-tab');
+      t.style.background = 'transparent'; t.style.color = '#94a3b8';
+    });
+    this.classList.add('active-tab');
+    this.style.background = ''; this.style.color = '';
+    Object.entries(tabMap).forEach(([tid, gid]) => {
+      document.getElementById(gid).classList.toggle('hidden', gid !== tabMap[this.id]);
+    });
+    attachSelectListeners();
+  });
+});
+
+/* Select button feedback */
+function attachSelectListeners() {
+  document.querySelectorAll('.select-btn, .select-primary').forEach(btn => {
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click', function() {
+      const orig = this.textContent;
+      const origStyle = this.getAttribute('style');
+      this.textContent = '✓ ADDED!';
+      this.style.background = '#16a34a'; this.style.color = '#fff'; this.style.border = 'none';
+      setTimeout(() => { this.textContent = orig; this.setAttribute('style', origStyle||''); }, 2000);
+    });
+  });
+}
+attachSelectListeners();
+
+/* Deploy CTA */
+const deployBtn = document.getElementById('deployBtn');
+const ctaEmail  = document.getElementById('ctaEmail');
+deployBtn.addEventListener('click', () => {
+  if (ctaEmail.value.trim()) {
+    deployBtn.textContent = '✓ LAUNCHING...';
+    deployBtn.style.background = 'linear-gradient(180deg,#16a34a,#15803d)';
+    setTimeout(() => { deployBtn.textContent = '🚀 LAUNCH MY SERVER'; deployBtn.style.background = ''; ctaEmail.value = ''; }, 2200);
+  } else {
+    ctaEmail.style.borderColor = '#ef4444'; ctaEmail.style.boxShadow = '0 0 0 3px rgba(239,68,68,.2)';
+    setTimeout(() => { ctaEmail.style.borderColor = ''; ctaEmail.style.boxShadow = ''; }, 1500);
+  }
+});
+
+/* FAQ accordion */
+document.querySelectorAll('.faq-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const item = btn.closest('.faq-item');
+    const body = item.querySelector('.faq-body');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => {
+      i.classList.remove('open'); i.querySelector('.faq-body').classList.remove('open');
+      i.querySelector('.faq-sym').textContent = 'add';
+    });
+    if (!isOpen) { item.classList.add('open'); body.classList.add('open'); btn.querySelector('.faq-sym').textContent = 'close'; }
+  });
+});
+
+/* Mobile Drawer */
+(function() {
+  const toggle  = document.getElementById('menu-toggle');
+  const drawer  = document.getElementById('mobile-drawer');
+  const overlay = document.getElementById('mobile-overlay');
+  const closeBtn = document.getElementById('close-drawer');
+
+  function openDrawer()  { drawer.classList.add('open'); overlay.classList.add('show'); toggle.classList.add('open'); document.body.classList.add('nav-open'); }
+  function closeDrawer() { drawer.classList.remove('open'); overlay.classList.remove('show'); toggle.classList.remove('open'); document.body.classList.remove('nav-open'); }
+
+  toggle.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+  overlay.addEventListener('click', closeDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
+    trigger.addEventListener('click', function() {
+      const subId = 'sub-' + this.id.replace('acc-', '');
+      const sub = document.getElementById(subId);
+      if (!sub) return;
+      const isOpen = sub.classList.contains('open');
+      document.querySelectorAll('.mob-submenu').forEach(s => s.classList.remove('open'));
+      document.querySelectorAll('[id^="acc-"]').forEach(t => t.classList.remove('sub-open'));
+      if (!isOpen) { sub.classList.add('open'); this.classList.add('sub-open'); }
+    });
+  });
+})();
+
+/* Promo Popup */
+(function() {
+  const overlay = document.getElementById('promo-overlay');
+  const closeBtn = document.getElementById('promo-close');
+  const copyBtn = document.getElementById('promo-copy-btn');
+  const codeEl = document.getElementById('promo-code');
+  const toast = document.getElementById('promo-toast');
+  const claimBtn = document.getElementById('promo-claim-btn');
+  if (!overlay) return;
+
+  function openPromo() { overlay.classList.add('show'); }
+  function closePromo() {
+    overlay.classList.remove('show');
+    try { sessionStorage.setItem('promoDismissed', '1'); } catch(e) {}
+  }
+
+  let alreadySeen = false;
+  try { alreadySeen = sessionStorage.getItem('promoDismissed') === '1'; } catch(e) {}
+  if (!alreadySeen) { setTimeout(openPromo, 1800); }
+
+  closeBtn.addEventListener('click', closePromo);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePromo(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('show')) closePromo(); });
+  claimBtn.addEventListener('click', closePromo);
+
+  copyBtn.addEventListener('click', () => {
+    const code = codeEl.textContent.trim();
+    const done = () => {
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(done);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = code; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      document.body.removeChild(ta); done();
+    }
+  });
+
+  /* Countdown to offer expiry */
+  const promoEnd = new Date();
+  promoEnd.setDate(promoEnd.getDate() + 5);
+  promoEnd.setHours(23, 59, 59, 0);
+
+  function tickCountdown() {
+    const now = new Date();
+    let diff = promoEnd - now;
+    if (diff < 0) diff = 0;
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const pad = n => String(n).padStart(2, '0');
+    document.getElementById('promo-days').textContent = pad(d);
+    document.getElementById('promo-hours').textContent = pad(h);
+    document.getElementById('promo-mins').textContent = pad(m);
+    document.getElementById('promo-secs').textContent = pad(s);
+  }
+  tickCountdown();
+  setInterval(tickCountdown, 1000);
+})();
+</script>
+<script src="/header.js"></script>
+<script src="/currency.js"></script>
+</body>
+</html>
