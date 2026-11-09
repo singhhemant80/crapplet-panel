@@ -52,6 +52,9 @@ builds; runs `prisma migrate deploy`; seeds; starts `crapplet-api` (×2), `crapp
 under PM2; configures Nginx + SSL, UFW and nightly `pg_dump` backups. Admin credentials are written to
 `/root/crapplet-admin-credentials.txt`. Re-running the script upgrades in place.
 
+Forgot the admin password? `sudo bash /opt/crapplet-panel/deploy/reset-admin.sh admin@crapplet.co.in` prints a new one
+(`--list` shows every staff email).
+
 **Back up `apps/api/.env`.** `APP_ENCRYPTION_KEY` encrypts hypervisor tokens, gateway secrets, VPS passwords
 and 2FA seeds — losing it makes them unrecoverable.
 
