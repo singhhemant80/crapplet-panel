@@ -253,6 +253,25 @@ export class VirtualizorClient {
     throw new VirtualizorError(`Couldn't get console access for VPS ${vpsid} — ${errors.join("; ")}. Check that VNC is enabled for the VPS (Virtualizor → Manage VPS → VNC) and that this panel can reach the master on port 4083.`);
   }
 
+  /**
+   * Where the VPS's node can be reached (hostname and IP), for the console: with Virtualizor's
+   * "Master Proxy Only" off, noVNC is served by the node, not the master. Empty for VPSes on the master.
+   */
+  async nodeAddress(vpsid: string): Promise<{ serid: string; name?: string; hosts: string[] }> {
+    const r = await this.call<{ vs?: Record<string, Record<string, unknown>> }>("vs", { vpsid }).catch(() => null);
+    const v = r?.vs?.[vpsid] ?? Object.values(r?.vs ?? {})[0];
+    const serid = v?.serid !== undefined && v?.serid !== null ? String(v.serid) : "";
+    if (!serid || serid === "0") return { serid, hosts: [] };
+    const list = await this.servers().catch(() => null);
+    const all = list?.servs ? (Array.isArray(list.servs) ? list.servs : Object.values(list.servs)) : [];
+    const node = (all as Record<string, unknown>[]).find((x) => String(x.serid ?? x.id ?? "") === serid);
+    if (!node) return { serid, hosts: [] };
+    const hosts = [node.hostname, node.server_hostname, node.ip, node.internal_ip]
+      .map((x) => String(x ?? "").trim().replace(/^https?:\/\//, "").replace(/[:/].*$/, ""))
+      .filter((x) => x && x !== "0.0.0.0" && /^[a-z0-9.-]+$/i.test(x));
+    return { serid, name: node.server_name ? String(node.server_name) : undefined, hosts: [...new Set(hosts)] };
+  }
+
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
   }
