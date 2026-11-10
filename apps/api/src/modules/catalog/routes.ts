@@ -62,7 +62,7 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
     group: p.group ? { name: p.group.name, slug: p.group.slug } : undefined,
     specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4Count: p.ipv4Count, ipv6: p.ipv6Enabled, virtType: p.virtType },
     isVps: p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR",
-    allowIpSelection: p.allowIpSelection,
+    allowIpSelection: p.allowIpSelection && p.provisioner !== "VIRTUALIZOR",
     requireHostname: p.requireHostname,
     featured: p.featured,
     outOfStock: p.stockControl && p.stockQty <= 0,
@@ -134,7 +134,7 @@ catalogRouter.get(
     const q = parse(z.object({ serverId: z.string().optional(), search: z.string().max(40).optional() }), req.query);
     const p = await prisma.product.findFirst({ where: { enabled: true, OR: [{ id: req.params.key }, { slug: req.params.key }] }, include: { servers: true } });
     if (!p) throw notFound("Product not found");
-    if (!p.allowIpSelection) throw badRequest("This plan assigns IPs automatically");
+    if (!p.allowIpSelection || p.provisioner === "VIRTUALIZOR") throw badRequest("This plan assigns IPs automatically");
     const allowed = p.servers.map((s) => s.serverId);
     const serverIds = q.serverId ? allowed.filter((id) => id === q.serverId) : allowed;
     const ips = await listAvailableIps({ serverIds, search: q.search, limit: 256 });
@@ -148,7 +148,7 @@ catalogRouter.post(
   ah(async (req, res) => {
     const { productId } = parse(z.object({ productId: z.string() }), req.body);
     const p = await prisma.product.findFirst({ where: { OR: [{ id: productId }, { slug: productId }], enabled: true }, include: { servers: true } });
-    if (!p || !p.allowIpSelection) throw badRequest("This plan does not support IP selection");
+    if (!p || !p.allowIpSelection || p.provisioner === "VIRTUALIZOR") throw badRequest("This plan does not support IP selection");
     const ip = await reserveIp({ ipId: req.params.ipId, userId: req.user!.id, serverIds: p.servers.map((s) => s.serverId) });
     res.json({ reservation: { ipId: ip.id, address: ip.address, serverId: ip.serverId, expiresAt: ip.reservedUntil } });
   }),

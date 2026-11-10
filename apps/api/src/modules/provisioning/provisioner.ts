@@ -332,20 +332,16 @@ async function virtualizorCreate(svc: FullService) {
     if (!same?.virtualizorOsId) throw new ProvisionError(`"${svc.osTemplate.name}" isn't available on ${server.name} — sync OS templates for that master`, false);
     osId = same.virtualizorOsId;
   }
-  // IPs: from IP Management (customer-chosen or next free), or left to Virtualizor's own pools
+  // IPs always come from Virtualizor: like its WHMCS module, the panel only asks for how many
+  // (num_ips) and records the ones Virtualizor gave the VPS. The panel never picks an address.
   const ipCount = Math.max(1, p.ipv4Count);
-  const panelHasIps = (await prisma.ipAddress.count({ where: { serverId: server.id, version: 4 } })) > 0;
-  const usePanelIps = mc.ipSource === "panel" || !!cfg.requestedIpId || (mc.ipSource !== "virtualizor" && panelHasIps);
-  if (mc.ipSource === "panel" && !panelHasIps) throw new ProvisionError(`IP Management has no IPs for "${server.name}" — click "Sync from Virtualizor" in IP Management or add a subnet`, false);
-  const ips = usePanelIps
-    ? await prisma.$transaction((tx) =>
-        allocateIpsForService(tx, { serviceId: svc.id, userId: svc.userId, serverId: server.id, orderId: svc.orderId, requestedIpId: (cfg.requestedIpId as string) ?? null, count: ipCount }),
-      )
-    : [];
-  // a Virtualizor pool is attached to specific nodes — the VPS must land on one of them
-  const ipNodes = ips.length
-    ? ((await prisma.ipAddress.findMany({ where: { id: { in: ips.map((i) => i.id) } }, include: { subnet: { select: { nodeIds: true } } } }))[0]?.subnet?.nodeIds ?? [])
-    : [];
+  const ips: { id: string; address: string }[] = [];
+  const ipNodes: string[] = [];
+  // release anything the panel had set aside for this order (from before IPs came only from Virtualizor)
+  await prisma.ipAddress.updateMany({
+    where: { OR: [{ serviceId: svc.id }, ...(svc.orderId ? [{ reservedOrderId: svc.orderId }] : [])], status: { in: ["RESERVED", "ALLOCATED"] }, serverId: server.id },
+    data: { serviceId: null, status: "AVAILABLE", isPrimary: false, reservedById: null, reservedOrderId: null, reservedUntil: null },
+  });
   const password = svc.passwordEnc ? decrypt(svc.passwordEnc) : generatePassword(18);
   const hostname = (svc.hostname || `vps-${svc.id.slice(-6)}.crapplet.cloud`).toLowerCase();
   let vpsid = svc.remoteId;
@@ -489,20 +485,7 @@ async function virtualizorCreate(svc: FullService) {
         }
         if (mc.planId) attempts.push({ label: "node's primary storage with the plan's sizes", diskMode: "scalar" });
         const virtMismatch = hints?.virts.length && !hints.virts.includes(virt) ? hints.virts : null;
-        // like the WHMCS module: IPs must be free IPs of this node in Virtualizor's own pools. A panel IP
-        // that Virtualizor doesn't list (typo'd range, another node's pool, already used) would be set on
-        // the VPS as-is — so only send panel IPs that Virtualizor confirms, else let it assign them.
-        let nodeIps = base.ips;
-        if (nodeIps.length) {
-          const free = await client.formFreeIps(n.serid, virt).catch(() => null);
-          const bad = free && free.size ? nodeIps.filter((ip) => !free.has(ip)) : [];
-          if (bad.length) {
-            if (mc.ipSource === "panel")
-              throw new ProvisionError(`${bad.join(", ")} ${bad.length === 1 ? "isn't a free IP" : "aren't free IPs"} of node ${n.name} in Virtualizor. Fix the range in IP Management (Sync from Virtualizor) or set “IPv4 addresses come from” to Automatic.`, false);
-            await log(svc.id, "create", true, `${bad.join(", ")} ${bad.length === 1 ? "isn't a free IP" : "aren't free IPs"} of ${n.name} in Virtualizor — letting Virtualizor assign the IPs`);
-            nodeIps = [];
-          }
-        }
+        const nodeIps: string[] = [];
         await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}${attempts.length > 2 ? ` (${attempts.length} ways to try)` : ""}`);
         const errs: string[] = [];
         for (const a of attempts) {
@@ -532,6 +515,7 @@ async function virtualizorCreate(svc: FullService) {
   const actual = await client.vpsIps(vpsid).catch(() => [] as string[]);
   const addresses = actual.length ? actual : ips.map((i) => i.address);
   if (actual.length) await recordServiceIps(svc.id, server.id, actual);
+  void import("./virtualizor-ips").then((m) => m.syncVirtualizorIps(server)).catch(() => null);
   await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id } });
   await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
   return { password, username: "root", hostname, ip: addresses[0] ?? "" };
@@ -814,6 +798,7 @@ export async function replaceVirtualizorIps(serviceId: string, newIps?: string[]
   await client.replaceIps(svc.remoteId, newIps);
   const after = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
   if (after.length) await recordServiceIps(svc.id, svc.server.id, after);
+  void import("./virtualizor-ips").then((m) => m.syncVirtualizorIps(svc.server!)).catch(() => null);
   await log(svc.id, "change_ip", true, `IPs changed in Virtualizor: ${before.join(", ") || "none"} → ${after.join(", ") || "?"}`);
   return { before, after };
 }

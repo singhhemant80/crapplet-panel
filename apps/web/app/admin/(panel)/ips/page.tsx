@@ -23,7 +23,7 @@ export default function Ips() {
 
   return (
     <>
-      <PageHeader title="IP Management" subtitle="IPv4/IPv6 pools per server. Customers pick from AVAILABLE addresses; holds expire after 15 minutes."
+      <PageHeader title="IP Management" subtitle="IPv4/IPv6 pools per server. Virtualizor masters are mirrored from Virtualizor (every 10 minutes and with Sync) — add their IPs in Virtualizor, not here. For Proxmox, customers pick from AVAILABLE addresses; holds expire after 15 minutes."
         actions={<><SyncIpsButton onDone={() => window.location.reload()} /><Button variant="outline" icon="upload_file" onClick={() => setModal("csv")}>Import CSV</Button><Button variant="outline" icon="add" onClick={() => setModal("single")}>Add IP</Button><Button icon="lan" onClick={() => setModal("cidr")}>Import CIDR range</Button></>} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -183,7 +183,7 @@ function SyncIpsButton({ onDone }: { onDone: () => void }) {
         setBusy(true);
         try {
           const r = await api("/admin/virtualizor/all/sync-ips", { body: {} });
-          for (const x of r.results) x.ok ? toast.success(`${x.serverName}: ${x.pools} pool(s), ${x.ips} IPs — ${x.available} free, ${x.used} in use`) : toast.error(`${x.serverName}: ${x.error}`);
+          for (const x of r.results) x.ok ? toast.success(`${x.serverName}: ${x.pools} pool(s), ${x.ips} IPs — ${x.available} free, ${x.used} in use${x.removed ? `, ${x.removed} not in Virtualizor removed` : ""}`) : toast.error(`${x.serverName}: ${x.error}`);
           setTimeout(onDone, 1200);
         } catch (e: any) {
           toast.error(e.message);

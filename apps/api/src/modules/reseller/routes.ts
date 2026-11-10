@@ -58,7 +58,7 @@ resellerRouter.get(
         name: p.name,
         type: p.type,
         specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4: p.ipv4Count, virtType: p.virtType },
-        allowIpSelection: p.allowIpSelection,
+        allowIpSelection: p.allowIpSelection && p.provisioner !== "VIRTUALIZOR",
         locations: p.servers.map((s) => ({ serverId: s.serverId, name: s.server.location?.name ?? s.server.name })),
         os: p.osTemplates.map((o) => ({ id: o.osTemplate.id, name: o.osTemplate.name })),
         prices: p.pricing.map((x) => {

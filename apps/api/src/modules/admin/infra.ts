@@ -543,11 +543,19 @@ adminInfra.delete(
   }),
 );
 
+/** IPs of a Virtualizor master come only from Virtualizor (Sync), never typed in. */
+async function assertNotVirtualizor(serverId?: string | null) {
+  if (!serverId) return;
+  const srv = await prisma.server.findUnique({ where: { id: serverId }, select: { type: true, name: true } });
+  if (srv?.type === "VIRTUALIZOR") throw badRequest(`IPs for ${srv.name} come from Virtualizor — add them to an IP pool in Virtualizor, then click “Sync from Virtualizor”.`);
+}
+
 adminInfra.post(
   "/ips/import-cidr",
   requireStaff("ips.manage"),
   ah(async (req, res) => {
     const b = parse(z.object({ cidr: z.string(), serverId: z.string().nullable().optional(), locationId: z.string().nullable().optional(), gateway: z.string().ip().nullable().optional(), vlan: z.number().int().nullable().optional(), notes: z.string().nullable().optional(), expand: z.boolean().default(true) }), req.body);
+    await assertNotVirtualizor(b.serverId);
     let r;
     try {
       r = await importCidr({ ...b, actorId: req.user!.id });
@@ -564,6 +572,7 @@ adminInfra.post(
   requireStaff("ips.manage"),
   ah(async (req, res) => {
     const b = parse(z.object({ csv: z.string().min(3).max(2_000_000), serverId: z.string().nullable().optional() }), req.body);
+    await assertNotVirtualizor(b.serverId);
     let rows: Record<string, string>[];
     try {
       rows = parseCsv(b.csv, { columns: (h: string[]) => h.map((x) => x.trim().toLowerCase()), skip_empty_lines: true, trim: true });

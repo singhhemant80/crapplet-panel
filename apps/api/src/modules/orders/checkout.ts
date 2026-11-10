@@ -42,7 +42,7 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
         }
         const isVps = p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR";
         if (isVps && !item.osTemplateId && p.osTemplates.length) throw badRequest(`Please choose an operating system for ${p.name}`);
-        if (item.ipId && !p.allowIpSelection) throw badRequest(`${p.name} does not support choosing an IP address`);
+        if (item.ipId && (!p.allowIpSelection || p.provisioner === "VIRTUALIZOR")) throw badRequest(`${p.name} does not support choosing an IP address — IPs are assigned by Virtualizor`);
         if (item.ipId && item.quantity > 1) throw badRequest("A selected IP can only be used for a single server");
 
         for (let q = 0; q < item.quantity; q++) {

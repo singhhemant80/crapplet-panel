@@ -19,11 +19,12 @@ const list = (v: unknown): string[] =>
   Array.isArray(v) ? v.map(String) : v && typeof v === "object" ? Object.keys(v as object) : typeof v === "string" && v ? v.split(",").map((x) => x.trim()).filter(Boolean) : [];
 
 /**
- * Imports Virtualizor IPv4 pools and their IPs into IP Management:
+ * Mirrors Virtualizor's IPv4 pools and IPs into IP Management. For a Virtualizor master, Virtualizor is
+ * the only source of truth — the panel never assigns these IPs itself:
  *  - each pool becomes an IpSubnet (linked to the nodes it's attached to)
- *  - free IPs become AVAILABLE (customers can pick them on the order page)
- *  - IPs Virtualizor already uses are ALLOCATED (linked to our service when the VPS is ours) or BLOCKED,
- *    locked IPs are BLOCKED. IPs the panel already holds are never downgraded.
+ *  - free IPs → AVAILABLE; IPs on one of our VPSes → ALLOCATED to that service; on another VPS or
+ *    locked → BLOCKED
+ *  - IPs/ranges the panel holds for this master that Virtualizor doesn't have are removed
  */
 export async function syncVirtualizorIps(server: Server) {
   const c = virtualizorFor(server);
@@ -48,7 +49,6 @@ export async function syncVirtualizorIps(server: Server) {
     subnetByPool.set(p.ippid, sn.id);
     subnets++;
   }
-
   // walk all pages of IPs
   const ips: Record<string, unknown>[] = [];
   for (let page = 1; page < 100; page++) {
@@ -58,24 +58,53 @@ export async function syncVirtualizorIps(server: Server) {
     if (rows.length < 1000) break;
   }
   const ourVps = new Map((await prisma.service.findMany({ where: { serverId: server.id, remoteId: { not: null } }, select: { id: true, remoteId: true } })).map((s) => [s.remoteId!, s.id]));
-  let available = 0, used = 0, created = 0;
+  let available = 0, used = 0, created = 0, removed = 0;
+  const seen = new Set<string>();
+  const perService = new Map<string, string[]>();
   for (const ip of ips) {
     const address = String(ip.ip ?? "");
     if (!isV4(address)) continue;
+    seen.add(address);
     const vpsid = String(ip.vpsid ?? "0");
     const locked = String(ip.locked ?? "0") === "1";
     const subnetId = subnetByPool.get(Number(ip.ippid)) ?? null;
     const serviceId = vpsid !== "0" ? ourVps.get(vpsid) ?? null : null;
     const status = locked ? "BLOCKED" : vpsid !== "0" ? (serviceId ? "ALLOCATED" : "BLOCKED") : "AVAILABLE";
+    const notes = vpsid !== "0" && !serviceId ? `In use by Virtualizor VPS ${vpsid}` : locked ? "Locked in Virtualizor" : serviceId ? "Assigned by Virtualizor" : null;
+    if (serviceId) perService.set(serviceId, [...(perService.get(serviceId) ?? []), address]);
     const existing = await prisma.ipAddress.findUnique({ where: { address } });
     if (!existing) {
-      await prisma.ipAddress.create({ data: { address, version: 4, subnetId, serverId: server.id, status, serviceId, notes: vpsid !== "0" && !serviceId ? `In use by Virtualizor VPS ${vpsid}` : locked ? "Locked in Virtualizor" : null } });
+      await prisma.ipAddress.create({ data: { address, version: 4, subnetId, serverId: server.id, status, serviceId, notes } });
       created++;
-    } else if (existing.status === "AVAILABLE" || existing.status === "BLOCKED") {
-      // keep panel reservations/allocations; refresh what Virtualizor says about free/used
-      await prisma.ipAddress.update({ where: { id: existing.id }, data: { subnetId: subnetId ?? existing.subnetId, serverId: server.id, status, serviceId: serviceId ?? existing.serviceId } });
+    } else {
+      await prisma.ipAddress.update({
+        where: { id: existing.id },
+        data: {
+          subnetId: subnetId ?? existing.subnetId,
+          serverId: server.id,
+          status,
+          serviceId,
+          notes,
+          isPrimary: serviceId && existing.serviceId === serviceId ? existing.isPrimary : false,
+          reservedById: null,
+          reservedOrderId: null,
+          reservedUntil: null,
+        },
+      });
     }
     status === "AVAILABLE" ? available++ : used++;
   }
-  return { pools: subnets, ips: ips.length, created, available, used };
+  // every VPS of ours keeps exactly one primary IP
+  for (const [serviceId, addrs] of perService) {
+    const hasPrimary = await prisma.ipAddress.count({ where: { serviceId, isPrimary: true } });
+    if (!hasPrimary) await prisma.ipAddress.update({ where: { address: addrs.sort()[0] }, data: { isPrimary: true } });
+  }
+  // remove what Virtualizor doesn't have (typo'd or hand-added ranges) — only when Virtualizor answered with IPs
+  if (seen.size) {
+    const stale = await prisma.ipAddress.findMany({ where: { version: 4, OR: [{ serverId: server.id }, { subnet: { serverId: server.id } }], address: { notIn: [...seen] } }, select: { id: true } });
+    if (stale.length) removed = (await prisma.ipAddress.deleteMany({ where: { id: { in: stale.map((x) => x.id) } } })).count;
+    const keep = [...subnetByPool.values()];
+    await prisma.ipSubnet.deleteMany({ where: { serverId: server.id, id: { notIn: keep }, ips: { none: {} } } });
+  }
+  return { pools: subnets, ips: ips.length, created, available, used, removed };
 }

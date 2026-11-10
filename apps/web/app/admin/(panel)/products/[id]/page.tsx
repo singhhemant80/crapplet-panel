@@ -204,7 +204,7 @@ export default function ProductEditor() {
               <Field label="Bandwidth (GB, empty = unmetered)"><Input type="number" value={p.bandwidthGb ?? ""} onChange={(e) => set({ bandwidthGb: e.target.value })} /></Field>
               <Field label="IPv4 addresses"><Input type="number" value={p.ipv4Count} onChange={(e) => set({ ipv4Count: e.target.value })} /></Field>
               <div className="flex flex-wrap gap-5 sm:col-span-2">
-                <Toggle checked={p.allowIpSelection} onChange={(v) => set({ allowIpSelection: v })} label="Customer chooses IPv4" />
+                {p.provisioner === "VIRTUALIZOR" ? <span className="text-xs font-semibold text-mute">IPv4 is assigned by Virtualizor from its own pools</span> : <Toggle checked={p.allowIpSelection} onChange={(v) => set({ allowIpSelection: v })} label="Customer chooses IPv4" />}
                 <Toggle checked={p.ipv6Enabled} onChange={(v) => set({ ipv6Enabled: v })} label="IPv6" />
                 <Toggle checked={p.requireHostname} onChange={(v) => set({ requireHostname: v })} label="Require hostname" />
               </div>
@@ -428,13 +428,9 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
           </div>
         </div>
       )}
-      <Field label="IPv4 addresses come from" hint={value.ipSource === "virtualizor" ? "Virtualizor assigns IPs from its pools; the panel records them after creation. Customers can't pick an IP." : value.ipSource === "panel" ? "Always use IP Management (sync pools from Virtualizor there). Customers can pick an IP." : "Uses IP Management when it has IPs for the server, otherwise lets Virtualizor assign them."}>
-        <Select value={value.ipSource ?? "auto"} onChange={(e) => onChange({ ipSource: e.target.value })}>
-          <option value="auto">Automatic (recommended)</option>
-          <option value="panel">IP Management (customer can choose)</option>
-          <option value="virtualizor">Virtualizor assigns</option>
-        </Select>
-      </Field>
+      <div className="rounded-xl bg-[#faf6ff] px-4 py-3 text-xs text-slate-600 ring-1 ring-[#efe4ff]">
+        <b className="text-ink">IPv4 addresses come from Virtualizor.</b> The panel asks for the plan's number of IPs, Virtualizor assigns them from the node's pool, and IP Management mirrors Virtualizor (every 10 minutes and after each change).
+      </div>
       <Field label="Advanced: extra Virtualizor parameters" hint="One key=value per line, sent when the VPS is created — e.g. vnc=1, nic_type=virtio, kvm_cache=writeback. # starts a comment.">
         <Textarea rows={3} className="font-mono text-xs" value={value.extraParams ?? ""} placeholder={"vnc=1\nnic_type=virtio"} onChange={(e) => onChange({ extraParams: e.target.value })} />
       </Field>
