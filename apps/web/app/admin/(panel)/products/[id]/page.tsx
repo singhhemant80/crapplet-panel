@@ -373,7 +373,7 @@ function VirtualizorPlanPicker({ serverIds, planId, virt, onPick }: { serverIds:
 
 const pct = (u: number, t: number) => (t ? Math.round((u / t) * 100) : 0);
 
-/** Where new VPS of this plan are built: Virtualizor's auto-select, the least-loaded allowed node, or one fixed node. */
+/** Where new VPS of this plan are built: automatic (panel picks node + storage), the least-loaded allowed node, or one fixed node. */
 function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: string[]; value: any; onChange: (patch: any) => void }) {
   const mon = useApi("/admin/monitoring");
   const firstServer = serverIds[0];
@@ -387,7 +387,7 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
       <div className="flex items-center gap-2 text-sm font-extrabold text-ink"><Icon name="hub" className="text-primary-dark" /> Node placement</div>
       <div className="grid gap-2 sm:grid-cols-3">
         {[
-          ["auto", "Virtualizor decides", "node_select — optionally inside a server group"],
+          ["auto", "Automatic", "Node with the most free RAM and its primary storage — optionally inside a server group"],
           ["least_loaded", "Least-loaded node", "We pick the allowed node with most free RAM, under your limits"],
           ["fixed", "Fixed node", "Always build on one node"],
         ].map(([k, t, d]) => (

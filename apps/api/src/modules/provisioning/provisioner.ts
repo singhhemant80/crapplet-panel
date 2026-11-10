@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { VirtualizorClient } from "./virtualizor";
+import { VirtualizorClient, pickStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 
 export class ProvisionError extends Error {
@@ -244,39 +244,77 @@ export function parseExtraParams(text?: string): Record<string, string> {
  *  2. the plan's placement: fixed node / least-loaded allowed node (from the 5-minute monitoring data,
  *     skipping offline, locked, disabled and over-threshold nodes) / Virtualizor's own node_select.
  */
-export async function chooseVirtualizorNode(
+type NodeChoice = { serid: number; name: string; reason: string };
+
+/**
+ * Ordered list of nodes to try for a new VPS. Virtualizor's own "auto" (node_select) can't resolve a
+ * primary storage on many setups ("no_storage"), so the panel always picks the node itself — the one
+ * with the most free RAM that's online, unlocked, accepting VPSes and under the server's limits.
+ * Returns an empty list only when the panel knows nothing about the nodes (falls back to node_select).
+ */
+export async function virtualizorNodeCandidates(
   svc: { node: string | null },
   server: Server,
   mc: VirtualizorModuleConfig,
   /** nodes that can use the VPS's IP (from the Virtualizor pool the IP belongs to); empty = any */
   ipNodes: string[] = [],
-): Promise<{ serid?: number; serverGroupId?: number; reason: string }> {
-  if (svc.node && /^\d+$/.test(svc.node)) return { serid: Number(svc.node), reason: `node ${svc.node} chosen by staff` };
+  virt?: string,
+): Promise<NodeChoice[]> {
+  const one = (serid: string | number, reason: string): NodeChoice[] => [{ serid: Number(serid), name: String(serid), reason }];
+  if (svc.node && /^\d+$/.test(svc.node)) return one(svc.node, `node ${svc.node} chosen by staff`);
+  let placement = mc.placement ?? (mc.slaveServerId !== undefined && mc.slaveServerId !== null ? "fixed" : "auto");
+  let allowed = placement === "least_loaded" && mc.nodeIds?.length ? mc.nodeIds : null;
   if (ipNodes.length) {
-    const allowed = mc.nodeIds?.length ? ipNodes.filter((n) => mc.nodeIds!.includes(n)) : ipNodes;
-    const pick = allowed.length ? allowed : ipNodes;
-    if (pick.length === 1) return { serid: Number(pick[0]), reason: `node ${pick[0]} — the only node attached to the IP's pool` };
-    mc = { ...mc, placement: "least_loaded", nodeIds: pick };
+    const inPlan = mc.nodeIds?.length && placement !== "auto" ? ipNodes.filter((n) => mc.nodeIds!.includes(n)) : ipNodes;
+    const pick = inPlan.length ? inPlan : ipNodes;
+    if (pick.length === 1) return one(pick[0], `node ${pick[0]} — the only node attached to the IP's pool`);
+    placement = "least_loaded";
+    allowed = pick;
   }
-  const placement = mc.placement ?? (mc.slaveServerId !== undefined && mc.slaveServerId !== null ? "fixed" : "auto");
   if (placement === "fixed") {
     const id = mc.nodeIds?.[0] ?? (mc.slaveServerId !== undefined ? String(mc.slaveServerId) : undefined);
     if (id === undefined) throw new ProvisionError("The plan is set to a fixed Virtualizor node but none is selected", false);
-    return { serid: Number(id), reason: `fixed node ${id}` };
+    return one(id, `fixed node ${id}`);
   }
-  if (placement === "least_loaded") {
-    const nodes = await prisma.serverNode.findMany({ where: { serverId: server.id, enabled: true, online: true, ...(mc.nodeIds?.length ? { externalId: { in: mc.nodeIds } } : {}) } });
-    const fit = nodes
-      .filter((n) => !(n.meta as { locked?: boolean } | null)?.locked && n.externalId !== null)
-      .filter((n) => (!n.ramTotalMb || (n.ramUsedMb / n.ramTotalMb) * 100 < server.maxRamPct) && (!n.diskTotalGb || (n.diskUsedGb / n.diskTotalGb) * 100 < server.maxDiskPct) && n.cpuPct < server.maxCpuPct)
-      .sort((a, b) => b.ramTotalMb - b.ramUsedMb - (a.ramTotalMb - a.ramUsedMb));
-    if (!fit.length)
-      throw new ProvisionError(`No Virtualizor node of "${server.name}" is online and under the limits (RAM ${server.maxRamPct}%, disk ${server.maxDiskPct}%, CPU ${server.maxCpuPct}%) — check Node Monitoring`);
-    const n = fit[0];
-    return { serid: Number(n.externalId), reason: `least-loaded node ${n.name} (${Math.round(n.ramTotalMb - n.ramUsedMb)} MB RAM free)` };
+
+  let nodes = await prisma.serverNode.findMany({ where: { serverId: server.id } });
+  const group = placement === "auto" && mc.serverGroupId != null ? String(mc.serverGroupId) : null;
+  const metaOf = (n: (typeof nodes)[number]) => (n.meta ?? {}) as { locked?: boolean; virt?: string | null; sgid?: string | null };
+  // first VPS on a fresh install, or nodes synced before group info was stored → refresh once
+  if (!nodes.length || (group && nodes.every((n) => metaOf(n).sgid === undefined))) {
+    const { syncVirtualizorNodes } = await import("./virtualizor-nodes");
+    await syncVirtualizorNodes(server).catch(() => null);
+    nodes = await prisma.serverNode.findMany({ where: { serverId: server.id } });
   }
-  return { serverGroupId: mc.serverGroupId ?? undefined, reason: mc.serverGroupId != null ? `Virtualizor auto-select in server group ${mc.serverGroupId}` : "Virtualizor auto-select" };
+  if (!nodes.length) return [];
+
+  let pool = nodes.filter((n) => n.externalId !== null && n.enabled && n.online && !metaOf(n).locked);
+  if (allowed) pool = pool.filter((n) => allowed!.includes(n.externalId!));
+  if (group) pool = pool.filter((n) => metaOf(n).sgid === undefined || metaOf(n).sgid === null || metaOf(n).sgid === group);
+  if (virt) {
+    const sameVirt = pool.filter((n) => !metaOf(n).virt || String(metaOf(n).virt).split(/[,\s]+/).includes(virt));
+    if (sameVirt.length) pool = sameVirt;
+  }
+  const fit = pool
+    .filter((n) => (!n.ramTotalMb || (n.ramUsedMb / n.ramTotalMb) * 100 < server.maxRamPct) && (!n.diskTotalGb || (n.diskUsedGb / n.diskTotalGb) * 100 < server.maxDiskPct) && n.cpuPct < server.maxCpuPct)
+    .sort((a, b) => b.ramTotalMb - b.ramUsedMb - (a.ramTotalMb - a.ramUsedMb));
+  if (!fit.length)
+    throw new ProvisionError(
+      `No Virtualizor node of "${server.name}"${group ? ` in server group ${group}` : ""} is online, accepting new VPSes and under the limits (RAM ${server.maxRamPct}%, disk ${server.maxDiskPct}%, CPU ${server.maxCpuPct}%) — check Node Monitoring`,
+    );
+  const how = placement === "auto" ? (group ? `auto (group ${group})` : "auto") : "least-loaded";
+  return fit.map((n) => ({ serid: Number(n.externalId), name: n.name, reason: `${how}: node ${n.name} (${Math.round(n.ramTotalMb - n.ramUsedMb)} MB RAM free)` }));
 }
+
+/** First choice only (kept for callers that need a single node). */
+export async function chooseVirtualizorNode(svc: { node: string | null }, server: Server, mc: VirtualizorModuleConfig, ipNodes: string[] = [], virt?: string) {
+  const [first] = await virtualizorNodeCandidates(svc, server, mc, ipNodes, virt);
+  return first
+    ? { serid: first.serid, reason: first.reason }
+    : { serid: undefined, serverGroupId: mc.serverGroupId ?? undefined, reason: mc.serverGroupId != null ? `Virtualizor auto-select in server group ${mc.serverGroupId}` : "Virtualizor auto-select" };
+}
+
+const isNoStorage = (e: unknown) => /no_storage|primary storage|storage could not be found|not enough (free )?space|no_space/i.test((e as Error)?.message ?? "");
 
 async function virtualizorCreate(svc: FullService) {
   const server = await pickServer(svc);
@@ -310,14 +348,13 @@ async function virtualizorCreate(svc: FullService) {
   const hostname = (svc.hostname || `vps-${svc.id.slice(-6)}.crapplet.cloud`).toLowerCase();
   let vpsid = svc.remoteId;
   if (!vpsid) {
-    const placement = await chooseVirtualizorNode(svc, server, mc, ipNodes);
-    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root", ...(placement.serid !== undefined ? { node: String(placement.serid) } : {}) } });
-    await log(svc.id, "create", true, `Placing VPS: ${placement.reason}`);
-    vpsid = await client.createVps({
-      virt: mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm"),
+    const virt = mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm");
+    const candidates = await virtualizorNodeCandidates(svc, server, mc, ipNodes, virt);
+    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root" } });
+    const storages = candidates.length ? await client.storages().catch(() => []) : [];
+    const base = {
+      virt,
       planId: mc.planId,
-      serverId: placement.serid,
-      serverGroupId: placement.serverGroupId,
       extra: parseExtraParams(mc.extraParams),
       userEmail: svc.user.email,
       userPass: generatePassword(16),
@@ -330,7 +367,37 @@ async function virtualizorCreate(svc: FullService) {
       diskGb: p.diskGb ?? undefined,
       cores: p.cpuCores ?? undefined,
       bandwidthGb: p.bandwidthGb ?? 0,
-    });
+    };
+    const tried: string[] = [];
+    if (!candidates.length) {
+      await log(svc.id, "create", true, "Placing VPS: Virtualizor auto-select (no node data yet)");
+      try {
+        vpsid = await client.createVps({ ...base, serverGroupId: mc.serverGroupId ?? undefined });
+      } catch (e) {
+        if (isNoStorage(e)) throw new ProvisionError(`Virtualizor couldn't choose a storage on its own. Open Node Monitoring and click Refresh so the panel can pick the node itself, then retry. (${(e as Error).message})`, false);
+        throw e;
+      }
+    } else {
+      // try up to 3 nodes — a node without a usable primary storage shouldn't fail the order
+      for (const n of candidates.slice(0, 3)) {
+        const st = pickStorage(storages, String(n.serid), p.diskGb ?? 0);
+        await log(svc.id, "create", true, `Placing VPS: ${n.reason}${st ? ` · storage ${st.name} (id ${st.stid}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})` : ""}`);
+        try {
+          vpsid = await client.createVps({ ...base, serverId: n.serid, storageId: st?.stid });
+          await prisma.service.update({ where: { id: svc.id }, data: { node: String(n.serid) } });
+          break;
+        } catch (e) {
+          if (!isNoStorage(e)) throw e;
+          tried.push(`${n.name} (${(e as Error).message.replace(/^Virtualizor addvs:\s*/, "")})`);
+          await log(svc.id, "create", false, `Node ${n.name} has no usable storage — trying the next node`);
+        }
+      }
+      if (!vpsid)
+        throw new ProvisionError(
+          `No storage available on ${tried.join("; ")}. In Virtualizor open Storage, edit the storage of these nodes and tick “Primary storage” (or add one with enough free space), then retry.`,
+          false,
+        );
+    }
   }
   let addresses = ips.map((i) => i.address);
   if (!usePanelIps) {

@@ -2,7 +2,8 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "../src/db";
 import { encrypt } from "../src/lib/crypto";
-import { chooseVirtualizorNode, parseExtraParams } from "../src/modules/provisioning/provisioner";
+import { chooseVirtualizorNode, parseExtraParams, virtualizorNodeCandidates } from "../src/modules/provisioning/provisioner";
+import { parseStorages, pickStorage } from "../src/modules/provisioning/virtualizor";
 
 const RUN = Date.now().toString(36);
 after(async () => {
@@ -16,13 +17,14 @@ test("extra Virtualizor params parse key=value lines", () => {
 
 test("node placement: staff choice, fixed, least-loaded under limits, auto with server group", async () => {
   const srv = await prisma.server.create({ data: { name: `place-${RUN}`, type: "VIRTUALIZOR", hostname: "v.invalid", port: 4085, apiUser: "k", apiSecretEnc: encrypt("p"), maxRamPct: 90, maxDiskPct: 90, maxCpuPct: 85 } });
-  const mk = (name: string, externalId: string, d: Partial<{ online: boolean; enabled: boolean; cpuPct: number; ramUsedMb: number; ramTotalMb: number; locked: boolean }>) =>
-    prisma.serverNode.create({ data: { serverId: srv.id, name, externalId, online: d.online ?? true, enabled: d.enabled ?? true, cpuPct: d.cpuPct ?? 10, ramUsedMb: d.ramUsedMb ?? 0, ramTotalMb: d.ramTotalMb ?? 65536, diskUsedGb: 100, diskTotalGb: 1000, meta: { locked: d.locked ?? false } } });
+  const mk = (name: string, externalId: string, d: Partial<{ online: boolean; enabled: boolean; cpuPct: number; ramUsedMb: number; ramTotalMb: number; locked: boolean; sgid: string; virt: string }>) =>
+    prisma.serverNode.create({ data: { serverId: srv.id, name, externalId, online: d.online ?? true, enabled: d.enabled ?? true, cpuPct: d.cpuPct ?? 10, ramUsedMb: d.ramUsedMb ?? 0, ramTotalMb: d.ramTotalMb ?? 65536, diskUsedGb: 100, diskTotalGb: 1000, meta: { locked: d.locked ?? false, sgid: d.sgid ?? "0", virt: d.virt ?? "proxk" } } });
   await mk("busy", "1", { ramUsedMb: 62000 }); // 95% RAM → over the 90% limit
   await mk("roomy", "2", { ramUsedMb: 20000 });
   await mk("emptiest-but-off", "3", { ramUsedMb: 1000, enabled: false });
   await mk("emptiest-but-locked", "4", { ramUsedMb: 1000, locked: true });
-  await mk("half", "5", { ramUsedMb: 32000 });
+  await mk("half", "5", { ramUsedMb: 32000, sgid: "7" });
+  await mk("half-openvz", "6", { ramUsedMb: 30000, sgid: "7", virt: "vzo" });
 
   assert.deepEqual(await chooseVirtualizorNode({ node: "5" }, srv, { placement: "least_loaded" }), { serid: 5, reason: "node 5 chosen by staff" });
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "fixed", nodeIds: ["1"] })).serid, 1);
@@ -30,9 +32,11 @@ test("node placement: staff choice, fixed, least-loaded under limits, auto with 
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "least_loaded" })).serid, 2, "most free RAM among usable nodes");
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "least_loaded", nodeIds: ["1", "5"] })).serid, 5, "only allowed nodes; busy one is over the limit");
   await assert.rejects(chooseVirtualizorNode({ node: null }, srv, { placement: "least_loaded", nodeIds: ["1"] }), /under the limits/);
-  const auto = await chooseVirtualizorNode({ node: null }, srv, { placement: "auto", serverGroupId: 7 });
-  assert.equal(auto.serid, undefined);
-  assert.equal(auto.serverGroupId, 7);
+  // auto: the panel picks the node itself (Virtualizor's node_select fails with "no_storage" on many masters)
+  assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "auto" }, [], "proxk")).serid, 2, "auto = most free RAM");
+  assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "auto", serverGroupId: 7 }, [], "proxk")).serid, 5, "auto stays inside the server group and skips other virt types");
+  const all = await virtualizorNodeCandidates({ node: null }, srv, { placement: "auto" }, [], "proxk");
+  assert.deepEqual(all.map((n) => n.serid), [2, 5], "fallback order for a node without storage");
 });
 
 test("Virtualizor pools map to the right subnet", async () => {
@@ -42,3 +46,18 @@ test("Virtualizor pools map to the right subnet", async () => {
   assert.deepEqual(poolCidr("10.0.0.1", "28"), { cidr: "10.0.0.0/28", prefix: 28 });
 });
 
+
+test("storage choice: node's primary storage with room, else the roomiest attached one", () => {
+  const st = parseStorages({
+    storage: {
+      "1": { stid: "1", name: "nvme-node2", type: "lvm", primary_storage: "1", serid: "2", size: "1800", free: "1500" },
+      "2": { stid: "2", name: "small-primary-node5", primary_storage: "1", serid: "5", size: "100", free: "10" },
+      "3": { stid: "3", name: "big-node5", primary_storage: "0", serid: "5", size: "4000", free: "3000" },
+      "4": { stid: "4", name: "shared-ceph", primary_storage: "0", servers: { "2": "2", "5": "5" }, free: "500" },
+    },
+  });
+  assert.deepEqual(st.find((s) => s.stid === 4)?.serids, ["2", "5"]);
+  assert.equal(pickStorage(st, "2", 50)?.stid, 1);
+  assert.equal(pickStorage(st, "5", 50)?.stid, 3, "primary too small → biggest attached storage");
+  assert.equal(pickStorage(st, "9", 50), null, "nothing attached to node 9");
+});

@@ -133,6 +133,8 @@ export class VirtualizorClient {
     serverId?: number;
     /** with automatic placement: limit Virtualizor's choice to this server group */
     serverGroupId?: number;
+    /** storage to put the disk on; omit = the node's primary storage */
+    storageId?: number;
     /** extra addvs fields from the plan's advanced settings (vnc, nic_type, …) */
     extra?: Record<string, string>;
     userEmail: string;
@@ -155,6 +157,7 @@ export class VirtualizorClient {
       ...(p.serverId !== undefined
         ? { slave_server: p.serverId, serid: p.serverId }
         : { node_select: 1, ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
+      ...(p.storageId !== undefined ? { stid: p.storageId } : {}),
       user_email: p.userEmail,
       user_pass: p.userPass,
       hostname: p.hostname,
@@ -171,6 +174,11 @@ export class VirtualizorClient {
     const vpsid = r.vs_info?.vpsid ?? r.newvs?.vpsid;
     if (!vpsid) throw new VirtualizorError("Virtualizor did not return a VPS id", r);
     return String(vpsid);
+  }
+
+  /** All storages with the nodes they're attached to (act=storage). */
+  async storages(): Promise<VirtStorage[]> {
+    return parseStorages(await this.call<Record<string, unknown>>("storage", { reslen: 1000 }));
   }
 
   suspend(vpsid: string) {
@@ -197,4 +205,73 @@ export class VirtualizorClient {
   stats(vpsid: string) {
     return this.call<Record<string, unknown>>("vps_stats", { vpsid });
   }
+}
+
+export interface VirtStorage {
+  stid: number;
+  name: string;
+  type: string;
+  primary: boolean;
+  /** Virtualizor serids the storage is attached to; empty = not reported (treat as usable anywhere) */
+  serids: string[];
+  totalGb: number | null;
+  freeGb: number | null;
+}
+
+const numOrNull = (v: unknown) => {
+  const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Collects node ids from the many shapes Virtualizor uses: "3", 3, "1,3", [1,3], {"1":…,"3":…}, [{serid:1}]. */
+function seridList(...vals: unknown[]): string[] {
+  const out = new Set<string>();
+  const add = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return;
+    if (Array.isArray(v)) return v.forEach((x) => (x && typeof x === "object" ? add((x as Record<string, unknown>).serid ?? (x as Record<string, unknown>).id) : add(x)));
+    if (typeof v === "object") {
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+        if (x && typeof x === "object" && "serid" in (x as object)) add((x as Record<string, unknown>).serid);
+        else if (/^-?\d+$/.test(k)) out.add(k);
+      }
+      return;
+    }
+    for (const part of String(v).split(/[,\s]+/)) if (/^-?\d+$/.test(part) && part !== "-1") out.add(part);
+  };
+  vals.forEach(add);
+  return [...out];
+}
+
+export function parseStorages(r: Record<string, unknown>): VirtStorage[] {
+  const raw = (r.storage ?? r.storages ?? {}) as Record<string, Record<string, unknown>> | Record<string, unknown>[];
+  const rows = Array.isArray(raw) ? raw : Object.entries(raw).map(([k, v]) => ({ stid: k, ...(v as object) }) as Record<string, unknown>);
+  const map = (r.storage_servers ?? r.storages_servers ?? null) as Record<string, unknown> | null;
+  return rows
+    .filter((s) => s && typeof s === "object")
+    .map((s) => {
+      const stid = Number(s.stid ?? s.id);
+      return {
+        stid,
+        name: String(s.name ?? s.path ?? `Storage ${stid}`),
+        type: String(s.type ?? ""),
+        primary: String(s.primary_storage ?? s.primary ?? "0") === "1",
+        serids: seridList(s.serid, s.servers, s.server_ids, s.storage_servers, map?.[String(stid)]),
+        totalGb: numOrNull(s.size ?? s.total ?? s.total_size),
+        freeGb: numOrNull(s.free ?? s.free_size ?? s.available),
+      };
+    })
+    .filter((s) => Number.isFinite(s.stid));
+}
+
+/**
+ * Best storage for a new disk on a node: its primary storage when it has room, otherwise the
+ * attached storage with the most free space. null = nothing suitable is known (let Virtualizor decide).
+ */
+export function pickStorage(storages: VirtStorage[], serid: string, diskGb = 0): VirtStorage | null {
+  const onNode = storages.filter((s) => !s.serids.length || s.serids.includes(serid));
+  const fits = (s: VirtStorage) => s.freeGb === null || s.freeGb >= diskGb;
+  const primary = onNode.filter((s) => s.primary && fits(s)).sort((a, b) => (b.freeGb ?? 0) - (a.freeGb ?? 0));
+  if (primary.length) return primary[0];
+  const any = onNode.filter(fits).sort((a, b) => (b.freeGb ?? 0) - (a.freeGb ?? 0));
+  return any[0] ?? null;
 }

@@ -99,6 +99,7 @@ export async function syncVirtualizorNodes(server: Server) {
       ip: s.ip ?? null,
       internalIp: s.internal_ip ?? null,
       virt: s.virt ?? null,
+      sgid: s.sgid !== undefined && s.sgid !== null ? String(s.sgid) : null,
       os: s.os ?? null,
       cpuModel: typeof s.cpu === "string" ? s.cpu : null,
       vpsCount: num(s.numvps),
