@@ -92,6 +92,12 @@ export function createApp() {
     res.json({ opened: t.number });
   }));
 
+  // why a console connection failed — the random ticket is the only key
+  api.get("/console/status", ah(async (req, res) => {
+    const { consoleError } = await import("./modules/console");
+    res.json({ error: await consoleError(String(req.query.t ?? "")) });
+  }));
+
   app.use("/api", api);
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
   app.use(errorHandler);

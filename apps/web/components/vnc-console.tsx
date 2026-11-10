@@ -31,7 +31,7 @@ export function VncConsole({ sessionPath, title }: { sessionPath: string; title:
     setState("connecting");
     setMsg("Opening console…");
     try {
-      const s = await api<{ path: string; password: string }>(sessionPath, { body: {} });
+      const s = await api<{ path: string; statusPath?: string; password: string }>(sessionPath, { body: {} });
       // `next dev` doesn't proxy websockets — talk to the API port directly there
       const origin = process.env.NEXT_PUBLIC_CONSOLE_WS_ORIGIN || `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
       const { default: RFB } = (await import("@novnc/novnc/lib/rfb")) as { default: new (el: HTMLElement, url: string, opts: object) => RFBType };
@@ -46,9 +46,17 @@ export function VncConsole({ sessionPath, title }: { sessionPath: string; title:
         setMsg("Connected");
         r.focus();
       });
-      r.addEventListener("disconnect", (e: any) => {
-        setState(e?.detail?.clean ? "disconnected" : "error");
-        setMsg(e?.detail?.clean ? "Disconnected" : "The console connection was closed. Is the VPS running and VNC enabled?");
+      let connected = false;
+      r.addEventListener("connect", () => (connected = true));
+      r.addEventListener("disconnect", async (e: any) => {
+        const clean = !!e?.detail?.clean && connected;
+        setState(clean ? "disconnected" : "error");
+        setMsg(clean ? "Disconnected" : "The console connection was closed. Checking why…");
+        if (clean || !s.statusPath) return;
+        // the relay records the real reason (unreachable master, VPS off, VNC disabled…)
+        await new Promise((ok) => setTimeout(ok, 400));
+        const st = await api<{ error: string | null }>(s.statusPath.replace(/^\/api/, "")).catch(() => null);
+        setMsg(st?.error ?? "The console connection was closed. Is the VPS running and VNC enabled? If this keeps happening, check the panel can reach the Virtualizor master on port 4083.");
       });
       r.addEventListener("securityfailure", (e: any) => {
         setState("error");
