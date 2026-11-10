@@ -16,6 +16,7 @@ import { resellerRouter } from "./modules/reseller/routes";
 import { adminCore } from "./modules/admin/core";
 import { adminCatalog } from "./modules/admin/catalog";
 import { adminInfra } from "./modules/admin/infra";
+import { adminEmail } from "./modules/email/routes";
 import { adminSupport } from "./modules/admin/support";
 import { migrationRouter } from "./modules/migration/routes";
 import { replyTicket } from "./modules/tickets/service";
@@ -48,7 +49,7 @@ export function createApp() {
   api.use("/webhooks", webhooksRouter);
   api.use("/reseller", resellerRouter);
   api.use("/v1/reseller", resellerRouter); // API-key access for resellers
-  api.use("/admin", adminCore, adminCatalog, adminInfra, adminSupport, migrationRouter);
+  api.use("/admin", adminCore, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter);
 
   // public content
   api.get("/content/announcements", ah(async (_req, res) => {

@@ -44,8 +44,12 @@ Options: `--no-ssl` (skip Let's Encrypt), `--demo` (seed a test server, IP range
 `--dir /opt/crapplet-panel`, `--branch main`. **Run the same command again to update** — it pulls the latest code,
 rebuilds and applies migrations; your `.env`, database and uploads are kept.
 
-Email: set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in `/opt/crapplet-panel/apps/api/.env`, then
-`sudo -u crapplet pm2 restart all`.
+Email: open **Admin → Email Delivery**, pick your provider (Zoho, ZeptoMail, Google Workspace, Microsoft 365,
+Amazon SES, Brevo, Mailgun, SendGrid, Postmark or any SMTP server), enter the login, press **Test connection**,
+send a test email and **Save**. The **Deliverability check** tab then looks up SPF, DKIM, DMARC and MX for your
+From domain (plus reverse DNS and blocklists when sending from this server) and shows the exact DNS records to add.
+Every email, with the receiving server's reply, appears in the **Delivery log**; hard bounces aren't retried and
+that address is paused for 30 days. The `SMTP_*` values in `.env` are only used until the page is saved once.
 
 The script installs Node 22, PostgreSQL, Redis, Nginx, Certbot and PM2; generates secrets into `apps/api/.env`;
 builds; runs `prisma migrate deploy`; seeds; starts `crapplet-api` (×2), `crapplet-worker` and `crapplet-web`

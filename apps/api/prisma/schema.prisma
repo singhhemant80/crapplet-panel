@@ -1047,9 +1047,15 @@ model EmailLog {
   subject   String
   template  String?
   userId    String?
-  status    String
+  status    String // SENT | LOGGED | FAILED | BOUNCED | SUPPRESSED
   error     String?
+  messageId String?
+  response  String? // the receiving server's reply, e.g. "250 2.0.0 OK"
+  job       Json? // template + vars, so the email can be re-sent
   createdAt DateTime @default(now())
+
+  @@index([to])
+  @@index([createdAt])
 }
 
 model ActivityLog {

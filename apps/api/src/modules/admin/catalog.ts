@@ -371,7 +371,7 @@ adminCatalog.post(
     const vars = { company: s.company, appUrl: "https://crapplet.co.in", name: "Asha", invoiceNumber: "CC/2026-27/00042", total: "₹1,178.82", dueDate: "16 Nov 2026", productName: "Linux VPS G2", hostname: "vps1.example.com", ip: "103.0.0.10", username: "root", password: "S4mple#Pass", os: "Ubuntu 24.04", ticketNumber: "CC-100123", subject: "Sample", message: "Sample reply", ...(req.body?.vars ?? {}) };
     const subject = render(req.body?.subject ?? d.subject, vars);
     const body = render(req.body?.body ?? d.body, vars);
-    if (req.body?.sendTo) await sendTemplatedEmail({ template: req.params.key, to: String(req.body.sendTo), vars });
+    if (req.body?.sendTo) await sendTemplatedEmail({ template: req.params.key, to: String(req.body.sendTo), vars }, { ignoreSuppression: true });
     res.json({ subject, body });
   }),
 );
