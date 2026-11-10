@@ -465,7 +465,7 @@ async function virtualizorCreate(svc: FullService) {
               ...hints.stids.map((id) => storages.find((x) => x.stid === id) ?? { stid: id, uuid: null, name: `#${id}`, type: "", primary: false, serids: [], sgids: [], totalGb: null, freeGb: null }),
             ]
           : [];
-        const own = await client.storagesForServer(n.serid).catch(() => [] as VirtStorage[]);
+        const own = await client.storagesForServer(n.serid, virt).catch(() => [] as VirtStorage[]);
         const mapped = rank([...own, ...storagesOfNode(storages, String(n.serid), sgidOf(n.serid))]);
         const guesses = learned.length || mapped.length || anyMapped ? [] : rank(storages);
         const seen = new Set<string>();
@@ -476,7 +476,9 @@ async function virtualizorCreate(svc: FullService) {
           return true;
         });
         type Attempt = { label: string; storage?: { stid?: number | null; uuid?: string | null }; diskMode: "scalar" | "array" | "plan" };
-        const attempts: Attempt[] = [];
+        // first exactly what Virtualizor's own WHMCS module sends: plan + node + type, no storage —
+        // Virtualizor then uses that node's storage for this VPS type
+        const attempts: Attempt[] = mc.planId ? [{ label: "Virtualizor plan on this node (like the WHMCS module)", diskMode: "plan" }] : [{ label: "node's primary storage", diskMode: "scalar" }];
         for (const st of pool.slice(0, 5)) {
           const id = Number.isFinite(st.stid) ? st.stid : null;
           const label = `storage ${st.name}${id !== null ? ` (id ${id}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})` : ""}${learned.includes(st) ? " — used by VPS on this node" : ""}`;
@@ -485,8 +487,7 @@ async function virtualizorCreate(svc: FullService) {
           if (st.uuid && id !== null) attempts.push({ label: `${label} [uuid only]`, storage: { uuid: st.uuid }, diskMode: "array" });
           if (id !== null) attempts.push({ label: `${label} [id only]`, storage: { stid: id }, diskMode: "scalar" });
         }
-        attempts.push({ label: "node's primary storage", diskMode: "scalar" });
-        if (mc.planId) attempts.push({ label: "Virtualizor plan defaults", diskMode: "plan" });
+        if (mc.planId) attempts.push({ label: "node's primary storage with the plan's sizes", diskMode: "scalar" });
         const virtMismatch = hints?.virts.length && !hints.virts.includes(virt) ? hints.virts : null;
         await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}${attempts.length > 2 ? ` (${attempts.length} ways to try)` : ""}`);
         const errs: string[] = [];

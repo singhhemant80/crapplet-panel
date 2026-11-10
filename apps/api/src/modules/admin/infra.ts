@@ -317,7 +317,7 @@ adminInfra.get(
     const [hints, storageRaw, form, plans] = await Promise.all([
       safe(() => c.learnNode(serid)),
       safe(() => c.storagesRaw()),
-      safe(() => c.addvsForm(serid)),
+      safe(async () => c.addvsForm(serid, (((await prisma.product.findFirst({ where: { provisioner: "VIRTUALIZOR" }, select: { moduleConfig: true } }))?.moduleConfig ?? {}) as { virtualizor?: { virt?: string } }).virtualizor?.virt ?? "kvm")),
       safe(() => c.plans()),
     ]);
     const formData = form.ok ? (form.data as Record<string, unknown>) : null;

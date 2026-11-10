@@ -61,7 +61,7 @@ export class VirtualizorClient {
     return `https://${host}:${this.creds.port}/index.php?${q.toString()}`;
   }
 
-  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean } = {}): Promise<T> {
+  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean; cookies?: Record<string, string> } = {}): Promise<T> {
     let body: string | undefined;
     if (post) {
       const form = new URLSearchParams();
@@ -75,7 +75,10 @@ export class VirtualizorClient {
     const res = await request(this.url(act, query), {
       method: post ? "POST" : "GET",
       dispatcher: opts.slow ? this.slowAgent : this.agent,
-      headers: post ? { "Content-Type": "application/x-www-form-urlencoded" } : undefined,
+      headers: {
+        ...(post ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+        ...(opts.cookies && Object.keys(opts.cookies).length ? { Cookie: Object.entries(opts.cookies).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("; ") } : {}),
+      },
       body,
     }).catch((e) => {
       throw explainNetError(e, host, this.creds.port, "Virtualizor");
@@ -155,9 +158,19 @@ export class VirtualizorClient {
     return hints;
   }
 
-  /** Virtualizor's Create VPS form for a node, unparsed (for diagnosis). */
-  addvsForm(serid: number | string) {
-    return this.call<Record<string, unknown>>("addvs", { serid, slave_server: serid });
+  private cookieNameCache: string | null = null;
+  /** Name of the admin session cookie; "<name>_server" selects the node in the Create VPS form. */
+  async cookieName(virt = "kvm") {
+    if (this.cookieNameCache) return this.cookieNameCache;
+    const r = await this.call<{ globals?: { cookie_name?: string } }>("addvs", { virt });
+    this.cookieNameCache = r.globals?.cookie_name ? String(r.globals.cookie_name) : "SIMCookies";
+    return this.cookieNameCache;
+  }
+
+  /** Virtualizor's Create VPS form for a node and VPS type, unparsed (for diagnosis). */
+  async addvsForm(serid: number | string, virt = "kvm") {
+    const name = await this.cookieName(virt).catch(() => null);
+    return this.call<Record<string, unknown>>("addvs", { virt, serid, slave_server: serid }, undefined, { cookies: name ? { [`${name}_server`]: String(serid) } : {} });
   }
 
   getVps(vpsid: string | number) {
@@ -231,13 +244,22 @@ export class VirtualizorClient {
     cores?: number;
     bandwidthGb?: number;
   }) {
-    const r = await this.call<{ done?: boolean; vs_info?: { vpsid: string | number }; newvs?: { vpsid: string | number } }>("addvs", {}, {
+    // Same request shape as Virtualizor's own WHMCS module: the VPS type goes in the URL (it decides
+    // which storages/templates are valid), the node is sent as slave_server with node_select=1 and as
+    // the "<cookie>_server" cookie the admin panel uses; storage is only sent when asked for.
+    const cookies: Record<string, string> = {};
+    if (p.serverId !== undefined) {
+      const name = await this.cookieName(p.virt).catch(() => null);
+      if (name) cookies[`${name}_server`] = String(p.serverId);
+    }
+    const r = await this.call<{ done?: boolean; vs_info?: { vpsid: string | number }; newvs?: { vpsid: string | number } }>("addvs", { virt: p.virt }, {
       addvps: 1,
       virt: p.virt,
       plid: p.planId,
+      node_select: 1,
       ...(p.serverId !== undefined
-        ? { slave_server: p.serverId, serid: p.serverId }
-        : { node_select: 1, ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
+        ? { slave_server: p.serverId, serid: p.serverId, server_group: "" }
+        : { slave_server: "auto", ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
       ...(p.storage?.stid !== undefined && p.storage?.stid !== null ? { stid: p.storage.stid } : {}),
       user_email: p.userEmail,
       user_pass: p.userPass,
@@ -253,9 +275,9 @@ export class VirtualizorClient {
             cores: p.cores,
             space: p.diskMode === "array" && p.diskGb ? { 0: { size: p.diskGb, ...(p.storage?.uuid ? { st_uuid: p.storage.uuid } : {}) } } : p.diskGb,
           }),
-      bandwidth: p.bandwidthGb ?? 0,
+      ...(p.diskMode === "plan" && p.planId ? {} : { bandwidth: p.bandwidthGb ?? 0 }),
       ...(p.extra ?? {}),
-    }, { slow: true });
+    }, { slow: true, cookies });
     const vpsid = r.vs_info?.vpsid ?? r.newvs?.vpsid;
     if (!vpsid) throw new VirtualizorError("Virtualizor did not return a VPS id", r);
     return String(vpsid);
@@ -272,8 +294,8 @@ export class VirtualizorClient {
    * Storages Virtualizor offers for one node — read from its own Create VPS form (act=addvs without
    * submitting), the same list the admin panel's storage dropdown shows for that server.
    */
-  async storagesForServer(serid: number): Promise<VirtStorage[]> {
-    const r = await this.call<Record<string, unknown>>("addvs", { serid, slave_server: serid });
+  async storagesForServer(serid: number, virt = "kvm"): Promise<VirtStorage[]> {
+    const r = await this.addvsForm(serid, virt);
     return parseStorages(r).map((x) => (x.serids.length ? x : { ...x, serids: [String(serid)] }));
   }
 
