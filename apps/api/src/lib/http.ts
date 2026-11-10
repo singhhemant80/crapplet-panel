@@ -32,6 +32,11 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   if (anyErr?.code === "P2002") return res.status(409).json({ error: "A record with these details already exists", code: "CONFLICT" });
   if (anyErr?.code === "P2025") return res.status(404).json({ error: "Not found", code: "NOT_FOUND" });
   console.error(`[api] ${req.method} ${req.originalUrl}`, err);
+  // hypervisor / provisioning failures carry a message meant for staff — show it instead of a bare 500
+  const name = (err as { constructor?: { name?: string } })?.constructor?.name ?? "";
+  if (["VirtualizorError", "ProvisionError", "ProxmoxError"].includes(name) && anyErr.message) {
+    return res.status(502).json({ error: anyErr.message, code: "UPSTREAM" });
+  }
   res.status(500).json({ error: "Internal server error" });
 }
 

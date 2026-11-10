@@ -21,7 +21,12 @@ export async function openConsole(serviceId: string, who: { userId: string; staf
   if (svc.product.provisioner !== "VIRTUALIZOR") throw new HttpError(400, "The browser console is available for Virtualizor VPSes");
   if (!svc.server || !svc.remoteId) throw new HttpError(409, "This VPS hasn't been created yet");
   if (!who.staff && svc.status !== "ACTIVE") throw new HttpError(409, `The console isn't available while the service is ${svc.status.toLowerCase()}`);
-  const info = await virtualizorFor(svc.server).vncInfo(svc.remoteId);
+  const info = await virtualizorFor(svc.server)
+    .vncInfo(svc.remoteId)
+    .catch((e: Error) => {
+      // show the real reason instead of a generic 500
+      throw new HttpError(502, e.message);
+    });
   const ticket = crypto.randomBytes(24).toString("base64url");
   const t: Ticket = { host: info.host || svc.server.hostname.replace(/^https?:\/\//, "").replace(/[:/].*$/, ""), port: 4083, vpsid: svc.remoteId, verifyTls: svc.server.verifyTls, serviceId: svc.id };
   await redis().set(KEY(ticket), JSON.stringify(t), "EX", 60);

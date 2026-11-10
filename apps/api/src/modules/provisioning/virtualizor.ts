@@ -50,7 +50,7 @@ export class VirtualizorClient {
     this.slowAgent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: CREATE_TIMEOUT_MS, bodyTimeout: CREATE_TIMEOUT_MS, keepAliveTimeout: 1000 });
   }
 
-  private url(act: string, query: Record<string, string | number | undefined> = {}) {
+  private url(act: string, query: Record<string, string | number | undefined> = {}, port = this.creds.port) {
     const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
     // same auth as Virtualizor's own admin SDK: key + pass, plus apikey = rand8 + md5(pass + rand8)
     const pass = this.creds.apiPass.trim();
@@ -58,10 +58,10 @@ export class VirtualizorClient {
     const apikey = rand + createHash("md5").update(pass + rand).digest("hex");
     const q = new URLSearchParams({ act, api: "json", adminapikey: this.creds.apiKey.trim(), adminapipass: pass, apikey });
     for (const [k, v] of Object.entries(query)) if (v !== undefined) q.set(k, String(v));
-    return `https://${host}:${this.creds.port}/index.php?${q.toString()}`;
+    return `https://${host}:${port}/index.php?${q.toString()}`;
   }
 
-  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean; cookies?: Record<string, string> } = {}): Promise<T> {
+  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean; cookies?: Record<string, string>; port?: number } = {}): Promise<T> {
     let body: string | undefined;
     if (post) {
       const form = new URLSearchParams();
@@ -72,7 +72,7 @@ export class VirtualizorClient {
       body = form.toString();
     }
     const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const res = await request(this.url(act, query), {
+    const res = await request(this.url(act, query, opts.port), {
       method: post ? "POST" : "GET",
       dispatcher: opts.slow ? this.slowAgent : this.agent,
       headers: {
@@ -225,15 +225,32 @@ export class VirtualizorClient {
    * (https) at /novnc/?virttoken=<vpsid>.
    */
   async vncInfo(vpsid: string): Promise<{ password: string; virt?: string; host?: string }> {
-    const r = await this.call<Record<string, unknown>>("vnc", { novnc: 1, vpsid }, { vpsid, novnc: 1 });
-    const info = (r.info ?? r.vnc ?? r) as Record<string, unknown>;
-    let password = String(info.password ?? info.vncpass ?? "");
-    if (!password) {
-      const form = await this.call<{ vps?: Record<string, unknown> }>("editvs", { vpsid }).catch(() => null);
-      password = String(form?.vps?.vncpass ?? "");
+    const pick = (r: Record<string, unknown>) => {
+      const info = (r.info ?? r.vnc ?? r) as Record<string, unknown>;
+      return { password: String(info.password ?? info.vncpass ?? ""), virt: info.virt ? String(info.virt) : undefined, host: info.host ? String(info.host) : undefined };
+    };
+    const errors: string[] = [];
+    // 1) exactly like the WHMCS module: end-user API on 4083 with the admin key, acting on VPS "svs"
+    try {
+      const r = pick(await this.call<Record<string, unknown>>("vnc", { novnc: 1, svs: vpsid }, undefined, { port: 4083 }));
+      if (r.password) return r;
+      errors.push("end-user API (4083) returned no console password");
+    } catch (e) {
+      errors.push(`end-user API (4083): ${(e as Error).message}`);
     }
-    if (!password) throw new VirtualizorError("Virtualizor didn't return a console password — make sure VNC is enabled for this VPS (Virtualizor → Manage VPS → VNC)", r);
-    return { password, virt: info.virt ? String(info.virt) : undefined, host: info.host ? String(info.host) : undefined };
+    // 2) admin API
+    try {
+      const r = pick(await this.call<Record<string, unknown>>("vnc", { novnc: 1, vpsid, svs: vpsid }, { vpsid, novnc: 1 }));
+      if (r.password) return r;
+      errors.push("admin API returned no console password");
+    } catch (e) {
+      errors.push(`admin API: ${(e as Error).message}`);
+    }
+    // 3) the VNC password stored on the VPS
+    const form = await this.call<{ vps?: Record<string, unknown> }>("editvs", { vpsid }).catch(() => null);
+    const vncpass = form?.vps?.vncpass ? String(form.vps.vncpass) : "";
+    if (vncpass && String(form?.vps?.vnc ?? "1") !== "0") return { password: vncpass, virt: form?.vps?.virt ? String(form.vps.virt) : undefined };
+    throw new VirtualizorError(`Couldn't get console access for VPS ${vpsid} — ${errors.join("; ")}. Check that VNC is enabled for the VPS (Virtualizor → Manage VPS → VNC) and that this panel can reach the master on port 4083.`);
   }
 
   getVps(vpsid: string | number) {
