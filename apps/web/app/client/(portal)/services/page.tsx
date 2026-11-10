@@ -1,4 +1,5 @@
 "use client";
+import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -61,6 +62,11 @@ function Services() {
                   </div>
                   <Badge status={s.status} />
                 </div>
+                {vps && ["PENDING", "PROVISIONING", "FAILED"].includes(s.status) && (
+                  <div className="mt-4 rounded-xl bg-[#fbf9ff] px-3 py-2.5">
+                    <ProvisioningTracker path={`/client/services/${s.id}/provisioning`} audience="client" compact />
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-[#fbf9ff] p-3 text-center text-xs">
                   <div>
                     <div className="font-semibold text-mute">IP address</div>

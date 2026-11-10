@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { api, CYCLES, date, gb, invNo, money } from "@/lib/api";
 import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, toast, useApi } from "@/components/ui";
 import { Sparkline } from "@/components/sparkline";
+import { ProvisioningTracker } from "@/components/provisioning-tracker";
 
 export default function ServicePage() {
   const { id } = useParams<{ id: string }>();
@@ -28,12 +29,6 @@ export default function ServicePage() {
     const t = setInterval(tick, 15000);
     return () => clearInterval(t);
   }, [svc?.status, isVps, id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (svc?.status !== "PROVISIONING") return;
-    const t = setInterval(reload, 5000);
-    return () => clearInterval(t);
-  }, [svc?.status, reload]);
 
   if (loading || !svc) return <Loading />;
   const ip = svc.ips.find((i: any) => i.isPrimary)?.address ?? svc.ips[0]?.address;
@@ -65,12 +60,10 @@ export default function ServicePage() {
         subtitle={svc.hostname ?? undefined}
       />
 
-      {svc.status === "PROVISIONING" && (
-        <Alert className="mb-5">
-          <b>Your server is being deployed.</b> This page refreshes automatically — you'll also get an email with login details in about a minute.
-        </Alert>
+      {isVps && (["PENDING", "PROVISIONING", "FAILED"].includes(svc.status) || (svc.status === "ACTIVE" && Date.now() - new Date(svc.createdAt).getTime() < 3 * 3600_000)) && (
+        <ProvisioningTracker path={`/client/services/${id}/provisioning`} audience="client" onChange={() => reload()} />
       )}
-      {svc.status === "PENDING" && (
+      {!isVps && svc.status === "PENDING" && (
         <Alert tone="warn" className="mb-5">
           This service is awaiting payment. <Link href="/client/invoices?status=UNPAID" className="font-bold underline">Pay the invoice</Link> to activate it.
         </Alert>

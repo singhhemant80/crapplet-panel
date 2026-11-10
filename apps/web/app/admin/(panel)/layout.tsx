@@ -36,6 +36,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { href: "/admin/virtualizor", label: "Virtualizor", icon: "lan", perm: "servers.manage" },
       { href: "/admin/ips", label: "IP Management", icon: "router", perm: "ips.view" },
       { href: "/admin/services", label: "VPS & Services", icon: "developer_board", perm: "services.view" },
+      { href: "/admin/provisioning", label: "Provisioning", icon: "rocket_launch", perm: "services.view" },
       { href: "/admin/locations", label: "Locations", icon: "location_on", perm: "servers.manage" },
       { href: "/admin/domains", label: "Domains", icon: "language", perm: "domains.manage" },
     ],

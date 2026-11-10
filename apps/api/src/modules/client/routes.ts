@@ -1,3 +1,4 @@
+import { provisioningProgress } from "../provisioning/progress";
 import { requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import { z } from "zod";
@@ -113,9 +114,23 @@ clientRouter.get(
   ah(async (req, res) => {
     const { passwordEnc, config, ...s } = await ownService(req.user!.id, req.params.id);
     const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, proformaNumber: true, total: true, status: true, dueDate: true } });
-    const logs = await prisma.provisioningLog.findMany({ where: { serviceId: s.id, action: { in: ["create", "reinstall", "reboot", "start", "stop", "shutdown", "reset_password"] } }, orderBy: { createdAt: "desc" }, take: 10, select: { action: true, success: true, createdAt: true } });
+    // a build writes several "create" steps (started, node chosen, created…) — customers only see the outcome
+    const logs = (
+      await prisma.provisioningLog.findMany({ where: { serviceId: s.id, action: { in: ["create", "reinstall", "reboot", "start", "stop", "shutdown", "reset_password"] } }, orderBy: { createdAt: "desc" }, take: 60, select: { action: true, success: true, createdAt: true, message: true } })
+    )
+      .filter((l) => l.action !== "create" || (l.success ? /^(Virtualizor VPS \S+ created|VPS \S+ running on)/.test(l.message ?? "") : !/trying the next node/.test(l.message ?? "")))
+      .slice(0, 10)
+      .map(({ message: _m, ...l }) => l);
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });
     res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy });
+  }),
+);
+
+clientRouter.get(
+  "/services/:id/provisioning",
+  ah(async (req, res) => {
+    const s = await ownService(req.user!.id, req.params.id);
+    res.json(await provisioningProgress(s.id, "client"));
   }),
 );
 

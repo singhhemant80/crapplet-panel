@@ -474,6 +474,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
           return { ok: true };
         }
         await prisma.service.update({ where: { id: svc.id }, data: { status: "PROVISIONING" } });
+        await log(svc.id, "create", true, `Provisioning started${svc.status === "FAILED" ? " (retry)" : ""}`);
         const r = prov === "PROXMOX" ? await proxmoxCreate(svc) : await virtualizorCreate(svc);
         await queueEmail("service.vps_ready", svc.user.email, { ...vars, ...r, os: svc.osTemplate?.name ?? "" }, svc.userId);
         return { ok: true, ip: r.ip };

@@ -1,6 +1,7 @@
 "use client";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
+import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -25,10 +26,13 @@ export default function AdminService() {
   return (
     <>
       <PageHeader back="/admin/services" title={<span className="flex items-center gap-3">{s.product.name} <Badge status={s.status} /></span>} subtitle={<span>{s.hostname} · <Link className="font-bold text-primary-dark" href={`/admin/clients/${s.user.id}`}>{s.user.email}</Link>{s.order && <> · order <Link className="font-bold text-primary-dark" href={`/admin/orders/${s.order.id}`}>{s.order.number}</Link></>}{s.reseller && ` · via reseller ${s.reseller.brandName}`}</span>} />
+      {isVps && s.status !== "TERMINATED" && s.status !== "CANCELLED" && (["PENDING", "PROVISIONING", "FAILED"].includes(s.status) || Date.now() - new Date(s.createdAt).getTime() < 86400_000) && (
+        <ProvisioningTracker path={`/admin/services/${id}/provisioning`} audience="admin" onChange={() => reload()} onRetry={() => act("create")} />
+      )}
       {s.status === "FAILED" && <FailurePanel s={s} />}
       <Card title="Actions" className="mb-6">
         <div className="flex flex-wrap gap-2">
-          {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : "Provision now"}</Button>}
+          {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : s.status === "PROVISIONING" ? "Re-run provisioning" : "Provision now"}</Button>}
           {isVps && s.status === "ACTIVE" && <>
             <Button variant="outline" size="sm" icon="play_arrow" onClick={() => act("start")}>Start</Button>
             <Button variant="outline" size="sm" icon="restart_alt" onClick={() => act("reboot")}>Reboot</Button>

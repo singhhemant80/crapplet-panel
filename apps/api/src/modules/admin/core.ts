@@ -14,6 +14,7 @@ import { renderInvoicePdf } from "../billing/pdf";
 import { reviewOfflinePayment, refundTransaction } from "../payments/service";
 import { releaseOrderReservations } from "../ipam/service";
 import { liveStatus } from "../provisioning/provisioner";
+import { provisioningProgress } from "../provisioning/progress";
 import { queueEmail } from "../email/mailer";
 import { profileSchema, resolveStateCode, publicUser } from "../auth/routes";
 import { runBillingCycle } from "../../jobs/billing";
@@ -614,6 +615,44 @@ adminCore.get(
     ]);
     const num = <T extends Record<string, unknown>>(rows: T[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === "bigint" ? Number(v) : v])));
     res.json({ gst: num(gst), byType: num(byType), newClients: num(newClients), gateways: num(gateways) });
+  }),
+);
+
+// ───────────── Provisioning status ─────────────
+adminCore.get(
+  "/services/:id/provisioning",
+  requireStaff("services.view"),
+  ah(async (req, res) => {
+    res.json(await provisioningProgress(req.params.id, "admin"));
+  }),
+);
+
+/** Everything being set up right now, waiting, failed, or finished in the last 24 hours. */
+adminCore.get(
+  "/provisioning",
+  requireStaff("services.view"),
+  ah(async (_req, res) => {
+    const since = new Date(Date.now() - 24 * 3600_000);
+    const rows = await prisma.service.findMany({
+      where: {
+        product: { provisioner: { in: ["PROXMOX", "VIRTUALIZOR"] } },
+        OR: [{ status: { in: ["PENDING", "PROVISIONING", "FAILED"] } }, { status: "ACTIVE", logs: { some: { action: "create", createdAt: { gte: since } } } }],
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      select: { id: true, hostname: true, status: true, updatedAt: true, product: { select: { name: true } }, user: { select: { email: true, firstName: true, lastName: true } }, order: { select: { id: true, number: true } } },
+    });
+    const items = await Promise.all(rows.map(async (r) => ({ ...r, progress: await provisioningProgress(r.id, "admin") })));
+    const count = (f: (x: (typeof items)[number]) => boolean) => items.filter(f).length;
+    res.json({
+      items,
+      summary: {
+        inProgress: count((x) => x.progress.inProgress),
+        failed: count((x) => x.status === "FAILED" || x.progress.stuck),
+        waitingPayment: count((x) => x.progress.steps.find((s) => s.key === "payment")?.state === "current"),
+        doneToday: count((x) => x.status === "ACTIVE"),
+      },
+    });
   }),
 );
 

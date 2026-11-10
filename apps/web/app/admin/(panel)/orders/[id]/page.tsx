@@ -1,4 +1,5 @@
 "use client";
+import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -175,6 +176,11 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
       }
       action={<Link href={`/admin/services/${s.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline">Manage <Icon name="arrow_forward" className="text-[16px]" /></Link>}
     >
+      {vps && ["PENDING", "PROVISIONING", "FAILED"].includes(s.status) && (
+        <div className="mb-4 rounded-xl bg-[#fbf9ff] px-3 py-2.5 ring-1 ring-[#f0e6ff]">
+          <ProvisioningTracker path={`/admin/services/${s.id}/provisioning`} audience="admin" compact onChange={onSaved} />
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
         <span className="rounded-full bg-slate-100 px-2.5 py-1">{CYCLES[s.billingCycle]} · {money(s.recurringAmount, currency)}</span>
         {vps && s.product.cpuCores && <span className="rounded-full bg-slate-100 px-2.5 py-1">{s.product.cpuCores} vCPU · {gb(s.product.ramMb)} · {s.product.diskGb} GB</span>}

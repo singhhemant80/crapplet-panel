@@ -19,6 +19,14 @@ import { runProvisionAction } from "../src/modules/provisioning/provisioner";
 import { generateRenewalInvoices, processSuspensions } from "../src/jobs/billing";
 import { closeQueues } from "../src/jobs/queues";
 
+
+/** Test IP ranges come from 200 fixed slots — remove a leftover from an earlier run so this run owns it. */
+async function clearStaleRange(cidr: string) {
+  const stale = await prisma.ipSubnet.findUnique({ where: { cidr } });
+  if (!stale) return;
+  await prisma.ipAddress.deleteMany({ where: { subnetId: stale.id } });
+  await prisma.ipSubnet.delete({ where: { id: stale.id } });
+}
 const RUN = Date.now().toString(36);
 let base = "";
 let server: http.Server;
@@ -85,7 +93,10 @@ before(async () => {
   const srv = await prisma.server.create({ data: { name: `test-${RUN}`, type: "PROXMOX", hostname: "pve.invalid", apiUser: "x@pve!t", apiSecretEnc: encrypt("s"), locationId: loc.id } });
   testServerId = srv.id;
   const third = (parseInt(RUN.slice(-2), 36) % 200) + 10;
-  await importCidr({ cidr: `198.18.${third}.0/28`, serverId: srv.id, gateway: `198.18.${third}.1` });
+  // the range is picked from 200 slots — clear a leftover from an earlier run so this run owns it
+  const cidr = `198.18.${third}.0/28`;
+  await clearStaleRange(cidr);
+  await importCidr({ cidr, serverId: srv.id, gateway: `198.18.${third}.1` });
   const p = await prisma.product.findUniqueOrThrow({ where: { slug: "linux-vps-g2" } });
   productId = p.id;
   await prisma.productServer.create({ data: { productId, serverId: srv.id } });
@@ -386,6 +397,7 @@ test("Proxmox client: real REST flow against a mock PVE API (clone → config �
   const port = (mock.address() as AddressInfo).port;
   const srv = await prisma.server.create({ data: { name: `mockpve-${RUN}`, type: "PROXMOX", hostname: `http://127.0.0.1:${port}`, port, apiUser: "billing@pve!crapplet", apiSecretEnc: encrypt("secret-uuid"), verifyTls: false, maxCpuPct: 85 } });
   const third = (parseInt(RUN.slice(-3, -1), 36) % 200) + 20;
+  await clearStaleRange(`198.18.${third}.16/28`);
   await importCidr({ cidr: `198.18.${third}.16/28`, serverId: srv.id, gateway: `198.18.${third}.17` });
   const u = await prisma.user.create({ data: { email: `pve-${RUN}@t.test`, passwordHash: "x", firstName: "P", profile: { create: {} } } });
   const os = await prisma.osTemplate.findFirstOrThrow({ where: { proxmoxKvmVmid: 9000 } });
