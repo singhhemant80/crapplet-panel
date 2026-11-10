@@ -42,7 +42,8 @@ curl -fsSL https://raw.githubusercontent.com/singhhemant80/crapplet-panel/main/i
 
 Options: `--no-ssl` (skip Let's Encrypt), `--demo` (seed a test server, IP range and demo customer),
 `--dir /opt/crapplet-panel`, `--branch main`. **Run the same command again to update** — it pulls the latest code,
-rebuilds and applies migrations; your `.env`, database and uploads are kept.
+rebuilds and applies migrations; your `.env`, database and uploads are kept. On a server that's already installed,
+`sudo bash /opt/crapplet-panel/deploy/update.sh` does the same without the download.
 
 Email: open **Admin → Email Delivery**, pick your provider (Zoho, ZeptoMail, Google Workspace, Microsoft 365,
 Amazon SES, Brevo, Mailgun, SendGrid, Postmark or any SMTP server), enter the login, press **Test connection**,

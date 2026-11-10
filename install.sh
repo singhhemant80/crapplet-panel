@@ -10,6 +10,7 @@
 #           --dir <path>         install directory (default /opt/crapplet-panel)
 #           --branch <name>      git branch (default main)
 # Re-running the same command updates an existing install (git pull + rebuild + migrations); data is kept.
+# Faster update that doesn't need this download:  sudo bash /opt/crapplet-panel/deploy/update.sh
 set -euo pipefail
 
 REPO="https://github.com/singhhemant80/crapplet-panel.git"
@@ -39,13 +40,18 @@ if [ -z "$DOMAIN" ] && [ -r /dev/tty ]; then read -rp "Domain for the panel (e.g
 EMAIL="${EMAIL:-admin@${DOMAIN}}"
 
 echo "==> Crapplet Panel → ${DOMAIN}  (dir ${DIR}, branch ${BRANCH})"
-apt-get update -y >/dev/null
-apt-get install -y git curl ca-certificates >/dev/null
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+APT_OPTS=(-o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=2 -o Dpkg::Lock::Timeout=120)
+if ! command -v git >/dev/null; then
+  echo "==> Installing git"
+  apt-get "${APT_OPTS[@]}" update -y -q
+  apt-get "${APT_OPTS[@]}" install -y -q git curl ca-certificates
+fi
 
 if [ -d "$DIR/.git" ]; then
   echo "==> Updating existing checkout"
   git -C "$DIR" config --global --add safe.directory "$DIR" || true
-  git -C "$DIR" fetch --depth 1 origin "$BRANCH"
+  timeout 300 git -C "$DIR" fetch --depth 1 origin "$BRANCH" || { echo "!! Couldn't reach GitHub (see: getent hosts github.com)"; exit 1; }
   git -C "$DIR" reset --hard "origin/$BRANCH"
 else
   echo "==> Cloning ${REPO}"

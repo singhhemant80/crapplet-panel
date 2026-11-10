@@ -19,14 +19,15 @@ log() { printf '\n\033[1;35m==> %s\033[0m\n' "$*"; }
 [ "${VERSION_ID}" = "24.04" ] || echo "WARNING: tested on Ubuntu 24.04, found ${PRETTY_NAME}"
 
 log "Installing system packages"
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get install -y curl ca-certificates gnupg nginx postgresql postgresql-contrib redis-server certbot python3-certbot-nginx ufw fonts-inter
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+APT_OPTS=(-o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Acquire::Retries=2 -o Dpkg::Lock::Timeout=300)
+apt-get "${APT_OPTS[@]}" update -y -q || echo "WARNING: apt update had errors — continuing with the package lists we have"
+apt-get "${APT_OPTS[@]}" install -y -q curl ca-certificates gnupg nginx postgresql postgresql-contrib redis-server certbot python3-certbot-nginx ufw fonts-inter
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y nodejs
+  apt-get "${APT_OPTS[@]}" install -y -q nodejs
 fi
-npm install -g pm2@5
+command -v pm2 >/dev/null || npm install -g pm2@5
 
 log "Configuring Redis (local only, AOF persistence)"
 sed -i 's/^#\?\s*supervised .*/supervised systemd/; s/^#\?\s*appendonly .*/appendonly yes/' /etc/redis/redis.conf
@@ -82,8 +83,11 @@ mkdir -p /var/lib/crapplet/uploads /var/backups/crapplet
 chown -R "$APP_USER":"$APP_USER" "$ROOT" /var/lib/crapplet /var/backups/crapplet
 
 log "Installing dependencies and building"
-sudo -u "$APP_USER" bash -lc "cd '$ROOT' && npm ci --no-audit --no-fund"
+echo "    npm packages (2–5 minutes the first time)…"
+sudo -u "$APP_USER" bash -lc "cd '$ROOT' && npm ci --no-audit --no-fund --loglevel=error"
+echo "    compiling the API…"
 sudo -u "$APP_USER" bash -lc "cd '$ROOT/apps/api' && npx prisma generate && npx tsc -p tsconfig.json"
+echo "    building the website (2–4 minutes)…"
 sudo -u "$APP_USER" bash -lc "cd '$ROOT/apps/web' && NEXT_TELEMETRY_DISABLED=1 npx next build"
 
 log "Applying database migrations"
@@ -112,7 +116,10 @@ rm -f /etc/nginx/sites-enabled/default
 chmod o+x "$(dirname "$ROOT")" "$ROOT" || true
 nginx -t && systemctl reload nginx
 
-if [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
+if [ -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
+  log "Re-applying the existing SSL certificate"
+  certbot install --nginx -n --cert-name "$DOMAIN" --redirect >/dev/null 2>&1 || echo "certbot couldn't re-apply SSL — run: certbot --nginx -d $DOMAIN"
+elif [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
   log "Requesting Let's Encrypt certificate"
   certbot --nginx -n --agree-tos -m "$LETSENCRYPT_EMAIL" -d "$DOMAIN" -d "www.$DOMAIN" --redirect || echo "certbot failed — check DNS, then re-run: certbot --nginx -d $DOMAIN"
 fi
