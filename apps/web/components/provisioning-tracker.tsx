@@ -19,14 +19,17 @@ export type Progress = {
   error?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;
+  now?: string;
 };
 
 const ICON: Record<string, string> = { order: "shopping_bag", payment: "payments", queue: "schedule", server: "dns", create: "deployed_code", ready: "rocket_launch" };
 const time = (v?: string | null) => (v ? new Date(v).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
 
+/** server clock minus this device's clock — "running for" stays right when the viewer's clock is wrong */
+let skew = 0;
 function elapsed(from?: string | null, to?: string | null) {
   if (!from) return "";
-  const s = Math.max(0, Math.round(((to ? new Date(to) : new Date()).getTime() - new Date(from).getTime()) / 1000));
+  const s = Math.max(0, Math.round(((to ? new Date(to).getTime() : Date.now() + skew) - new Date(from).getTime()) / 1000));
   return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 }
 
@@ -46,6 +49,7 @@ export function ProvisioningTracker({ path, audience, onChange, onRetry, compact
       try {
         const r = await api<Progress>(path);
         if (!alive) return;
+        if (r.now) skew = new Date(r.now).getTime() - Date.now();
         setP(r);
         if (last.current && last.current !== r.status) onChange?.(r.status);
         last.current = r.status;

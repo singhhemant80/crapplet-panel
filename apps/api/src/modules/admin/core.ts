@@ -410,11 +410,16 @@ adminCore.post(
     const s = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id } });
     if (b.action === "create" && s.status === "ACTIVE") throw conflict("Service is already active");
     if (b.action === "create") {
-      await prisma.service.update({ where: { id: s.id }, data: { status: "PROVISIONING" } });
-      // remove any stale (failed) create job so it can be re-queued under the same id
       const { provisioningQueue } = await import("../../jobs/queues");
       const old = await provisioningQueue().getJob(`create-${s.id}`);
-      if (old && (await old.isFailed() || await old.isCompleted())) await old.remove();
+      const state = old ? await old.getState() : null;
+      if (state === "active") {
+        const mins = Math.max(1, Math.round((Date.now() - (old!.processedOn ?? Date.now())) / 60_000));
+        throw conflict(`Setup is already running for this service (for ${mins} min — Virtualizor can take several minutes to build). It finishes on its own; a run interrupted by a restart is picked up again within a minute.`);
+      }
+      await prisma.service.update({ where: { id: s.id }, data: { status: "PROVISIONING" } });
+      // remove a finished/failed create job so it can be queued again under the same id
+      if (old && (state === "failed" || state === "completed")) await old.remove();
     }
     await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify }, actorId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: s.userId, action: `service.${b.action}`, entity: "service", entityId: s.id, details: b });

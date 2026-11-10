@@ -2,7 +2,7 @@
  * Provisioning orchestration for Proxmox, Virtualizor and manual products.
  * Every action is executed by the BullMQ worker (jobs/worker.ts) — never inside an HTTP request.
  */
-import { prisma, type Server, ServiceStatus } from "../../db";
+import { prisma, Prisma, type Server, ServiceStatus } from "../../db";
 import { config } from "../../config";
 import { decrypt, encrypt, generatePassword } from "../../lib/crypto";
 import { HttpError } from "../../lib/http";
@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { VirtualizorClient, storagesOfNode, type VirtStorage } from "./virtualizor";
+import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, storagesOfNode, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 
 export class ProvisionError extends Error {
@@ -353,6 +353,59 @@ async function virtualizorCreate(svc: FullService) {
     const virt = mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm");
     const candidates = await virtualizorNodeCandidates(svc, server, mc, ipNodes, virt);
     await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root" } });
+
+    // ── never build twice ──
+    // Virtualizor keeps building after an unanswered request. Remember which VPSes already had this
+    // hostname before the first attempt; any newer one on a later attempt is ours — use it.
+    const sameName = await client.findVpsByHostname(hostname).catch(() => null);
+    let before = Array.isArray(cfg.vzExistingVpsIds) ? (cfg.vzExistingVpsIds as string[]) : null;
+    if (sameName && !before) {
+      // services that already went through attempts before this check existed: same-named VPSes
+      // created after their first attempt were built by those attempts — treat them as ours
+      const thisRun = await prisma.provisioningLog.findFirst({ where: { serviceId: svc.id, action: "create", message: { startsWith: "Provisioning started" } }, orderBy: { createdAt: "desc" } });
+      const firstEarlier = await prisma.provisioningLog.findFirst({ where: { serviceId: svc.id, action: "create", ...(thisRun ? { createdAt: { lt: thisRun.createdAt } } : { id: "-" }) }, orderBy: { createdAt: "asc" } });
+      const since = firstEarlier ? firstEarlier.createdAt.getTime() - 2 * 60_000 : Infinity;
+      before = sameName.filter((v) => !(v.createdAt !== null && v.createdAt >= since)).map((v) => v.vpsid);
+      await prisma.service.update({ where: { id: svc.id }, data: { config: { ...cfg, vzExistingVpsIds: before } as Prisma.InputJsonValue } });
+    }
+    const takenElsewhere = async (ids: string[]) =>
+      new Set((await prisma.service.findMany({ where: { serverId: server.id, remoteId: { in: ids }, NOT: { id: svc.id } }, select: { remoteId: true } })).map((r) => r.remoteId));
+    const freshOnes = async (list: { vpsid: string }[] | null) => {
+      if (!list || !before) return [];
+      const taken = await takenElsewhere(list.map((v) => v.vpsid));
+      return list.filter((v) => !before!.includes(v.vpsid) && !taken.has(v.vpsid));
+    };
+    const adopt = await freshOnes(sameName);
+    if (adopt.length) {
+      vpsid = adopt[0].vpsid;
+      await log(svc.id, "create", true, `Found VPS ${vpsid} that an earlier attempt already created in Virtualizor — using it instead of building another${adopt.length > 1 ? `. Also found ${adopt.slice(1).map((v) => v.vpsid).join(", ")} with the same hostname — delete them in Virtualizor if they're duplicates` : ""}`);
+      const n = adopt[0] as { serid?: string | null };
+      await prisma.service.update({ where: { id: svc.id }, data: { remoteId: vpsid, ...(n.serid ? { node: n.serid } : {}) } });
+    }
+    /** addvs that tolerates Virtualizor answering late: wait for the VPS to show up instead of failing. */
+    const createOrAdopt = async (params: Parameters<typeof client.createVps>[0]): Promise<string> => {
+      try {
+        return await client.createVps(params);
+      } catch (e) {
+        if (!isNoAnswer(e)) throw e;
+        await log(svc.id, "create", true, `Virtualizor hasn't answered yet (${short(e)}) — waiting for the VPS to appear`);
+        if (before) {
+          for (let i = 0; i < ADOPT_POLLS; i++) {
+            const found = await freshOnes(await client.findVpsByHostname(hostname).catch(() => null));
+            if (found.length) {
+              await log(svc.id, "create", true, `VPS ${found[0].vpsid} appeared in Virtualizor`);
+              return found[0].vpsid;
+            }
+            await new Promise((r) => setTimeout(r, ADOPT_POLL_MS));
+          }
+          throw new ProvisionError(`Virtualizor didn't answer and no VPS named ${hostname} appeared within ${Math.round((ADOPT_POLLS * ADOPT_POLL_MS) / 60_000)} minutes — retrying`, true);
+        }
+        throw new ProvisionError(
+          `Virtualizor didn't answer the create request in time. Check Virtualizor → Virtual Servers for ${hostname}: if it was created, type its VPS id in “VMID / VPS id” under Billing & overrides, Save, then Retry provisioning; if not, just Retry.`,
+          false,
+        );
+      }
+    };
     const storages = candidates.length ? await client.storages().catch(() => []) : [];
     const base = {
       virt,
@@ -371,10 +424,12 @@ async function virtualizorCreate(svc: FullService) {
       bandwidthGb: p.bandwidthGb ?? 0,
     };
     const tried: string[] = [];
-    if (!candidates.length) {
+    if (vpsid) {
+      // adopted a VPS an earlier attempt built — nothing to create
+    } else if (!candidates.length) {
       await log(svc.id, "create", true, "Placing VPS: Virtualizor auto-select (no node data yet)");
       try {
-        vpsid = await client.createVps({ ...base, serverGroupId: mc.serverGroupId ?? undefined });
+        vpsid = await createOrAdopt({ ...base, serverGroupId: mc.serverGroupId ?? undefined });
       } catch (e) {
         if (isStorageError(e)) throw new ProvisionError(`Virtualizor couldn't choose a storage on its own. Open Node Monitoring and click Refresh so the panel can pick the node itself, then retry. (${short(e)})`, false);
         throw e;
@@ -408,7 +463,7 @@ async function virtualizorCreate(svc: FullService) {
         const errs: string[] = [];
         for (const a of attempts) {
           try {
-            vpsid = await client.createVps({ ...base, serverId: n.serid, storage: a.storage, diskMode: a.diskMode });
+            vpsid = await createOrAdopt({ ...base, serverId: n.serid, storage: a.storage, diskMode: a.diskMode });
             if (a !== attempts[0]) await log(svc.id, "create", true, `Created on ${n.name} using ${a.label}`);
             await prisma.service.update({ where: { id: svc.id }, data: { node: String(n.serid) } });
             break;

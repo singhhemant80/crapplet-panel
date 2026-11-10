@@ -61,6 +61,16 @@ export const maintenanceQueue = () => q<Record<string, unknown>>("maintenance");
 export async function enqueueProvision(job: ProvisionJob) {
   // jobId de-duplicates repeated "create" requests for the same service
   const jobId = job.action === "create" ? `create-${job.serviceId}` : undefined;
+  if (jobId) {
+    // BullMQ ignores add() when a job with this id still exists — a finished/failed one from an earlier
+    // attempt would silently swallow "Retry provisioning". Clear it; keep a waiting/running one.
+    const old = await provisioningQueue().getJob(jobId);
+    if (old) {
+      const state = await old.getState();
+      if (state === "failed" || state === "completed") await old.remove();
+      else return old;
+    }
+  }
   return provisioningQueue().add(job.action, job, {
     jobId,
     attempts: job.action === "create" ? 3 : 2,

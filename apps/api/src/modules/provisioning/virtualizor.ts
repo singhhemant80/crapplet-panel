@@ -29,10 +29,25 @@ function appendForm(form: URLSearchParams, key: string, v: unknown) {
   form.set(key, String(v));
 }
 
+/** Virtualizor can take many minutes to answer addvs (it clones the disk before replying). */
+export const CREATE_TIMEOUT_MS = Number(process.env.VIRTUALIZOR_CREATE_TIMEOUT_MS) || 15 * 60_000;
+/** how often to look for the VPS after an unanswered create, and how many times */
+export const ADOPT_POLL_MS = Number(process.env.VIRTUALIZOR_ADOPT_POLL_MS) || 20_000;
+export const ADOPT_POLLS = 30;
+
+/** True when the request went out but no answer came back in time — the VPS may still be being built. */
+export function isNoAnswer(e: unknown) {
+  const err = e as { code?: string; cause?: { code?: string }; message?: string };
+  const code = err?.code ?? err?.cause?.code ?? "";
+  return /UND_ERR_HEADERS_TIMEOUT|UND_ERR_BODY_TIMEOUT|UND_ERR_SOCKET|ECONNRESET|EPIPE/.test(code) || /headers timeout|body timeout|socket hang up|other side closed|closed the connection/i.test(err?.message ?? "");
+}
+
 export class VirtualizorClient {
   private agent: Agent;
+  private slowAgent: Agent;
   constructor(private creds: VirtualizorCreds) {
     this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: 120_000, bodyTimeout: 300_000 });
+    this.slowAgent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: CREATE_TIMEOUT_MS, bodyTimeout: CREATE_TIMEOUT_MS, keepAliveTimeout: 1000 });
   }
 
   private url(act: string, query: Record<string, string | number | undefined> = {}) {
@@ -46,7 +61,7 @@ export class VirtualizorClient {
     return `https://${host}:${this.creds.port}/index.php?${q.toString()}`;
   }
 
-  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>): Promise<T> {
+  async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean } = {}): Promise<T> {
     let body: string | undefined;
     if (post) {
       const form = new URLSearchParams();
@@ -59,7 +74,7 @@ export class VirtualizorClient {
     const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "");
     const res = await request(this.url(act, query), {
       method: post ? "POST" : "GET",
-      dispatcher: this.agent,
+      dispatcher: opts.slow ? this.slowAgent : this.agent,
       headers: post ? { "Content-Type": "application/x-www-form-urlencoded" } : undefined,
       body,
     }).catch((e) => {
@@ -91,6 +106,26 @@ export class VirtualizorClient {
   listVps(page = 1, reslen = 50) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { page, reslen });
   }
+  /**
+   * VPSes on the master with this hostname (Virtualizor's list search). Used to find a VPS an earlier,
+   * unanswered create request already built, so a retry never builds a second one.
+   */
+  async findVpsByHostname(hostname: string): Promise<{ vpsid: string; hostname: string; serid: string | null; createdAt: number | null; email: string | null }[]> {
+    const want = hostname.trim().toLowerCase();
+    const r = await this.call<{ vs?: Record<string, Record<string, unknown>> | Record<string, unknown>[] }>("vs", { search: 1, vpshostname: want, page: 1, reslen: 200 });
+    const rows = Array.isArray(r.vs) ? r.vs : Object.entries(r.vs ?? {}).map(([k, v]) => ({ vpsid: k, ...(v as object) }) as Record<string, unknown>);
+    return rows
+      .filter((v) => String(v.hostname ?? "").trim().toLowerCase() === want)
+      .map((v) => ({
+        vpsid: String(v.vpsid),
+        hostname: String(v.hostname),
+        serid: v.serid !== undefined && v.serid !== null ? String(v.serid) : null,
+        createdAt: Number(v.time ?? v.created ?? 0) ? Number(v.time ?? v.created) * 1000 : null,
+        email: v.email ? String(v.email) : null,
+      }))
+      .sort((a, b) => Number(a.vpsid) - Number(b.vpsid));
+  }
+
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
   }
@@ -186,7 +221,7 @@ export class VirtualizorClient {
           }),
       bandwidth: p.bandwidthGb ?? 0,
       ...(p.extra ?? {}),
-    });
+    }, { slow: true });
     const vpsid = r.vs_info?.vpsid ?? r.newvs?.vpsid;
     if (!vpsid) throw new VirtualizorError("Virtualizor did not return a VPS id", r);
     return String(vpsid);

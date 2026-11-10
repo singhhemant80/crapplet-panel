@@ -29,6 +29,7 @@ export interface Progress {
   error?: string | null;
   startedAt?: Date | null;
   finishedAt?: Date | null;
+  now: Date;
 }
 
 const PLACED = /^(Placing VPS|Cloned template|Created container)/;
@@ -103,7 +104,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   if (!isVps && s.status === "ACTIVE") at("server").state = "done";
 
   const failed = s.status === "FAILED";
-  const error = failed || (job?.state === "delayed" && job.lastError) ? lastFail?.message ?? job?.lastError ?? null : null;
+  const error = failed || (job?.state === "delayed" && job.lastError) || job?.state === "failed" ? lastFail?.message ?? job?.lastError ?? null : null;
   if (failed) {
     const cur = steps.find((x) => x.state === "current") ?? steps.find((x) => x.state === "pending");
     // the full error is in the header — keep the step short
@@ -115,7 +116,16 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   const inProgress = !failed && paid && ["PENDING", "PROVISIONING"].includes(s.status) && !(s.status === "PENDING" && s.product.autoSetup === "MANUAL");
   const retrying = job?.state === "delayed";
   const lastActivity = Math.max(s.updatedAt.getTime(), ...attempt.map((l) => l.createdAt.getTime()));
-  const stuck = s.status === "PROVISIONING" && (!job || job.state === "failed" || job.state === "completed") && Date.now() - lastActivity > 15 * 60_000;
+  // a create job that failed for good while the service still says PROVISIONING is stuck right away;
+  // no job at all is only stuck after 15 quiet minutes (the 5-minute safety check re-queues it)
+  const stuck =
+    s.status === "PROVISIONING" &&
+    ((job?.state === "failed") || ((!job || job.state === "completed") && Date.now() - lastActivity > 15 * 60_000));
+  if (stuck && job?.state === "failed") {
+    const cur = steps.find((x) => x.state === "current") ?? steps.find((x) => x.state === "pending");
+    if (cur) cur.state = "failed";
+  }
+  const waitingOnVirtualizor = !!attempt.length && /hasn't answered yet/.test(attempt[attempt.length - 1].message ?? "");
 
   let headline: string;
   let message: string;
@@ -129,9 +139,11 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     headline = "Waiting for payment";
     message = "Setup starts automatically as soon as the invoice is paid.";
   } else if (stuck) {
-    headline = admin ? "Stuck — nothing is working on it" : "Taking longer than usual";
+    headline = admin ? (job?.state === "failed" ? "Setup stopped after all attempts" : "Stuck — nothing is working on it") : "Taking longer than usual";
     message = admin
-      ? "No provisioning job is queued or running and nothing has been logged for over 15 minutes. The background worker may be stopped (check: sudo -u crapplet pm2 status) or the job was lost — click Retry provisioning."
+      ? job?.state === "failed"
+        ? `All ${job.maxAttempts} attempts failed: ${job.lastError ?? lastFail?.message ?? "unknown error"}. Fix the cause and click Retry provisioning — it first checks Virtualizor for a VPS an earlier attempt already built.`
+        : "No provisioning job is queued or running and nothing has been logged for over 15 minutes. The background worker may be stopped (check: sudo -u crapplet pm2 status). The panel re-queues it automatically within 5 minutes, or click Retry provisioning."
       : "Setting up your server is taking longer than usual. Our team can see this and will complete it — we'll email you when it's ready.";
   } else if (retrying) {
     headline = "Retrying setup";
@@ -143,7 +155,11 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     message = admin ? "This plan is set up manually — click Provision now." : "Our team will set this up shortly and email you when it's ready.";
   } else {
     headline = at("create").state === "current" ? "Building your VPS" : at("server").state === "current" ? "Choosing the best server" : "In the setup queue";
-    message = "This usually takes 2–5 minutes. This page updates by itself, and we'll email you when it's ready.";
+    message = waitingOnVirtualizor
+      ? admin
+        ? "Virtualizor accepted the request and is still creating the disk — large templates can take up to 15 minutes. The panel waits for it and won't build a second VPS."
+        : "Your server is being built. Larger images can take up to 15 minutes — we'll email you as soon as it's ready."
+      : "This usually takes 2–5 minutes. This page updates by itself, and we'll email you when it's ready.";
   }
 
   return {
@@ -160,5 +176,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     error: admin ? error : null,
     startedAt: lastStart?.createdAt ?? attempt[0]?.createdAt ?? null,
     finishedAt: s.status === "ACTIVE" ? created?.createdAt ?? null : null,
+    /** server time, so "running for" is right even when the viewer's clock is off */
+    now: new Date(),
   };
 }

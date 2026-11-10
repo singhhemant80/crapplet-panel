@@ -15,13 +15,16 @@ import { syncVirtualizorIps } from "./modules/provisioning/virtualizor-ips";
 import { getSettings } from "./lib/settings";
 import { prisma } from "./db";
 import { executeMigrationRun } from "./modules/migration/service";
+import { clearStaleServiceLocks, reconcileProvisioning } from "./modules/provisioning/reconcile";
 
 const connection = bullConnection();
 
 const provisioning = new Worker<ProvisionJob>(
   "provisioning",
   async (job: Job<ProvisionJob>) => runProvisionAction(job.data.serviceId, job.data.action, job.data.params ?? {}),
-  { connection, concurrency: 4, lockDuration: 30 * 60_000 },
+  // short lock, renewed automatically while a job runs: a run killed by a restart is picked up again
+  // within about a minute instead of looking "active" for half an hour
+  { connection, concurrency: 4, lockDuration: 60_000, stalledInterval: 30_000, maxStalledCount: 3, autorun: false },
 );
 provisioning.on("failed", async (job, err) => {
   if (!job) return;
@@ -42,6 +45,8 @@ const maintenance = new Worker(
     switch (job.name) {
       case "expire-ip-reservations":
         return { released: await expireReservations() };
+      case "reconcile-provisioning":
+        return reconcileProvisioning();
       case "server-health":
         return checkAllServers();
       case "daily-billing":
@@ -75,12 +80,22 @@ async function schedule() {
   const q = maintenanceQueue();
   await q.upsertJobScheduler("expire-ip-reservations", { every: 60_000 }, { name: "expire-ip-reservations" });
   await q.upsertJobScheduler("server-health", { every: 5 * 60_000 }, { name: "server-health" });
+  await q.upsertJobScheduler("reconcile-provisioning", { every: 5 * 60_000 }, { name: "reconcile-provisioning" });
+
   await q.upsertJobScheduler("daily-billing", { pattern: "0 9 * * *", tz: "Asia/Kolkata" }, { name: "daily-billing" });
   // before billing runs, so renewal invoices use today's rate
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), billing (09:00 IST)");
 }
+
+// clear locks left by a killed run BEFORE taking provisioning jobs, so a fresh lock is never deleted
+clearStaleServiceLocks()
+  .catch(() => 0)
+  .then((cleared) => {
+    if (cleared) console.log(`[worker] cleared ${cleared} provisioning lock(s) left by a previous run`);
+    provisioning.run().catch((e) => console.error("[worker] provisioning worker stopped", e));
+  });
 
 schedule().catch((e) => {
   console.error("[worker] failed to register schedules", e);
