@@ -126,6 +126,40 @@ export class VirtualizorClient {
       .sort((a, b) => Number(a.vpsid) - Number(b.vpsid));
   }
 
+  /**
+   * What a VPS that already works on this node uses: storage references (st_uuid / stid) found in its
+   * details and edit form, its VPS type (virt) and plan. VPSes made in Virtualizor's own panel are the
+   * ground truth for what this master accepts on that node.
+   */
+  async learnNode(serid: number | string, max = 3): Promise<NodeHints> {
+    const hints: NodeHints = { serid: String(serid), uuids: [], stids: [], virts: [], plids: [], sampleVpsids: [], diskShapes: [] };
+    const r = await this.call<{ vs?: Record<string, Record<string, unknown>> | Record<string, unknown>[] }>("vs", { search: 1, serid, page: 1, reslen: 50 });
+    const rows = (Array.isArray(r.vs) ? r.vs : Object.entries(r.vs ?? {}).map(([k, v]) => ({ vpsid: k, ...(v as object) }) as Record<string, unknown>))
+      .filter((v) => String(v.serid ?? "") === String(serid))
+      .sort((a, b) => Number(b.vpsid) - Number(a.vpsid))
+      .slice(0, max);
+    for (const v of rows) {
+      hints.sampleVpsids.push(String(v.vpsid));
+      if (v.virt) hints.virts.push(String(v.virt));
+      if (v.plid) hints.plids.push(String(v.plid));
+      collectStorageRefs(v, hints);
+      for (const act of ["vs", "editvs"] as const) {
+        const d = await this.call<Record<string, unknown>>(act, { vpsid: String(v.vpsid) }).catch(() => null);
+        if (d) collectStorageRefs(act === "vs" ? (d.vs as Record<string, unknown>)?.[String(v.vpsid)] ?? d.vs : d, hints);
+      }
+    }
+    hints.uuids = [...new Set(hints.uuids)];
+    hints.stids = [...new Set(hints.stids)];
+    hints.virts = [...new Set(hints.virts)];
+    hints.plids = [...new Set(hints.plids)];
+    return hints;
+  }
+
+  /** Virtualizor's Create VPS form for a node, unparsed (for diagnosis). */
+  addvsForm(serid: number | string) {
+    return this.call<Record<string, unknown>>("addvs", { serid, slave_server: serid });
+  }
+
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
   }
@@ -176,7 +210,7 @@ export class VirtualizorClient {
     /** with automatic placement: limit Virtualizor's choice to this server group */
     serverGroupId?: number;
     /** storage to put the disk on; omit = the node's primary storage */
-    storage?: { stid: number; uuid?: string | null };
+    storage?: { stid?: number | null; uuid?: string | null };
     /**
      * how the disk is described: "scalar" = space=<GB> (classic), "array" = space[0][size]+st_uuid
      * (newer masters), "plan" = send no ram/disk/cpu overrides and let the Virtualizor plan decide
@@ -204,7 +238,7 @@ export class VirtualizorClient {
       ...(p.serverId !== undefined
         ? { slave_server: p.serverId, serid: p.serverId }
         : { node_select: 1, ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
-      ...(p.storage ? { stid: p.storage.stid } : {}),
+      ...(p.storage?.stid !== undefined && p.storage?.stid !== null ? { stid: p.storage.stid } : {}),
       user_email: p.userEmail,
       user_pass: p.userPass,
       hostname: p.hostname,
@@ -369,4 +403,28 @@ export function pickStorage(storages: VirtStorage[], serid: string, diskGb = 0, 
 /** Storages attached to a node, for display (same rules as pickStorage). */
 export function storagesOfNode(storages: VirtStorage[], serid: string, sgid?: string | null) {
   return storages.filter((s) => s.serids.includes(serid) || (!!sgid && s.sgids.includes(sgid)));
+}
+
+export interface NodeHints {
+  serid: string;
+  uuids: string[];
+  stids: number[];
+  virts: string[];
+  plids: string[];
+  sampleVpsids: string[];
+  /** a few disk objects as Virtualizor reports them (keys and values), for diagnosis */
+  diskShapes: Record<string, unknown>[];
+}
+
+/** Walks any Virtualizor reply and collects storage references from disk/storage objects. */
+export function collectStorageRefs(obj: unknown, acc: Pick<NodeHints, "uuids" | "stids" | "diskShapes">, depth = 0) {
+  if (!obj || typeof obj !== "object" || depth > 6) return;
+  if (Array.isArray(obj)) return obj.forEach((x) => collectStorageRefs(x, acc, depth + 1));
+  const o = obj as Record<string, unknown>;
+  const uuid = o.st_uuid ?? o.storage_uuid;
+  const stid = o.stid ?? o.storage_id;
+  if (typeof uuid === "string" && uuid) acc.uuids.push(uuid);
+  if (stid !== undefined && stid !== null && /^\d+$/.test(String(stid)) && Number(stid) > 0) acc.stids.push(Number(stid));
+  if ((uuid || stid) && acc.diskShapes.length < 4) acc.diskShapes.push(Object.fromEntries(Object.entries(o).filter(([, v]) => v === null || typeof v !== "object").slice(0, 20)));
+  for (const v of Object.values(o)) if (v && typeof v === "object") collectStorageRefs(v, acc, depth + 1);
 }

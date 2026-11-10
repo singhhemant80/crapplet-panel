@@ -90,3 +90,12 @@ test("storage rows are found in the shapes masters use (grouped per node, arrays
   assert.equal(other[0]?.stid, 4);
   assert.deepEqual(parseStorages({ title: "Create VPS", plans: { "1": { plid: "1" } } }), []);
 });
+
+test("storage used by an existing VPS is found in its details/edit form", async () => {
+  const { collectStorageRefs } = await import("../src/modules/provisioning/virtualizor");
+  const acc = { uuids: [] as string[], stids: [] as number[], diskShapes: [] as Record<string, unknown>[] };
+  collectStorageRefs({ title: "Edit VPS", vps: { vpsid: "3097", virt: "proxk" }, disks: { "0": { did: "1", st_uuid: "abc", size: "120" }, "1": { stid: "29", size: "20" } } }, acc);
+  assert.deepEqual(acc.uuids, ["abc"]);
+  assert.deepEqual(acc.stids, [29]);
+  assert.equal(acc.diskShapes.length, 2);
+});

@@ -281,6 +281,67 @@ adminInfra.get(
   }),
 );
 
+/** Removes anything secret-looking from a Virtualizor reply before showing it. */
+function scrub(v: unknown, depth = 0): unknown {
+  if (depth > 8 || v === null || typeof v !== "object") return v;
+  if (Array.isArray(v)) return v.slice(0, 50).map((x) => scrub(x, depth + 1));
+  return Object.fromEntries(
+    Object.entries(v as Record<string, unknown>)
+      .slice(0, 80)
+      .map(([k, x]) => [k, /pass|secret|token|apikey|api_key|vnc_?pass|cookie|session/i.test(k) ? "•••" : scrub(x, depth + 1)]),
+  );
+}
+
+/**
+ * Everything needed to see why a VPS can't be created on a node: what VPSes already running there use
+ * (storage, VPS type, plan), the storage list, the Create VPS form for that node, the panel's plans that
+ * use this master, and the last refusals. Secrets are removed.
+ */
+adminInfra.get(
+  "/virtualizor/:serverId/diagnose",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const srv = await prisma.server.findUniqueOrThrow({ where: { id: req.params.serverId } });
+    if (srv.type !== "VIRTUALIZOR") throw badRequest("Not a Virtualizor server");
+    const serid = String(req.query.serid ?? "");
+    if (!/^\d+$/.test(serid)) throw badRequest("serid required");
+    const c = virtualizorFor(srv);
+    const safe = async <T,>(f: () => Promise<T>) => {
+      try {
+        return { ok: true as const, data: await f() };
+      } catch (e) {
+        return { ok: false as const, error: (e as Error).message };
+      }
+    };
+    const node = await prisma.serverNode.findFirst({ where: { serverId: srv.id, externalId: serid } });
+    const [hints, storageRaw, form, plans] = await Promise.all([
+      safe(() => c.learnNode(serid)),
+      safe(() => c.storagesRaw()),
+      safe(() => c.addvsForm(serid)),
+      safe(() => c.plans()),
+    ]);
+    const formData = form.ok ? (form.data as Record<string, unknown>) : null;
+    const formStorageKeys = formData ? Object.keys(formData).filter((k) => /stor|space|disk|st_|virt/i.test(k)) : [];
+    const products = await prisma.product.findMany({ where: { provisioner: "VIRTUALIZOR", OR: [{ servers: { some: { serverId: srv.id } } }, { servers: { none: {} } }] }, select: { id: true, name: true, diskGb: true, moduleConfig: true } });
+    const planRows = plans.ok ? (plans.data.plans ?? {}) : {};
+    const lastFailure = await prisma.provisioningLog.findFirst({ where: { success: false, action: "create", service: { serverId: srv.id }, details: { not: Prisma.AnyNull } }, orderBy: { createdAt: "desc" }, select: { createdAt: true, message: true, details: true, serviceId: true } });
+    res.json({
+      generatedAt: new Date(),
+      master: { name: srv.name, host: srv.hostname },
+      node: node ? { name: node.name, serid, online: node.online, meta: node.meta } : { serid },
+      vpsOnThisNode: hints,
+      storageList: storageRaw.ok ? { parsed: parseStorages(storageRaw.data), raw: scrub(storageRaw.data.storage ?? storageRaw.data.storages ?? storageRaw.data) } : storageRaw,
+      createForm: form.ok ? { keys: Object.keys(formData!), storageFields: Object.fromEntries(formStorageKeys.map((k) => [k, scrub(formData![k])])), storagesFound: parseStorages(formData!) } : form,
+      panelPlans: products.map((pr) => {
+        const vz = ((pr.moduleConfig ?? {}) as { virtualizor?: { planId?: number; virt?: string } }).virtualizor ?? {};
+        const vp = vz.planId ? (planRows as Record<string, Record<string, unknown>>)[String(vz.planId)] : undefined;
+        return { name: pr.name, diskGb: pr.diskGb, virtualizorPlanId: vz.planId ?? null, virt: vz.virt ?? null, virtualizorPlan: vp ? scrub({ plid: vp.plid, plan_name: vp.plan_name, virt: vp.virt, space: vp.space, ram: vp.ram, cores: vp.cores }) : null };
+      }),
+      lastFailure,
+    });
+  }),
+);
+
 /** Server groups of a Virtualizor master (for "auto" placement inside a group). */
 adminInfra.get(
   "/virtualizor/:serverId/groups",

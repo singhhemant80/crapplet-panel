@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, storagesOfNode, type VirtStorage } from "./virtualizor";
+import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, storagesOfNode, type NodeHints, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 
 export class ProvisionError extends Error {
@@ -444,21 +444,50 @@ async function virtualizorCreate(svc: FullService) {
         [...new Map(list.map((x) => [x.stid, x])).values()]
           .filter((x) => x.freeGb === null || x.freeGb >= diskGb)
           .sort((a, b) => Number(b.primary) - Number(a.primary) || (b.freeGb ?? 0) - (a.freeGb ?? 0));
+      // Virtualizor refuses a plan of one VPS type with a build of another — often as a storage error,
+      // which hides the real cause. Check it before trying anything.
+      if (mc.planId && mc.virt) {
+        const vp = ((await client.plans().catch(() => null))?.plans ?? {})[String(mc.planId)] as Record<string, unknown> | undefined;
+        if (vp?.virt && String(vp.virt) !== virt)
+          throw new ProvisionError(`VPS type mismatch: this plan builds “${virt}” VPSes but Virtualizor plan “${vp.plan_name ?? mc.planId}” is “${vp.virt}”. Open Products → ${p.name}, choose the Virtualizor plan again and offer OS templates of the same type, then retry.`, false);
+      }
+      const hintsByNode = new Map<number, NodeHints>();
       for (const n of candidates.slice(0, 3)) {
-        // 1) what Virtualizor's own Create VPS form offers for this node, 2) storages the list ties to it,
-        // 3) when the master doesn't map storage to nodes at all: every storage (a wrong one is just refused)
+        // storage candidates, best evidence first:
+        // 1) the storage a VPS already running on this node uses (made in Virtualizor's own panel)
+        // 2) what Virtualizor's Create VPS form offers for the node, 3) storages the list ties to it,
+        // 4) when nothing is tied to the node: every listed storage (a wrong one is only refused)
+        const hints = await client.learnNode(n.serid).catch(() => null);
+        if (hints) hintsByNode.set(n.serid, hints);
+        const learned: VirtStorage[] = hints
+          ? [
+              ...hints.uuids.map((u) => storages.find((x) => x.uuid === u) ?? { stid: NaN, uuid: u, name: `uuid ${u}`, type: "", primary: false, serids: [], sgids: [], totalGb: null, freeGb: null }),
+              ...hints.stids.map((id) => storages.find((x) => x.stid === id) ?? { stid: id, uuid: null, name: `#${id}`, type: "", primary: false, serids: [], sgids: [], totalGb: null, freeGb: null }),
+            ]
+          : [];
         const own = await client.storagesForServer(n.serid).catch(() => [] as VirtStorage[]);
         const mapped = rank([...own, ...storagesOfNode(storages, String(n.serid), sgidOf(n.serid))]);
-        const guesses = mapped.length || anyMapped ? [] : rank(storages);
-        const attempts: { label: string; storage?: { stid: number; uuid?: string | null }; diskMode: "scalar" | "array" | "plan" }[] = [
-          ...[...mapped, ...guesses].slice(0, 8).map((st) => ({
-            label: `storage ${st.name} (id ${st.stid}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})`,
-            storage: { stid: st.stid, uuid: st.uuid },
-            diskMode: (st.uuid ? "array" : "scalar") as "array" | "scalar",
-          })),
-          { label: "node's primary storage", diskMode: "scalar" },
-          ...(mc.planId ? [{ label: "Virtualizor plan defaults", diskMode: "plan" as const }] : []),
-        ];
+        const guesses = learned.length || mapped.length || anyMapped ? [] : rank(storages);
+        const seen = new Set<string>();
+        const pool = [...learned, ...mapped, ...guesses].filter((st) => {
+          const k = `${Number.isFinite(st.stid) ? st.stid : ""}|${st.uuid ?? ""}`;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        type Attempt = { label: string; storage?: { stid?: number | null; uuid?: string | null }; diskMode: "scalar" | "array" | "plan" };
+        const attempts: Attempt[] = [];
+        for (const st of pool.slice(0, 5)) {
+          const id = Number.isFinite(st.stid) ? st.stid : null;
+          const label = `storage ${st.name}${id !== null ? ` (id ${id}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})` : ""}${learned.includes(st) ? " — used by VPS on this node" : ""}`;
+          // masters differ in how they want the disk: uuid per disk, uuid + stid, or stid with a plain size
+          if (st.uuid) attempts.push({ label, storage: { stid: id, uuid: st.uuid }, diskMode: "array" });
+          if (st.uuid && id !== null) attempts.push({ label: `${label} [uuid only]`, storage: { uuid: st.uuid }, diskMode: "array" });
+          if (id !== null) attempts.push({ label: `${label} [id only]`, storage: { stid: id }, diskMode: "scalar" });
+        }
+        attempts.push({ label: "node's primary storage", diskMode: "scalar" });
+        if (mc.planId) attempts.push({ label: "Virtualizor plan defaults", diskMode: "plan" });
+        const virtMismatch = hints?.virts.length && !hints.virts.includes(virt) ? hints.virts : null;
         await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}${attempts.length > 2 ? ` (${attempts.length} ways to try)` : ""}`);
         const errs: string[] = [];
         for (const a of attempts) {
@@ -474,12 +503,12 @@ async function virtualizorCreate(svc: FullService) {
         }
         if (vpsid) break;
         const distinct = [...new Set(errs.map((x) => x.replace(/^.*?: /, "")))];
-        tried.push(`${n.name} (${attempts.length} tries: ${distinct.join(" / ")})`);
-        await log(svc.id, "create", false, `Node ${n.name} refused all ${attempts.length} storage options — trying the next node`, { attempts: errs, storagesOffered: own, storagesListed: storages });
+        tried.push(`${n.name} (${attempts.length} tries: ${distinct.join(" / ")}${virtMismatch ? `; VPSes on this node are type ${virtMismatch.join("/")}, this plan builds ${virt}` : ""})`);
+        await log(svc.id, "create", false, `Node ${n.name} refused all ${attempts.length} storage options — trying the next node`, { attempts: errs, learnedFromNode: hints, storagesOffered: own, storagesListed: storages });
       }
       if (!vpsid)
         throw new ProvisionError(
-          `No storage could be used on ${tried.join("; ")}. In Virtualizor → Storage, add or edit a storage, attach it to these servers and tick “Primary storage” (it needs ${p.diskGb ?? "the plan's"} GB free). Admin → Node Monitoring shows the storage each node reports.`,
+          `Virtualizor refused every way of placing the disk on ${tried.join("; ")}. ${[...hintsByNode.values()].some((h) => h.virts.length && !h.virts.includes(virt)) ? `The VPS type doesn't match: pick a Virtualizor plan and OS templates of the same type as the node's VPSes (Products → ${p.name}). ` : ""}Open Admin → Node Monitoring → Diagnose on ${candidates[0].name} and send the report to support — it shows exactly what this master expects.`,
           false,
         );
     }

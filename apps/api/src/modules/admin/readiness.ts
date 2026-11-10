@@ -52,6 +52,25 @@ export async function productReadiness(productId: string): Promise<{ ready: bool
   const mc = ((p.moduleConfig ?? {}) as { virtualizor?: VirtualizorModuleConfig }).virtualizor ?? {};
   if (type === "VIRTUALIZOR") {
     add(mc.planId ? { key: "plan", label: "Virtualizor plan", status: "ok", detail: `Plan id ${mc.planId} · ${mc.virt ?? "kvm"}` } : { key: "plan", label: "Virtualizor plan", status: p.cpuCores && p.ramMb && p.diskGb ? "warn" : "error", detail: p.cpuCores && p.ramMb && p.diskGb ? "No plan — VPS will be created from the vCPU/RAM/disk values" : "No plan and no vCPU/RAM/disk set", fix: "Choose a Virtualizor plan", href: edit });
+    // VPS type must agree everywhere: panel plan ↔ Virtualizor plan ↔ OS templates
+    const master = p.servers.find((x) => x.server.enabled && x.server.type === "VIRTUALIZOR")?.server ?? (await prisma.server.findFirst({ where: { type: "VIRTUALIZOR", enabled: true } }));
+    if (mc.planId && master) {
+      try {
+        const { virtualizorFor } = await import("../provisioning/provisioner");
+        const plans = (await virtualizorFor(master).plans()).plans ?? {};
+        const vp = (plans as Record<string, Record<string, unknown>>)[String(mc.planId)];
+        if (!vp) add({ key: "virt", label: "VPS type", status: "error", detail: `Virtualizor plan #${mc.planId} doesn't exist on ${master.name}`, fix: "Choose the plan again", href: edit });
+        else if (mc.virt && vp.virt && String(vp.virt) !== mc.virt)
+          add({ key: "virt", label: "VPS type", status: "error", detail: `This plan builds “${mc.virt}” VPSes but Virtualizor plan “${vp.plan_name}” is “${vp.virt}” — Virtualizor refuses the mix (often as a storage error)`, fix: "Choose the Virtualizor plan again (it sets the type) and offer OS templates of that type", href: edit });
+        else {
+          const offered = p.osTemplates.map((x) => x.osTemplate).filter((o) => o.enabled && o.virtualizorVirt);
+          const wrong = offered.filter((o) => o.virtualizorVirt !== String(vp.virt ?? mc.virt));
+          add(wrong.length ? { key: "virt", label: "VPS type", status: offered.length > wrong.length ? "warn" : "error", detail: `${wrong.map((o) => `${o.name} (${o.virtualizorVirt})`).join(", ")} ${wrong.length === 1 ? "is" : "are"} not ${vp.virt ?? mc.virt} templates`, fix: "Untick them under operating systems", href: edit } : { key: "virt", label: "VPS type", status: "ok", detail: `${vp.virt ?? mc.virt} everywhere (plan, Virtualizor plan, OS templates)` });
+        }
+      } catch {
+        /* connection problems are reported by the connection check */
+      }
+    }
   } else {
     add(p.cpuCores && p.ramMb && p.diskGb ? { key: "specs", label: "Resources", status: "ok", detail: `${p.cpuCores} vCPU · ${p.ramMb} MB · ${p.diskGb} GB` } : { key: "specs", label: "Resources", status: "error", detail: "vCPU, RAM or disk missing", fix: "Fill in vCPU / RAM / disk", href: edit });
   }

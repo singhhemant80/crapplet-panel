@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { Alert, Button, Card, Empty, Icon, Input, Loading, PageHeader, Select, cx, toast, useApi } from "@/components/ui";
+import { Alert, Button, Card, Copy, Empty, Icon, Input, Loading, Modal, PageHeader, Select, cx, toast, useApi } from "@/components/ui";
 
 type Node = {
   id: string; name: string; online: boolean; cpuPct: number; ramUsedMb: number; ramTotalMb: number; diskUsedGb: number; diskTotalGb: number; updatedAt: string;
@@ -62,6 +62,42 @@ function NodeStorage({ list, info }: { list?: Storage[]; info?: StorageInfo }) {
   );
 }
 
+/** One-click report of what this master expects on a node — the panel learns from VPSes already running there. */
+function Diagnose({ server, n }: { server: Srv; n: Node }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const run = () => {
+    setOpen(true);
+    setData(null);
+    setErr("");
+    api(`/admin/virtualizor/${server.id}/diagnose?serid=${n.externalId}`).then(setData).catch((e) => setErr(e.message));
+  };
+  const text = data ? JSON.stringify(data, null, 2) : "";
+  const h = data?.vpsOnThisNode;
+  return (
+    <>
+      <button onClick={run} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-primary-dark hover:underline"><Icon name="troubleshoot" className="text-[16px]" />Diagnose VPS creation</button>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Diagnose · ${n.name}`} wide>
+        {err && <Alert tone="error">{err}</Alert>}
+        {!data && !err && <Loading label="Asking Virtualizor about this node…" />}
+        {data && (
+          <div className="space-y-3 text-sm">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-line"><div className="text-xs font-bold uppercase text-mute">VPS type on this node</div><div className="mt-0.5 font-bold">{h?.ok ? (h.data.virts.join(", ") || "no VPS yet") : h?.error}</div></div>
+              <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-line"><div className="text-xs font-bold uppercase text-mute">Storage used by its VPSes</div><div className="mt-0.5 break-all font-bold">{h?.ok ? ([...h.data.uuids, ...h.data.stids.map((x: number) => `#${x}`)].join(", ") || "not reported") : "—"}</div></div>
+              <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-line"><div className="text-xs font-bold uppercase text-mute">Panel plans → Virtualizor</div><div className="mt-0.5 text-xs">{data.panelPlans.map((p: any) => <div key={p.name}><b>{p.name}</b>: plan #{p.virtualizorPlanId ?? "—"} · {p.virt ?? "?"}{p.virtualizorPlan ? ` (${p.virtualizorPlan.plan_name}, ${p.virtualizorPlan.virt})` : ""}</div>)}</div></div>
+              <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-line"><div className="text-xs font-bold uppercase text-mute">Storages in the Create VPS form</div><div className="mt-0.5 text-xs">{data.createForm?.storagesFound?.map((x: any) => `${x.name} #${x.stid}${x.primary ? " (primary)" : ""}`).join(", ") || "none found"}</div></div>
+            </div>
+            <div className="flex items-center justify-between"><span className="text-xs text-mute">Full report (passwords removed). Copy it and send it to support if VPS creation still fails.</span><span className="flex items-center gap-1 text-xs font-bold text-primary-dark">Copy <Copy text={text} /></span></div>
+            <pre className="max-h-[50vh] overflow-auto rounded-xl bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100">{text}</pre>
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
+
 function NodeCard({ n, server, onChanged, storage }: { n: Node & { enabled: boolean }; server: Srv; onChanged: () => void; storage?: StorageInfo }) {
   const ram = p(n.ramUsedMb, n.ramTotalMb);
   const disk = p(n.diskUsedGb, n.diskTotalGb);
@@ -117,6 +153,7 @@ function NodeCard({ n, server, onChanged, storage }: { n: Node & { enabled: bool
         </label>
       )}
       {server.type === "VIRTUALIZOR" && n.externalId !== null && <NodeStorage list={storage?.byNode?.[n.externalId]} info={storage} />}
+      {server.type === "VIRTUALIZOR" && n.externalId !== null && <Diagnose server={server} n={n} />}
       {m.usageError && <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">Live usage unavailable — {m.usageError.replace(/^Virtualizor manageserver: /, "").replace(/[\[\]"]/g, "")}</div>}
     </div>
   );
