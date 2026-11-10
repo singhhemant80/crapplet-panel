@@ -31,6 +31,7 @@ export default function AdminService() {
         <ProvisioningTracker path={`/admin/services/${id}/provisioning`} audience="admin" onChange={() => reload()} onRetry={() => act("create")} />
       )}
       {s.status === "FAILED" && <FailurePanel s={s} />}
+      {isVps && ["TERMINATED", "CANCELLED"].includes(s.status) && <RecreatePanel s={s} onDone={reload} />}
       <Card title="Actions" className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : s.status === "PROVISIONING" ? "Re-run provisioning" : "Provision now"}</Button>}
@@ -152,6 +153,58 @@ function FailurePanel({ s }: { s: any }) {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/** A terminated/cancelled VPS can be built again for the same order (same customer, plan and billing record). */
+function RecreatePanel({ s, onDone }: { s: any; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [os, setOs] = useState<string>(s.osTemplateId ?? "");
+  const [hostname, setHostname] = useState<string>(s.hostname ?? "");
+  const [billing, setBilling] = useState<"keep" | "restart">("keep");
+  const [busy, setBusy] = useState(false);
+  const osList = s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => x.osTemplate);
+  async function go() {
+    setBusy(true);
+    try {
+      await api(`/admin/services/${s.id}/recreate`, { body: { osTemplateId: os || undefined, hostname: hostname || undefined, billing } });
+      toast.success("New VPS queued — follow it in the tracker");
+      setOpen(false);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-extrabold text-ink">This service was {s.status === "TERMINATED" ? "terminated" : "cancelled"}{s.terminationDate ? ` on ${new Date(s.terminationDate).toLocaleDateString("en-IN", { dateStyle: "medium" })}` : ""}</div>
+          <p className="text-sm text-slate-600">You can build a new VPS for the same order{s.order ? ` (${s.order.number})` : ""} — same customer, plan and billing record. The old VPS isn't brought back.</p>
+        </div>
+        {!open && <Button icon="add_circle" onClick={() => setOpen(true)}>Create a new VPS</Button>}
+      </div>
+      {open && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Field label="Operating system">
+            <Select value={os} onChange={(e) => setOs(e.target.value)}>{osList.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}</Select>
+          </Field>
+          <Field label="Hostname"><Input value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="server.example.com" /></Field>
+          <Field label="Billing">
+            <Select value={billing} onChange={(e) => setBilling(e.target.value as "keep" | "restart")}>
+              <option value="keep">Keep the current due date</option>
+              <option value="restart">Restart the cycle from today</option>
+            </Select>
+          </Field>
+          <div className="flex gap-2 sm:col-span-3">
+            <Button icon="rocket_launch" loading={busy} onClick={go}>Create VPS</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -364,6 +364,66 @@ adminCore.get(
   }),
 );
 
+/**
+ * Build a fresh VPS for a terminated (or cancelled) service — same order, customer, plan and billing
+ * record. The old VPS is gone, so its id/node/password are cleared and a normal create is queued.
+ */
+adminCore.post(
+  "/services/:id/recreate",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      z.object({
+        osTemplateId: z.string().optional(),
+        hostname: z.string().trim().toLowerCase().regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/, "Invalid hostname").max(253).optional(),
+        billing: z.enum(["keep", "restart"]).default("keep"),
+      }),
+      req.body ?? {},
+    );
+    const s = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, include: { product: true, server: true } });
+    if (!["TERMINATED", "CANCELLED"].includes(s.status)) throw conflict(`Only terminated or cancelled services can be created again (this one is ${s.status.toLowerCase()})`);
+    if (s.product.provisioner === "MANUAL") throw badRequest("This plan isn't set up automatically");
+    // never leave the old VPS running alongside the new one
+    if (s.remoteId && s.server?.type === "VIRTUALIZOR") {
+      const { virtualizorFor } = await import("../provisioning/provisioner");
+      const still = await virtualizorFor(s.server).getVps(s.remoteId).then((r) => Object.keys(r.vs ?? {}).length > 0).catch(() => false);
+      if (still) throw conflict(`The old VPS ${s.remoteId} still exists in Virtualizor — delete it there (or terminate again) before creating a new one`);
+    }
+    if (b.osTemplateId) {
+      const os = await prisma.productOs.findFirst({ where: { productId: s.productId, osTemplateId: b.osTemplateId } });
+      if (!os) throw badRequest("That OS isn't offered on this plan");
+    }
+    const cfg = { ...((s.config ?? {}) as Record<string, unknown>) };
+    delete cfg.vzExistingVpsIds;
+    delete cfg.requestedIpId;
+    const { addCycle } = await import("../../lib/money");
+    await prisma.service.update({
+      where: { id: s.id },
+      data: {
+        status: "PROVISIONING",
+        remoteId: null,
+        node: null,
+        passwordEnc: null,
+        terminationDate: null,
+        suspendReason: null,
+        config: cfg as Prisma.InputJsonValue,
+        ...(b.osTemplateId ? { osTemplateId: b.osTemplateId } : {}),
+        ...(b.hostname ? { hostname: b.hostname } : {}),
+        ...(b.billing === "restart" ? { nextDueDate: addCycle(new Date(), s.billingCycle) } : {}),
+      },
+    });
+    await prisma.provisioningLog.create({
+      data: { serviceId: s.id, action: "create", success: true, message: `Creating a new VPS for this order (previous VPS ${s.remoteId ?? "—"} was ${s.status.toLowerCase()}${s.terminationDate ? ` on ${s.terminationDate.toISOString().slice(0, 10)}` : ""})` },
+    });
+    const { provisioningQueue } = await import("../../jobs/queues");
+    const old = await provisioningQueue().getJob(`create-${s.id}`);
+    if (old && ["failed", "completed"].includes(await old.getState())) await old.remove();
+    await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.recreate", entity: "service", entityId: s.id, details: { previousVpsId: s.remoteId, ...b } });
+    res.status(202).json({ queued: true });
+  }),
+);
+
 /** Live state (online / offline / suspended / locked) for many services — one call per master. */
 adminCore.get(
   "/live-states",
