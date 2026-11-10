@@ -3,12 +3,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, date, invNo, money } from "@/lib/api";
-import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", SG: "Singapore", CA: "Canada", AU: "Australia", DE: "Germany" };
 const fullName = (x: any) => [x?.firstName, x?.lastName].filter(Boolean).join(" ") || x?.email || "—";
 
-/** WHMCS-style client summary. */
+/** Client summary — everything about one customer on one screen (WHMCS "Client Summary"). */
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -48,229 +48,249 @@ export default function ClientDetail() {
     setTimeout(() => document.getElementById("client-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
+  const initials = ((c.firstName?.[0] ?? "") + (c.lastName?.[0] ?? c.email?.[1] ?? "")).toUpperCase();
+  const place = [p.city, p.state, COUNTRY[p.country] ?? p.country].filter(Boolean).join(", ");
+  const inv = sum?.invoices;
+  const due = inv ? inv.UNPAID.total + inv.COLLECTIONS.total : 0;
+  const services = data.services as any[];
+  const activeSvc = services.filter((s) => s.status === "ACTIVE").length;
+
   return (
     <>
-      <PageHeader
-        back="/admin/clients"
-        title={<span className="flex items-center gap-3">{fullName(c)} <Badge status={c.status} /></span>}
-        subtitle={`#${c.id.slice(-6).toUpperCase()} · ${c.email}${c.phone ? ` · ${c.phone}` : ""} · customer since ${date(c.createdAt)}`}
-        actions={<>
-          <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
-          <Button variant="outline" size="sm" icon="login" disabled={c.status !== "ACTIVE"} title={c.status !== "ACTIVE" ? "Only active accounts" : "Open the client area as this customer"} onClick={loginAs}>Login as client</Button>
-        </>}
-      />
+      <Link href="/admin/clients" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline"><Icon name="arrow_back" className="text-[18px]" />Customers</Link>
 
-      <div className="mb-6 grid items-start gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        {/* ── column 1 ── */}
-        <div className="space-y-5">
-          <Panel title="Client information" action={<SmallBtn icon="edit" onClick={() => setModal("profile")}>Edit</SmallBtn>}>
-            <Rows rows={[
-              ["First name", c.firstName],
-              ["Last name", c.lastName || "—"],
-              ["Company", p.companyName || "—"],
-              ["Email", <span key="e" className="inline-flex items-center gap-1 break-all">{c.email}<Copy text={c.email} /></span>],
-              ["Address 1", p.address1 || "—"],
-              ["Address 2", p.address2 || "—"],
-              ["City", p.city || "—"],
-              ["State", `${p.state || "—"}${p.stateCode ? ` (${p.stateCode})` : ""}`],
-              ["Postcode", p.postcode || "—"],
-              ["Country", `${p.country ?? "—"}${COUNTRY[p.country] ? ` – ${COUNTRY[p.country]}` : ""}`],
-              ["Phone", c.phone || "—"],
-              ["GSTIN", <span key="g" className="font-mono">{p.gstin || "—"}</span>],
-              ["PAN", <span key="p" className="font-mono">{p.pan || "—"}</span>],
-              ["Currency", cur],
-            ]} />
-            <Links>
-              <ActionLink icon="login" onClick={loginAs} disabled={c.status !== "ACTIVE"}>Login as client</ActionLink>
-              <ActionLink icon="lock_reset" onClick={() => confirm(`Email ${c.email} a password reset link?`) && run(() => api(`/admin/clients/${id}/password-reset`, { body: {} }), "Password reset email sent")}>Send password reset email</ActionLink>
-              {c.totpEnabled && <ActionLink icon="phonelink_lock" onClick={() => confirm("Turn off two-factor sign-in for this customer?") && run(() => api(`/admin/clients/${id}/reset-2fa`, { body: {} }), "2FA reset")}>Reset two-factor sign-in</ActionLink>}
-            </Links>
+      {/* ── profile header ── */}
+      <section className="mb-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+        <div className="h-1.5 bg-gradient-to-r from-primary via-primary-dark to-primary-deep" />
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-lg font-extrabold text-white shadow-glow">{initials}</span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-2xl font-extrabold tracking-tight text-ink">{fullName(c)}</h1>
+                <Badge status={c.status} />
+                {!c.emailVerified && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">Email not verified</span>}
+                {c.reseller && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 ring-1 ring-sky-200">Reseller</span>}
+              </div>
+              <div className="mt-0.5 text-sm text-mute">{p.companyName ? <b className="font-semibold text-slate-700">{p.companyName} · </b> : null}Client #{c.id.slice(-6).toUpperCase()} · since {date(c.createdAt)}{sum ? ` (${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"})` : ""}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-600">
+                <span className="inline-flex items-center gap-1"><Icon name="mail" className="text-[16px] text-mute" />{c.email}<Copy text={c.email} /></span>
+                {c.phone && <span className="inline-flex items-center gap-1"><Icon name="call" className="text-[16px] text-mute" />{c.phone}</span>}
+                {place && <span className="inline-flex items-center gap-1"><Icon name="location_on" className="text-[16px] text-mute" />{place}</span>}
+                {sum?.other.lastLogin && <span className="inline-flex items-center gap-1"><Icon name="schedule" className="text-[16px] text-mute" />Last login {date(sum.other.lastLogin.at, true)} · <span className="font-mono text-[12px]">{sum.other.lastLogin.ip}</span></span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
+            <Button size="sm" variant="outline" icon="login" disabled={c.status !== "ACTIVE"} onClick={loginAs}>Login as client</Button>
+            <Button size="sm" variant="outline" icon="mail" onClick={() => setModal("email")}>Email</Button>
+            <Button size="sm" variant="outline" icon="chat" disabled={!c.phone} onClick={() => setModal("whatsapp")}>WhatsApp</Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── KPIs ── */}
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <Kpi icon="account_balance_wallet" tone="purple" label="Credit balance" value={sum ? money(sum.income.credit, cur) : "…"} onClick={() => setModal("credit")} hint="Manage credits" />
+        <Kpi icon="pending_actions" tone={due > 0 ? "rose" : "green"} label="Due now" value={sum ? money(due, cur) : "…"} hint={inv ? `${inv.UNPAID.count + inv.COLLECTIONS.count} unpaid invoice${inv.UNPAID.count + inv.COLLECTIONS.count === 1 ? "" : "s"}` : ""} onClick={() => goTab("invoices")} />
+        <Kpi icon="payments" tone="green" label="Lifetime revenue" value={sum ? money(sum.income.gross, cur) : "…"} hint={sum ? `Net ${money(sum.income.net, cur)} after fees` : ""} onClick={() => goTab("statement")} />
+        <Kpi icon="dns" tone="sky" label="Active services" value={`${activeSvc}`} hint={`${services.length} total · ${sum?.products.domains ?? 0} domain${sum?.products.domains === 1 ? "" : "s"}`} onClick={() => goTab("services")} />
+        <Kpi icon="support_agent" tone={sum?.products.openTickets ? "amber" : "slate"} label="Open tickets" value={`${sum?.products.openTickets ?? 0}`} hint={`${sum?.products.tickets ?? 0} total`} onClick={() => goTab("tickets")} />
+      </div>
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
+        {/* ── main column ── */}
+        <div className="min-w-0 space-y-5">
+          <Panel icon="badge" title="Account details" action={<HeadBtn icon="edit" onClick={() => setModal("profile")}>Edit</HeadBtn>}>
+            <dl className="grid gap-x-8 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              <Item k="Full name" v={fullName(c)} />
+              <Item k="Company" v={p.companyName} />
+              <Item k="Phone" v={c.phone} />
+              <Item k="Address" v={[p.address1, p.address2].filter(Boolean).join(", ")} wide />
+              <Item k="City / postcode" v={[p.city, p.postcode].filter(Boolean).join(" – ")} />
+              <Item k="State" v={p.state ? `${p.state}${p.stateCode ? ` (GST code ${p.stateCode})` : ""}` : ""} />
+              <Item k="Country" v={COUNTRY[p.country] ?? p.country} />
+              <Item k="GSTIN" v={p.gstin} mono />
+              <Item k="PAN" v={p.pan} mono />
+              <div>
+                <dt className="text-[11.5px] font-bold uppercase tracking-wide text-mute">Billing currency</dt>
+                <dd className="mt-1"><Select className="h-8 w-28 text-sm" value={cur} onChange={(e) => run(() => api(`/admin/clients/${id}`, { method: "PUT", body: { currency: e.target.value } }), `Now billed in ${e.target.value}`)}><option>INR</option><option>USD</option></Select></dd>
+              </div>
+              <div>
+                <dt className="text-[11.5px] font-bold uppercase tracking-wide text-mute">Account status</dt>
+                <dd className="mt-1"><Select className="h-8 w-32 text-sm" value={c.status} onChange={(e) => run(() => api(`/admin/clients/${id}`, { method: "PUT", body: { status: e.target.value } }), "Status updated")}><option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></Select></dd>
+              </div>
+              <Item k="Security" v={`${sum?.other.twoFactor ? "2FA on" : "2FA off"} · ${sum?.other.activeSessions ?? 0} signed-in session${sum?.other.activeSessions === 1 ? "" : "s"}`} />
+            </dl>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+              <Button size="sm" variant="ghost" icon="lock_reset" onClick={() => confirm(`Email ${c.email} a password reset link?`) && run(() => api(`/admin/clients/${id}/password-reset`, { body: {} }), "Password reset email sent")}>Send password reset</Button>
+              {c.totpEnabled && <Button size="sm" variant="ghost" icon="phonelink_lock" onClick={() => confirm("Turn off two-factor sign-in for this customer?") && run(() => api(`/admin/clients/${id}/reset-2fa`, { body: {} }), "2FA reset")}>Reset 2FA</Button>}
+              {sum?.other.affiliate ? <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary-tint px-3 text-[13px] font-semibold text-primary-dark"><Icon name="handshake" className="text-[17px]" />Affiliate <span className="font-mono">{sum.other.affiliate.code}</span></span>
+                : <Button size="sm" variant="ghost" icon="handshake" onClick={() => run(() => api(`/admin/clients/${id}/affiliate`, { body: {} }), (r) => `Affiliate activated — code ${r.code}`)}>Activate as affiliate</Button>}
+            </div>
           </Panel>
 
-          <Panel title="Contacts">
+          <Panel icon="receipt_long" title="Invoices & billing">
+            {inv ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {([["PAID", "Paid", "text-emerald-700"], ["UNPAID", "Unpaid / due", "text-rose-600"], ["DRAFT", "Draft", "text-slate-600"], ["CANCELLED", "Cancelled", "text-slate-600"], ["REFUNDED", "Refunded", "text-sky-700"], ["COLLECTIONS", "Collections", "text-amber-700"]] as const).map(([k, l, tone]) => (
+                  <button key={k} type="button" onClick={() => goTab("invoices")} className="rounded-xl border border-line bg-[#fcfaff] px-4 py-3 text-left transition hover:border-[#dccafb] hover:bg-white">
+                    <div className="text-[12px] font-semibold text-mute">{l}</div>
+                    <div className={cx("mt-0.5 text-lg font-extrabold", inv[k].count ? tone : "text-slate-300")}>{money(inv[k].total, cur)}</div>
+                    <div className="text-[11.5px] text-mute">{inv[k].count} invoice{inv[k].count === 1 ? "" : "s"}</div>
+                  </button>
+                ))}
+              </div>
+            ) : <Loading />}
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+              <Button size="sm" variant="secondary" icon="add" onClick={() => setModal("invoice")}>Create invoice</Button>
+              <Button size="sm" variant="ghost" icon="savings" onClick={() => setModal("funds")}>Add funds invoice</Button>
+              <Button size="sm" variant="ghost" icon="event_repeat" onClick={() => run(() => api(`/admin/clients/${id}/generate-due`, { body: {} }), (r) => (r.created ? `${r.created} due invoice${r.created > 1 ? "s" : ""} created` : "Nothing is due yet — no invoices created"))}>Generate due invoices</Button>
+              <Button size="sm" variant="ghost" icon="account_balance_wallet" onClick={() => setModal("credit")}>Manage credits</Button>
+              <Button size="sm" variant="ghost" icon="summarize" onClick={() => goTab("statement")}>Account statement</Button>
+            </div>
+          </Panel>
+
+          <Panel icon="inventory_2" title="Products & services" action={<HeadBtn icon="add" onClick={() => router.push(`/admin/orders/new?client=${c.id}`)}>Add order</HeadBtn>}>
+            {sum ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Count icon="dns" label="VPS / servers" a={sum.products.server.active} t={sum.products.server.total} />
+                <Count icon="cloud" label="Shared hosting" a={sum.products.shared.active} t={sum.products.shared.total} />
+                <Count icon="storefront" label="Reseller hosting" a={sum.products.reseller.active} t={sum.products.reseller.total} />
+                <Count icon="widgets" label="Other services" a={sum.products.other.active} t={sum.products.other.total} />
+                <Count icon="language" label="Domains" a={sum.products.domains} onClick={() => goTab("domains")} />
+                <Count icon="shopping_bag" label="Orders" a={sum.products.orders} onClick={() => goTab("orders")} />
+                <Count icon="forum" label="Tickets" a={sum.products.tickets} onClick={() => goTab("tickets")} />
+                <Count icon="group_add" label="Affiliate signups" a={sum.products.affiliateSignups} />
+              </div>
+            ) : <Loading />}
+          </Panel>
+
+          <div id="client-tabs" className="scroll-mt-24">
+            <div className="mb-3 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-white p-1.5 shadow-card">
+              {TABS.map(([t, l, n]) => (
+                <button key={t} onClick={() => setTab(t)} className={cx("inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-bold transition", tab === t ? "bg-primary-dark text-white shadow" : "text-slate-600 hover:bg-primary-tint hover:text-primary-dark")}>
+                  {l}
+                  {n && (data[n]?.length ?? 0) > 0 && <span className={cx("rounded-full px-1.5 text-[11px]", tab === t ? "bg-white/20" : "bg-slate-100 text-slate-500")}>{data[n].length}</span>}
+                </button>
+              ))}
+            </div>
+            <Card pad={false}>
+              {tab === "services" && <Table head={["Service", "Hostname / IP", "Status", "Recurring", "Next due"]}>{services.map((s: any) => <tr key={s.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/services/${s.id}`}>{s.product.name}</Link></Td><Td>{s.hostname}<div className="font-mono text-xs text-mute">{s.ips.map((i: any) => i.address).join(", ")}</div></Td><Td><Badge status={s.status} /></Td><Td>{money(s.recurringAmount, s.currency)}</Td><Td>{date(s.nextDueDate)}</Td></tr>)}</Table>}
+              {tab === "orders" && <Table head={["Order", "Date", "Total", "Status"]}>{(data.orders ?? []).map((o: any) => <tr key={o.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td><Td>{date(o.createdAt, true)}</Td><Td>{money(o.total, o.currency)}</Td><Td><Badge status={o.status} /></Td></tr>)}</Table>}
+              {tab === "invoices" && <Table head={["Invoice", "Date", "Due", "Total", "Status"]}>{data.invoices.map((i: any) => <tr key={i.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td><Td>{date(i.issueDate)}</Td><Td>{date(i.dueDate)}</Td><Td>{money(i.total, i.currency)}</Td><Td><Badge status={i.status} /></Td></tr>)}</Table>}
+              {tab === "statement" && <Statement id={id} />}
+              {tab === "transactions" && <Table head={["Date", "Gateway", "Reference", "Type", "Amount"]}>{data.transactions.map((t: any) => <tr key={t.id}><Td>{date(t.createdAt, true)}</Td><Td>{t.gateway}</Td><Td className="font-mono text-xs">{t.gatewayTxnId}</Td><Td>{t.type}</Td><Td>{money(t.amount, t.currency)}</Td></tr>)}</Table>}
+              {tab === "tickets" && <Table head={["Ticket", "Subject", "Department", "Status"]}>{data.tickets.map((t: any) => <tr key={t.id}><Td>#{t.number}</Td><Td><Link className="font-bold text-primary-dark" href={`/admin/tickets/${t.id}`}>{t.subject}</Link></Td><Td>{t.department.name}</Td><Td><Badge status={t.status} /></Td></tr>)}</Table>}
+              {tab === "domains" && <Table head={["Domain", "Status", "Expiry"]}>{data.domains.map((d: any) => <tr key={d.id}><Td className="font-bold">{d.name}</Td><Td><Badge status={d.status} /></Td><Td>{date(d.expiryDate)}</Td></tr>)}</Table>}
+              {tab === "credit" && <Table head={["Date", "Description", "Amount", "Balance"]}>{data.ledger.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td>{l.description}</Td><Td className={l.amount < 0 ? "text-rose-600" : "text-emerald-600"}>{money(l.amount, cur)}</Td><Td>{money(l.balanceAfter, cur)}</Td></tr>)}</Table>}
+              {tab === "logins" && <Table head={["Time", "IP", "Result"]}>{data.logins.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td className="font-mono text-xs">{l.ip}</Td><Td>{l.success ? <Badge status="ACTIVE">ok</Badge> : <Badge status="FAILED">{l.reason}</Badge>}</Td></tr>)}</Table>}
+            </Card>
+          </div>
+        </div>
+
+        {/* ── sidebar ── */}
+        <aside className="min-w-0 space-y-5">
+          <Panel icon="bolt" title="Quick actions">
+            <div className="grid grid-cols-2 gap-2">
+              <Quick icon="summarize" onClick={() => goTab("statement")}>Statement</Quick>
+              <Quick icon="support_agent" onClick={() => setModal("ticket")}>Open ticket</Quick>
+              <Quick icon="forum" onClick={() => goTab("tickets")}>All tickets</Quick>
+              <Quick icon="list_alt" onClick={() => goTab("orders")}>Orders</Quick>
+              <Quick icon="call_merge" onClick={() => setModal("merge")}>Merge</Quick>
+              <Quick icon="download" onClick={() => (window.location.href = `/api/admin/clients/${id}/export`)}>Export data</Quick>
+            </div>
+          </Panel>
+
+          <Panel icon="contacts" title="Contacts" count={sum?.contacts?.length} action={<HeadBtn icon="add" onClick={() => setModal("contact")}>Add</HeadBtn>}>
             {sum?.contacts?.length ? (
-              <ul className="divide-y divide-line text-sm">
+              <ul className="-my-1 divide-y divide-line">
                 {sum.contacts.map((k: any) => (
-                  <li key={k.id} className="flex items-start justify-between gap-2 py-2">
-                    <div className="min-w-0">
-                      <div className="font-bold text-ink">{fullName(k)}{k.companyName ? <span className="font-normal text-mute"> · {k.companyName}</span> : null}</div>
-                      <div className="break-all text-xs text-mute">{k.email}{k.phone ? ` · ${k.phone}` : ""}</div>
-                      {k.emails?.length > 0 && <div className="mt-0.5 text-[11px] text-mute">Gets: {k.emails.join(", ")} emails</div>}
+                  <li key={k.id} className="group flex items-center gap-3 py-2.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-[12px] font-bold text-slate-600">{((k.firstName?.[0] ?? "") + (k.lastName?.[0] ?? "")).toUpperCase()}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-ink">{fullName(k)}</div>
+                      <div className="truncate text-xs text-mute">{k.email}{k.emails?.length ? ` · ${k.emails.join(", ")}` : ""}</div>
                     </div>
-                    <IconBtn icon="delete" title="Remove contact" onClick={() => confirm(`Remove ${k.email}?`) && run(() => api(`/admin/clients/${id}/contacts/${k.id}`, { method: "DELETE" }), "Contact removed")} />
+                    <RowDel title="Remove contact" onClick={() => confirm(`Remove ${k.email}?`) && run(() => api(`/admin/clients/${id}/contacts/${k.id}`, { method: "DELETE" }), "Contact removed")} />
                   </li>
                 ))}
               </ul>
-            ) : <Empty>No additional contacts</Empty>}
-            <Links><ActionLink icon="person_add" onClick={() => setModal("contact")}>Add contact</ActionLink></Links>
+            ) : <Blank icon="person_add">No additional contacts</Blank>}
           </Panel>
 
-          <Panel title="Pay methods">
+          <Panel icon="credit_card" title="Pay methods" count={sum?.payMethods?.length} action={<HeadBtn icon="add" onClick={() => setModal("paymethod")}>Add</HeadBtn>}>
             {sum?.payMethods?.length ? (
-              <ul className="divide-y divide-line text-sm">
+              <ul className="space-y-2.5">
                 {sum.payMethods.map((m: any) => (
-                  <li key={m.id} className="py-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5 font-bold text-ink">
-                          <Icon name={m.type === "CARD" ? "credit_card" : m.type === "UPI" ? "qr_code_2" : m.type === "BANK" ? "account_balance" : "verified_user"} className="text-[18px] text-mute" />
-                          {m.label}
-                          {m.isDefault && <span className="rounded bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary-dark">Default</span>}
-                          {m.status !== "ACTIVE" && <Badge status="FAILED">{m.status}</Badge>}
-                        </div>
-                        <div className="text-xs text-mute">{m.gateway}{m.last4 ? ` · •••• ${m.last4}` : ""}{m.expiry ? ` · exp ${m.expiry}` : ""}</div>
+                  <li key={m.id} className={cx("rounded-xl border p-3", m.isDefault ? "border-[#dccafb] bg-primary-tint" : "border-line")}>
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-primary-dark ring-1 ring-line"><Icon name={m.type === "CARD" ? "credit_card" : m.type === "UPI" ? "qr_code_2" : m.type === "BANK" ? "account_balance" : "verified_user"} className="text-[19px]" /></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink"><span className="truncate">{m.label}</span>{m.isDefault && <span className="rounded bg-primary-dark px-1.5 py-px text-[10px] font-bold uppercase text-white">Default</span>}{m.status !== "ACTIVE" && <Badge status="FAILED">{m.status}</Badge>}</div>
+                        <div className="text-xs capitalize text-mute">{m.gateway}{m.last4 ? ` · •••• ${m.last4}` : ""}{m.expiry ? ` · exp ${m.expiry}` : ""}</div>
                       </div>
-                      <IconBtn icon="delete" title="Remove" onClick={() => confirm(`Remove ${m.label}?`) && run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "DELETE" }), "Pay method removed")} />
+                      <RowDel title="Remove" onClick={() => confirm(`Remove ${m.label}?`) && run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "DELETE" }), "Pay method removed")} />
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-3">
-                      <Toggle checked={m.autopay} onChange={(v) => run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "PUT", body: { autopay: v } }), v ? "Autopay on" : "Autopay off")} label={<span className="text-xs">Autopay renewals</span>} />
-                      {!m.isDefault && <button className="text-xs font-bold text-primary-dark" onClick={() => run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "PUT", body: { isDefault: true } }), "Default pay method set")}>Make default</button>}
+                    <div className="mt-2 flex items-center justify-between gap-2 pl-12">
+                      <Toggle checked={m.autopay} onChange={(v) => run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "PUT", body: { autopay: v } }), v ? "Autopay on" : "Autopay off")} label={<span className="text-xs">Autopay</span>} />
+                      {!m.isDefault && <button className="text-xs font-bold text-primary-dark hover:underline" onClick={() => run(() => api(`/admin/clients/${id}/pay-methods/${m.id}`, { method: "PUT", body: { isDefault: true } }), "Default pay method set")}>Make default</button>}
                     </div>
                   </li>
                 ))}
               </ul>
-            ) : <Empty>No pay methods</Empty>}
-            <Links><ActionLink icon="add_card" onClick={() => setModal("paymethod")}>Add pay method</ActionLink></Links>
-          </Panel>
-        </div>
-
-        {/* ── column 2 ── */}
-        <div className="space-y-5">
-          <Panel title="Invoices / billing">
-            {sum ? (
-              <Rows rows={[
-                ...(["PAID", "DRAFT", "UNPAID", "CANCELLED", "REFUNDED", "COLLECTIONS"] as const).map((k) => [
-                  k === "UNPAID" ? "Unpaid / due" : k[0] + k.slice(1).toLowerCase(),
-                  <span key={k} className={cx(k === "UNPAID" && sum.invoices[k].count > 0 && "font-bold text-rose-600")}>{sum.invoices[k].count} ({money(sum.invoices[k].total, cur)})</span>,
-                ] as [string, ReactNode]),
-                ["Gross revenue", money(sum.income.gross, cur)],
-                ["Gateway fees", money(sum.income.fees, cur)],
-                ["Net income", <b key="n">{money(sum.income.net, cur)}</b>],
-                ["Credit balance", <b key="c" className={sum.income.credit > 0 ? "text-emerald-700" : ""}>{money(sum.income.credit, cur)}</b>],
-              ]} />
-            ) : <Loading />}
-            <Links>
-              <ActionLink icon="receipt_long" onClick={() => setModal("invoice")}>Create invoice</ActionLink>
-              <ActionLink icon="savings" onClick={() => setModal("funds")}>Create add funds invoice</ActionLink>
-              <ActionLink icon="event_repeat" onClick={() => run(() => api(`/admin/clients/${id}/generate-due`, { body: {} }), (r) => (r.created ? `${r.created} due invoice${r.created > 1 ? "s" : ""} created` : "Nothing is due yet — no invoices created"))}>Generate due invoices</ActionLink>
-              <ActionLink icon="account_balance_wallet" onClick={() => setModal("credit")}>Manage credits</ActionLink>
-              <ActionLink icon="summarize" onClick={() => goTab("statement")}>View account statement</ActionLink>
-            </Links>
+            ) : <Blank icon="add_card">No saved pay methods</Blank>}
           </Panel>
 
-          <Panel title="Other information">
-            {sum ? (
-              <Rows rows={[
-                ["Status", <Select key="s" className="h-8 w-32 text-sm" value={c.status} onChange={(e) => run(() => api(`/admin/clients/${id}`, { method: "PUT", body: { status: e.target.value } }), "Status updated")}><option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></Select>],
-                ["Billing currency", <Select key="cur" className="h-8 w-24 text-sm" value={cur} onChange={(e) => run(() => api(`/admin/clients/${id}`, { method: "PUT", body: { currency: e.target.value } }), `Now billed in ${e.target.value}`)}><option>INR</option><option>USD</option></Select>],
-                ["Signup date", date(sum.other.signupDate)],
-                ["Client for", `${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"}`],
-                ["Last login", sum.other.lastLogin ? <span key="l">{date(sum.other.lastLogin.at, true)}<br /><span className="break-all font-mono text-[11px] text-mute">{sum.other.lastLogin.ip}</span></span> : "Never"],
-                ["Signed-in sessions", String(sum.other.activeSessions)],
-                ["Email verified", sum.other.emailVerified ? "Yes" : <b key="v" className="text-amber-700">No</b>],
-                ["Two-factor sign-in", sum.other.twoFactor ? "On" : "Off"],
-                ["Reseller", c.reseller ? `${c.reseller.brandName} (${c.reseller.status})` : "—"],
-                ["Affiliate", sum.other.affiliate ? <span key="a" className="font-mono">{sum.other.affiliate.code}</span> : "—"],
-              ]} />
-            ) : <Loading />}
-          </Panel>
-        </div>
-
-        {/* ── column 3 ── */}
-        <div className="space-y-5">
-          <Panel title="Products / services">
-            {sum ? (
-              <Rows rows={[
-                ["Shared hosting", `${sum.products.shared.active} (${sum.products.shared.total} total)`],
-                ["Reseller hosting", `${sum.products.reseller.active} (${sum.products.reseller.total} total)`],
-                ["VPS / server", `${sum.products.server.active} (${sum.products.server.total} total)`],
-                ["Other services", `${sum.products.other.active} (${sum.products.other.total} total)`],
-                ["Domains", String(sum.products.domains)],
-                ["Orders", String(sum.products.orders)],
-                ["Support tickets", `${sum.products.openTickets} open (${sum.products.tickets} total)`],
-                ["Affiliate signups", String(sum.products.affiliateSignups)],
-              ]} />
-            ) : <Loading />}
-            <Links>
-              <ActionLink icon="list_alt" onClick={() => goTab("orders")}>View orders</ActionLink>
-              <ActionLink icon="add_shopping_cart" onClick={() => router.push(`/admin/orders/new?client=${c.id}`)}>Add new order</ActionLink>
-            </Links>
-          </Panel>
-
-          <Panel title="Files">
+          <Panel icon="folder" title="Files" count={sum?.files?.length} action={<HeadBtn icon="upload" onClick={() => setModal("file")}>Upload</HeadBtn>}>
             {sum?.files?.length ? (
-              <ul className="divide-y divide-line text-sm">
+              <ul className="-my-1 divide-y divide-line">
                 {sum.files.map((f: any) => (
-                  <li key={f.id} className="flex items-center justify-between gap-2 py-2">
-                    <a className="min-w-0 truncate font-semibold text-primary-dark" href={`/api/admin/clients/${id}/files/${f.id}`}>{f.title}</a>
-                    <span className="flex shrink-0 items-center gap-1 text-[11px] text-mute">
-                      {f.adminOnly && <span title="Only staff can see this file"><Icon name="lock" className="text-[14px]" /></span>}
-                      {(f.size / 1024).toFixed(0)} KB · {date(f.createdAt)}
-                      <IconBtn icon="delete" title="Delete file" onClick={() => confirm(`Delete ${f.filename}?`) && run(() => api(`/admin/clients/${id}/files/${f.id}`, { method: "DELETE" }), "File deleted")} />
-                    </span>
+                  <li key={f.id} className="group flex items-center gap-3 py-2.5">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-600"><Icon name={/\.pdf$/i.test(f.filename) ? "picture_as_pdf" : /\.(png|jpe?g|gif|webp)$/i.test(f.filename) ? "image" : "description"} className="text-[19px]" /></span>
+                    <div className="min-w-0 flex-1">
+                      <a className="block truncate text-sm font-bold text-ink hover:text-primary-dark" href={`/api/admin/clients/${id}/files/${f.id}`}>{f.title}</a>
+                      <div className="flex items-center gap-1 text-xs text-mute">{f.adminOnly && <Icon name="lock" className="text-[13px]" />}{f.size < 1024 * 1024 ? `${Math.max(1, Math.round(f.size / 1024))} KB` : `${(f.size / 1048576).toFixed(1)} MB`} · {date(f.createdAt)}</div>
+                    </div>
+                    <RowDel title="Delete file" onClick={() => confirm(`Delete ${f.filename}?`) && run(() => api(`/admin/clients/${id}/files/${f.id}`, { method: "DELETE" }), "File deleted")} />
                   </li>
                 ))}
               </ul>
-            ) : <Empty>No files uploaded</Empty>}
-            <Links><ActionLink icon="upload_file" onClick={() => setModal("file")}>Add file</ActionLink></Links>
+            ) : <Blank icon="upload_file">No files uploaded</Blank>}
           </Panel>
 
-          <Panel title="Recent emails">
+          <Panel icon="outgoing_mail" title="Recent emails" action={<HeadBtn icon="send" onClick={() => setModal("email")}>Send</HeadBtn>}>
             {sum?.emails?.length ? (
-              <ul className="divide-y divide-line text-sm">
+              <ol className="relative ml-1.5 space-y-3 border-l border-line pl-4">
                 {sum.emails.map((e: any) => (
-                  <li key={e.id} className="flex items-start justify-between gap-2 py-2">
-                    <div className="min-w-0"><div className="truncate font-semibold text-ink" title={e.subject}>{e.subject}</div><div className="text-[11px] text-mute">{date(e.createdAt, true)}</div></div>
-                    <Badge status={e.status === "SENT" ? "ACTIVE" : e.status === "LOGGED" ? "PENDING" : "FAILED"}>{e.status.toLowerCase()}</Badge>
+                  <li key={e.id} className="relative">
+                    <span className={cx("absolute -left-[21.5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white", e.status === "SENT" ? "bg-emerald-500" : e.status === "LOGGED" ? "bg-slate-300" : "bg-rose-500")} />
+                    <div className="truncate text-[13px] font-semibold text-ink" title={e.subject}>{e.subject}</div>
+                    <div className="text-[11.5px] text-mute">{date(e.createdAt, true)} · {e.status.toLowerCase()}</div>
                   </li>
                 ))}
-              </ul>
-            ) : <Empty>No emails yet</Empty>}
-            <Links><ActionLink icon="mail" onClick={() => router.push(`/admin/email?q=${encodeURIComponent(c.email)}`)}>Email delivery log</ActionLink></Links>
+              </ol>
+            ) : <Blank icon="mail">No emails yet</Blank>}
           </Panel>
-        </div>
 
-        {/* ── column 4 ── */}
-        <div className="space-y-5">
-          <Panel title="Other actions">
-            <Links first>
-              <ActionLink icon="summarize" onClick={() => goTab("statement")}>View account statement</ActionLink>
-              <ActionLink icon="support_agent" onClick={() => setModal("ticket")}>Open new support ticket</ActionLink>
-              <ActionLink icon="forum" onClick={() => goTab("tickets")}>View all support tickets</ActionLink>
-              <ActionLink icon="handshake" disabled={!!sum?.other?.affiliate} onClick={() => run(() => api(`/admin/clients/${id}/affiliate`, { body: {} }), (r) => `Affiliate activated — code ${r.code}`)}>{sum?.other?.affiliate ? "Already an affiliate" : "Activate as affiliate"}</ActionLink>
-              <ActionLink icon="call_merge" onClick={() => setModal("merge")}>Merge clients accounts</ActionLink>
-              <ActionLink icon="download" onClick={() => (window.location.href = `/api/admin/clients/${id}/export`)}>Export client data</ActionLink>
-              <ActionLink icon="block" tone="danger" disabled={c.status === "CLOSED"} onClick={() => setModal("close")}>Close client account</ActionLink>
-              <ActionLink icon="delete_forever" tone="danger" onClick={async () => {
+          <Panel icon="sticky_note_2" title="Admin notes">
+            <Textarea rows={4} defaultValue={p.notes ?? ""} onBlur={(e) => e.target.value !== (p.notes ?? "") && api(`/admin/clients/${id}`, { method: "PUT", body: { notes: e.target.value } }).then(() => toast.success("Notes saved"))} placeholder="Private notes — only staff see these. Saved when you click away." className="bg-amber-50/40" />
+          </Panel>
+
+          <section className="rounded-2xl border border-rose-200 bg-white shadow-card">
+            <div className="flex items-center gap-2 border-b border-rose-100 px-5 py-3"><Icon name="warning" className="text-[19px] text-rose-500" /><h3 className="text-[15px] font-extrabold text-rose-700">Danger zone</h3></div>
+            <div className="space-y-2 p-4">
+              <Button size="sm" variant="outline" className="w-full !justify-start hover:!border-rose-300 hover:!text-rose-600" icon="block" disabled={c.status === "CLOSED"} onClick={() => setModal("close")}>Close account</Button>
+              <Button size="sm" variant="outline" className="w-full !justify-start hover:!border-rose-300 hover:!text-rose-600" icon="delete_forever" onClick={async () => {
                 if (!confirm(`Permanently delete ${c.email}? This can't be undone.`)) return;
                 try { await api(`/admin/clients/${id}`, { method: "DELETE" }); toast.success("Customer deleted"); router.push("/admin/clients"); } catch (e: any) { toast.error(e.message); }
-              }}>Delete client account</ActionLink>
-            </Links>
-          </Panel>
-
-          <WhatsAppCard client={c} />
-          <SendEmailCard id={id} email={c.email} onSent={reloadSum} />
-
-          <Panel title="Admin notes">
-            <Textarea rows={5} defaultValue={p.notes ?? ""} onBlur={(e) => e.target.value !== (p.notes ?? "") && api(`/admin/clients/${id}`, { method: "PUT", body: { notes: e.target.value } }).then(() => toast.success("Notes saved"))} placeholder="Private notes — only staff see these (saved when you click away)" />
-          </Panel>
-        </div>
+              }}>Delete account</Button>
+              <p className="px-1 text-[11.5px] text-mute">Accounts with invoices or payments can only be closed — tax records must be kept.</p>
+            </div>
+          </section>
+        </aside>
       </div>
-
-      <div id="client-tabs" className="mb-4 flex scroll-mt-24 gap-2 overflow-x-auto">
-        {["services", "orders", "invoices", "statement", "transactions", "tickets", "domains", "credit", "logins"].map((t) => <button key={t} onClick={() => setTab(t)} className={cx("rounded-full px-4 py-2 text-sm font-bold capitalize", tab === t ? "bg-primary-dark text-white" : "bg-white text-slate-600 ring-1 ring-line")}>{t}</button>)}
-      </div>
-      <Card pad={false}>
-        {tab === "services" && <Table head={["Service", "Hostname / IP", "Status", "Recurring", "Next due"]}>{data.services.map((s: any) => <tr key={s.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/services/${s.id}`}>{s.product.name}</Link></Td><Td>{s.hostname}<div className="font-mono text-xs text-mute">{s.ips.map((i: any) => i.address).join(", ")}</div></Td><Td><Badge status={s.status} /></Td><Td>{money(s.recurringAmount, s.currency)}</Td><Td>{date(s.nextDueDate)}</Td></tr>)}</Table>}
-        {tab === "orders" && <Table head={["Order", "Date", "Total", "Status"]}>{(data.orders ?? []).map((o: any) => <tr key={o.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td><Td>{date(o.createdAt, true)}</Td><Td>{money(o.total, o.currency)}</Td><Td><Badge status={o.status} /></Td></tr>)}</Table>}
-        {tab === "invoices" && <Table head={["Invoice", "Date", "Total", "Status"]}>{data.invoices.map((i: any) => <tr key={i.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td><Td>{date(i.issueDate)}</Td><Td>{money(i.total, i.currency)}</Td><Td><Badge status={i.status} /></Td></tr>)}</Table>}
-        {tab === "statement" && <Statement id={id} />}
-        {tab === "transactions" && <Table head={["Date", "Gateway", "Reference", "Type", "Amount"]}>{data.transactions.map((t: any) => <tr key={t.id}><Td>{date(t.createdAt, true)}</Td><Td>{t.gateway}</Td><Td className="font-mono text-xs">{t.gatewayTxnId}</Td><Td>{t.type}</Td><Td>{money(t.amount, t.currency)}</Td></tr>)}</Table>}
-        {tab === "tickets" && <Table head={["Ticket", "Subject", "Department", "Status"]}>{data.tickets.map((t: any) => <tr key={t.id}><Td>#{t.number}</Td><Td><Link className="font-bold text-primary-dark" href={`/admin/tickets/${t.id}`}>{t.subject}</Link></Td><Td>{t.department.name}</Td><Td><Badge status={t.status} /></Td></tr>)}</Table>}
-        {tab === "domains" && <Table head={["Domain", "Status", "Expiry"]}>{data.domains.map((d: any) => <tr key={d.id}><Td className="font-bold">{d.name}</Td><Td><Badge status={d.status} /></Td><Td>{date(d.expiryDate)}</Td></tr>)}</Table>}
-        {tab === "credit" && <Table head={["Date", "Description", "Amount", "Balance"]}>{data.ledger.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td>{l.description}</Td><Td className={l.amount < 0 ? "text-rose-600" : "text-emerald-600"}>{money(l.amount, cur)}</Td><Td>{money(l.balanceAfter, cur)}</Td></tr>)}</Table>}
-        {tab === "logins" && <Table head={["Time", "IP", "Result"]}>{data.logins.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td className="font-mono text-xs">{l.ip}</Td><Td>{l.success ? <Badge status="ACTIVE">ok</Badge> : <Badge status="FAILED">{l.reason}</Badge>}</Td></tr>)}</Table>}
-      </Card>
 
       <ProfileModal open={modal === "profile"} onClose={close} c={c} onDone={refresh} />
       <ContactModal open={modal === "contact"} onClose={close} id={id} onDone={refresh} />
@@ -280,93 +300,114 @@ export default function ClientDetail() {
       <InvoiceModal open={modal === "invoice"} onClose={close} id={id} currency={cur} onDone={refresh} />
       <FundsModal open={modal === "funds"} onClose={close} id={id} currency={cur} onDone={refresh} />
       <TicketModal open={modal === "ticket"} onClose={close} id={id} onDone={refresh} />
+      <EmailModal open={modal === "email"} onClose={close} id={id} email={c.email} onDone={refresh} />
+      <WhatsAppModal open={modal === "whatsapp"} onClose={close} client={c} />
       <MergeModal open={modal === "merge"} onClose={close} c={c} onDone={(into: string) => router.push(`/admin/clients/${into}`)} />
       <CloseModal open={modal === "close"} onClose={close} c={c} onDone={refresh} />
     </>
   );
 }
 
-// ───── small building blocks ─────
-function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+const TABS: [string, string, string?][] = [["services", "Services", "services"], ["invoices", "Invoices", "invoices"], ["statement", "Statement"], ["orders", "Orders", "orders"], ["transactions", "Transactions", "transactions"], ["tickets", "Tickets", "tickets"], ["domains", "Domains", "domains"], ["credit", "Credit log"], ["logins", "Logins"]];
+
+// ───── building blocks ─────
+function Panel({ icon, title, count, action, children }: { icon: string; title: string; count?: number; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-white shadow-card">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
-        <h3 className="text-[15px] font-extrabold text-ink">{title}</h3>
+      <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3.5">
+        <h3 className="flex items-center gap-2 text-[15px] font-extrabold text-ink">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary-soft text-primary-dark"><Icon name={icon} className="text-[17px]" /></span>
+          {title}
+          {count ? <span className="rounded-full bg-slate-100 px-2 text-[11.5px] font-bold text-slate-500">{count}</span> : null}
+        </h3>
         {action}
       </div>
-      <div className="px-5 py-3">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
-function Rows({ rows }: { rows: [string, ReactNode][] }) {
+function HeadBtn({ icon, children, onClick }: { icon: string; children: ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-bold text-primary-dark transition hover:bg-primary-tint"><Icon name={icon} className="text-[16px]" />{children}</button>;
+}
+function Item({ k, v, mono, wide }: { k: string; v?: ReactNode; mono?: boolean; wide?: boolean }) {
   return (
-    <dl className="divide-y divide-line text-[13.5px]">
-      {rows.map(([k, v]) => (
-        <div key={k} className="grid grid-cols-[minmax(0,42%)_1fr] items-center gap-3 py-1.5">
-          <dt className="text-mute">{k}</dt>
-          <dd className="min-w-0 break-words font-semibold text-ink">{v}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className={cx("min-w-0", wide && "sm:col-span-2")}>
+      <dt className="text-[11.5px] font-bold uppercase tracking-wide text-mute">{k}</dt>
+      <dd className={cx("mt-1 break-words text-[14px] font-semibold text-ink", mono && !!v && "font-mono text-[13px]", !v && "font-normal text-slate-300")}>{v || "Not set"}</dd>
+    </div>
   );
 }
-function Links({ children, first }: { children: ReactNode; first?: boolean }) {
-  return <div className={cx("space-y-0.5", !first && "mt-3 border-t border-line pt-2")}>{children}</div>;
-}
-function ActionLink({ icon, children, onClick, disabled, tone }: { icon: string; children: ReactNode; onClick: () => void; disabled?: boolean; tone?: "danger" }) {
+function Kpi({ icon, label, value, hint, tone, onClick }: { icon: string; label: string; value: ReactNode; hint?: string; tone: "purple" | "green" | "amber" | "rose" | "sky" | "slate"; onClick?: () => void }) {
+  const tones = { purple: "bg-primary-soft text-primary-dark", green: "bg-emerald-50 text-emerald-600", amber: "bg-amber-50 text-amber-600", rose: "bg-rose-50 text-rose-600", sky: "bg-sky-50 text-sky-600", slate: "bg-slate-100 text-slate-500" };
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className={cx("flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45", tone === "danger" ? "text-rose-600 hover:bg-rose-50" : "text-primary-dark hover:bg-primary-tint")}>
-      <Icon name={icon} className="text-[18px]" />
-      {children}
+    <button type="button" onClick={onClick} className="flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4 text-left shadow-card transition hover:-translate-y-px hover:border-[#dccafb]">
+      <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-xl", tones[tone])}><Icon name={icon} className="text-[22px]" /></span>
+      <div className="min-w-0">
+        <div className="truncate text-[12.5px] font-semibold text-mute">{label}</div>
+        <div className={cx("truncate text-xl font-extrabold tracking-tight", tone === "rose" ? "text-rose-600" : "text-ink")}>{value}</div>
+        {hint && <div className="truncate text-[11.5px] text-mute">{hint}</div>}
+      </div>
     </button>
   );
 }
-function SmallBtn({ icon, children, onClick }: { icon: string; children: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-primary-dark hover:bg-primary-tint"><Icon name={icon} className="text-[15px]" />{children}</button>;
-}
-function IconBtn({ icon, title, onClick }: { icon: string; title: string; onClick: () => void }) {
-  return <button type="button" title={title} onClick={onClick} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Icon name={icon} className="text-[16px]" /></button>;
-}
-function Empty({ children }: { children: ReactNode }) {
-  return <p className="rounded-xl bg-[#fbf9ff] py-3 text-center text-sm text-mute">{children}</p>;
-}
-
-// ───── cards ─────
-function WhatsAppCard({ client: c }: { client: any }) {
-  const [msg, setMsg] = useState("");
-  const digits = String(c.phone ?? "").replace(/\D/g, "");
-  const phone = digits.length === 10 ? `91${digits}` : digits;
-  const fill = (t: string) => t.replace(/\{firstname\}/gi, c.firstName ?? "").replace(/\{lastname\}/gi, c.lastName ?? "").replace(/\{email\}/gi, c.email ?? "").replace(/\{userid\}/gi, c.id);
+function Count({ icon, label, a, t, onClick }: { icon: string; label: string; a: number; t?: number; onClick?: () => void }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <Panel title="Send WhatsApp message">
-      {phone.length < 10 ? <Empty>No mobile number on the account</Empty> : (
-        <>
-          <Textarea rows={3} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={`Hi {firstname}, …`} />
-          <p className="mt-1 text-[11px] text-mute">You can use {"{firstname}"}, {"{lastname}"}, {"{email}"}, {"{userid}"}</p>
-          <Button className="mt-2 w-full !bg-emerald-600 hover:!bg-emerald-700" size="sm" icon="chat" disabled={!msg.trim()} onClick={() => window.open(`https://wa.me/${phone}?text=${encodeURIComponent(fill(msg))}`, "_blank", "noopener")}>Open in WhatsApp (+{phone})</Button>
-        </>
-      )}
-    </Panel>
+    <Tag type={onClick ? "button" : undefined} onClick={onClick} className={cx("flex items-center gap-3 rounded-xl border border-line px-3.5 py-3 text-left", onClick && "transition hover:border-[#dccafb] hover:bg-primary-tint")}>
+      <Icon name={icon} className={cx("text-[22px]", a ? "text-primary-dark" : "text-slate-300")} />
+      <div className="min-w-0">
+        <div className={cx("text-lg font-extrabold leading-tight", a ? "text-ink" : "text-slate-300")}>{a}{t !== undefined && t !== a ? <span className="text-[12px] font-semibold text-mute"> / {t}</span> : null}</div>
+        <div className="truncate text-[11.5px] font-semibold text-mute">{label}</div>
+      </div>
+    </Tag>
   );
 }
+function Quick({ icon, children, onClick }: { icon: string; children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex items-center gap-2 rounded-xl border border-line px-3 py-2.5 text-left text-[13px] font-bold text-slate-700 transition hover:border-[#dccafb] hover:bg-primary-tint hover:text-primary-dark">
+      <Icon name={icon} className="text-[18px] text-primary-dark" />
+      <span className="truncate">{children}</span>
+    </button>
+  );
+}
+function RowDel({ title, onClick }: { title: string; onClick: () => void }) {
+  return <button type="button" title={title} onClick={onClick} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-600"><Icon name="delete" className="text-[17px]" /></button>;
+}
+function Blank({ icon, children }: { icon: string; children: ReactNode }) {
+  return <div className="flex flex-col items-center gap-1 rounded-xl border border-dashed border-line py-5 text-center text-[13px] text-mute"><Icon name={icon} className="text-[22px] text-slate-300" />{children}</div>;
+}
 
-function SendEmailCard({ id, email, onSent }: { id: string; email: string; onSent: () => void }) {
+function EmailModal({ open, onClose, id, email, onDone }: { open: boolean; onClose: () => void; id: string; email: string; onDone: () => void }) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) { setSubject(""); setMessage(""); } }, [open]);
   return (
-    <Panel title="Send email">
-      <div className="space-y-2">
-        <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" />
-        <Textarea rows={4} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={`Message to ${email}`} />
-        <Button size="sm" className="w-full" icon="send" loading={busy} disabled={subject.trim().length < 2 || message.trim().length < 2} onClick={async () => {
+    <Modal open={open} onClose={onClose} title={`Email ${email}`} wide>
+      <div className="space-y-3">
+        <Field label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} autoFocus /></Field>
+        <Field label="Message" hint="Sent with your branding through Email Delivery; it appears under Recent emails."><Textarea rows={8} value={message} onChange={(e) => setMessage(e.target.value)} /></Field>
+        <Button icon="send" loading={busy} disabled={subject.trim().length < 2 || message.trim().length < 2} onClick={async () => {
           setBusy(true);
-          try { await api(`/admin/clients/${id}/email`, { body: { subject, message } }); toast.success("Email queued"); setSubject(""); setMessage(""); onSent(); } catch (e: any) { toast.error(e.message); }
+          try { await api(`/admin/clients/${id}/email`, { body: { subject, message } }); toast.success("Email queued"); onClose(); onDone(); } catch (e: any) { toast.error(e.message); }
           setBusy(false);
-        }}>Send</Button>
-        <p className="text-[11px] text-mute">Goes out with your branding through Email Delivery and appears under Recent emails.</p>
+        }}>Send email</Button>
       </div>
-    </Panel>
+    </Modal>
+  );
+}
+
+function WhatsAppModal({ open, onClose, client: c }: { open: boolean; onClose: () => void; client: any }) {
+  const [msg, setMsg] = useState("");
+  useEffect(() => { if (open) setMsg(`Hi ${c.firstName ?? ""}, `); }, [open, c.firstName]);
+  const digits = String(c.phone ?? "").replace(/\D/g, "");
+  const phone = digits.length === 10 ? `91${digits}` : digits;
+  return (
+    <Modal open={open} onClose={onClose} title="Send WhatsApp message">
+      <p className="mb-3 text-sm text-mute">Opens WhatsApp with this message to <b>+{phone}</b>.</p>
+      <Textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)} autoFocus />
+      <Button className="mt-4 !bg-emerald-600 !bg-none hover:!bg-emerald-700" icon="chat" disabled={!msg.trim() || phone.length < 10} onClick={() => { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener"); onClose(); }}>Open WhatsApp</Button>
+    </Modal>
   );
 }
 
