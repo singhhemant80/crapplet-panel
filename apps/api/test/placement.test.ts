@@ -26,7 +26,7 @@ test("node placement: staff choice, fixed, least-loaded under limits, auto with 
   await mk("half", "5", { ramUsedMb: 32000, sgid: "7" });
   await mk("half-openvz", "6", { ramUsedMb: 30000, sgid: "7", virt: "vzo" });
 
-  assert.deepEqual(await chooseVirtualizorNode({ node: "5" }, srv, { placement: "least_loaded" }), { serid: 5, reason: "node 5 chosen by staff" });
+  assert.deepEqual(await chooseVirtualizorNode({ node: "5" }, srv, { placement: "least_loaded" }), { serid: 5, reason: "node half (#5) chosen by staff" });
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "fixed", nodeIds: ["1"] })).serid, 1);
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { slaveServerId: 3 })).serid, 3, "legacy slaveServerId = fixed");
   assert.equal((await chooseVirtualizorNode({ node: null }, srv, { placement: "least_loaded" })).serid, 2, "most free RAM among usable nodes");
@@ -98,4 +98,11 @@ test("storage used by an existing VPS is found in its details/edit form", async 
   assert.deepEqual(acc.uuids, ["abc"]);
   assert.deepEqual(acc.stids, [29]);
   assert.equal(acc.diskShapes.length, 2);
+});
+
+test("root password chosen at order time: rules", async () => {
+  const { rootPasswordSchema, cartItemSchema } = await import("../src/modules/orders/pricing");
+  for (const ok of ["Str0ng-Pass#2026", "Abcdefgh12", "Xe=NNi+SFgw5noa="]) assert.ok(rootPasswordSchema.safeParse(ok).success, ok);
+  for (const bad of ["short1A", "alllowercase123", "NoDigitsHere!!", "Has space 1A", "Quote'1Abcdef", 'Back\\\\slash1Abc', "Ünïcode1Abcd"]) assert.ok(!rootPasswordSchema.safeParse(bad).success, bad);
+  assert.equal(cartItemSchema.parse({ productId: "p", cycle: "MONTHLY", rootPassword: "" }).rootPassword, null);
 });

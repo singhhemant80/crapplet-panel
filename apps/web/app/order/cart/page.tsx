@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { readCart, toApiCart, writeCart, type Cart } from "@/lib/cart";
 import { Alert, Button, Card, Empty, Icon, Input, Loading, toast } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
+import { PasswordField, passwordProblem } from "@/components/password-field";
 import { CurrencySwitch, readCurrency, useCurrency } from "@/lib/currency";
 
 export default function CartPage() {
@@ -19,6 +20,8 @@ export default function CartPage() {
   const [promo, setPromo] = useState("");
   const [tos, setTos] = useState(false);
   const [busy, setBusy] = useState(false);
+  // root passwords live only in this page's memory — never in the saved cart
+  const [passwords, setPasswords] = useState<Record<string, string>>({});
   const [, tick] = useState(0);
 
   useEffect(() => {
@@ -46,9 +49,13 @@ export default function CartPage() {
 
   async function checkout() {
     if (!me || me.type !== "CLIENT") return router.push(`/client/login?next=/order/cart`);
+    const bad = cart!.items.find((i) => passwordProblem(passwords[i.key] ?? ""));
+    if (bad) return toast.error(`Root password for ${bad.productName}: ${passwordProblem(passwords[bad.key])}`);
     setBusy(true);
     try {
-      const r = await api("/catalog/cart/checkout", { body: { ...toApiCart(cart!, currency), acceptTos: tos, useCredit: true } });
+      const base = toApiCart(cart!, currency);
+      const items = base.items.map((it, n) => ({ ...it, rootPassword: passwords[cart!.items[n].key] || null }));
+      const r = await api("/catalog/cart/checkout", { body: { ...base, items, acceptTos: tos, useCredit: true } });
       writeCart({ items: [], domains: [] });
       router.push(r.paid ? `/client/services?ordered=1` : `/client/invoices/${r.invoiceId}`);
     } catch (e: any) {
@@ -94,6 +101,12 @@ export default function CartPage() {
                     </div>
                     <button className="text-sm font-bold text-rose-600 hover:underline" onClick={() => { if (i.ipId) api(`/catalog/ips/${i.ipId}/reserve`, { method: "DELETE" }).catch(() => {}); update({ ...cart, items: cart.items.filter((x) => x.key !== i.key) }); }}>Remove</button>
                   </div>
+                  {i.osTemplateId && (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-ink"><Icon name="key" className="text-[18px] text-primary-dark" />Root password{(i.quantity ?? 1) > 1 ? ` (used for all ${i.quantity} servers)` : ""}</div>
+                      <PasswordField value={passwords[i.key] ?? ""} onChange={(v) => setPasswords({ ...passwords, [i.key]: v })} />
+                    </div>
+                  )}
                 </Card>
               );
             })}

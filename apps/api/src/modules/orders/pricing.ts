@@ -8,6 +8,18 @@ import { BASE_CURRENCY, jsonPrice, priceResolver } from "../../lib/currency";
 
 type Resolver = Awaited<ReturnType<typeof priceResolver>>;
 
+/**
+ * Root password chosen at order time. 10–64 characters with lower case, upper case and a digit; no
+ * spaces, quotes or backslashes (they break cloud-init / hypervisor APIs).
+ */
+export const rootPasswordSchema = z
+  .string()
+  .min(10, "Root password must be at least 10 characters")
+  .max(64, "Root password can be at most 64 characters")
+  .regex(/^[\x21-\x7e]+$/, "Root password can't contain spaces or non-ASCII characters")
+  .refine((v) => !/['"`\\]/.test(v), "Root password can't contain quotes or backslashes")
+  .refine((v) => /[a-z]/.test(v) && /[A-Z]/.test(v) && /\d/.test(v), "Root password needs upper case, lower case and a number");
+
 export const cartItemSchema = z.object({
   productId: z.string(),
   cycle: z.nativeEnum(BillingCycle),
@@ -26,6 +38,8 @@ export const cartItemSchema = z.object({
   config: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}),
   addonIds: z.array(z.string()).default([]),
   quantity: z.number().int().min(1).max(10).default(1),
+  /** optional; empty = the panel generates one and emails it */
+  rootPassword: rootPasswordSchema.optional().nullable().or(z.literal("").transform(() => null)),
 });
 
 export const domainItemSchema = z.object({

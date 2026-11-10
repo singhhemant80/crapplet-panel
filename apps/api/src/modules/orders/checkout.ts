@@ -67,6 +67,8 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
               recurringAmount: perRecurring,
               hostname: item.hostname ?? null,
               osTemplateId: item.osTemplateId ?? null,
+              // root password chosen at order time (encrypted); empty = generated at setup
+              passwordEnc: isVps && item.rootPassword ? encrypt(item.rootPassword) : null,
               virtType: p.virtType,
               config: { ...item.config, ...(args.extraConfig ?? {}), requestedIpId: q === 0 ? item.ipId ?? null : null },
               resellerId: args.resellerId ?? null,

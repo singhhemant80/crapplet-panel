@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma, Prisma, InvoiceStatus, ServiceStatus, BillingCycle, OrderStatus } from "../../db";
 import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
+import { cartSchema, rootPasswordSchema } from "../orders/pricing";
 import { decrypt, encrypt, randomToken } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
 import { enqueueProvision, type ProvisionAction } from "../../jobs/queues";
@@ -367,6 +368,38 @@ adminCore.get(
 );
 
 /**
+ * Staff places an order for a customer (same checkout as the shop): plan, cycle, OS, hostname and an
+ * optional root password; optionally records the payment so setup starts right away.
+ */
+adminCore.post(
+  "/orders",
+  requireStaff("orders.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      cartSchema.extend({
+        userId: z.string(),
+        notes: z.string().max(1000).optional(),
+        markPaid: z.boolean().default(false),
+        paymentReference: z.string().trim().max(120).optional(),
+      }),
+      req.body,
+    );
+    const u = await prisma.user.findUnique({ where: { id: b.userId } });
+    if (!u) throw notFound("Customer not found");
+    const { checkout } = await import("../orders/checkout");
+    const r = await checkout({ userId: u.id, cart: b, ip: req.ip, notes: b.notes ?? `Placed by staff`, useCredit: false });
+    let paid = r.paid;
+    if (b.markPaid && !paid && r.total > 0) {
+      const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: r.invoiceId } });
+      const out = await applyPayment({ invoiceId: inv.id, amount: inv.total - inv.amountPaid, gateway: "manual", gatewayTxnId: b.paymentReference || `staff-${r.orderId}`, description: `Recorded by staff with the order` });
+      paid = out.paid;
+    }
+    await audit({ actorId: req.user!.id, userId: u.id, action: "order.created_by_staff", entity: "order", entityId: r.orderId, details: { items: b.items.map((i) => ({ productId: i.productId, cycle: i.cycle, hostname: i.hostname, osTemplateId: i.osTemplateId, passwordChosen: !!i.rootPassword })), markPaid: b.markPaid } });
+    res.status(201).json({ ...r, paid });
+  }),
+);
+
+/**
  * Build a fresh VPS for a terminated (or cancelled) service — same order, customer, plan and billing
  * record. The old VPS is gone, so its id/node/password are cleared and a normal create is queued.
  */
@@ -379,6 +412,7 @@ adminCore.post(
         osTemplateId: z.string().optional(),
         hostname: z.string().trim().toLowerCase().regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/, "Invalid hostname").max(253).optional(),
         billing: z.enum(["keep", "restart"]).default("keep"),
+        rootPassword: rootPasswordSchema.optional().or(z.literal("").transform(() => undefined)),
       }),
       req.body ?? {},
     );
@@ -405,7 +439,7 @@ adminCore.post(
         status: "PROVISIONING",
         remoteId: null,
         node: null,
-        passwordEnc: null,
+        passwordEnc: b.rootPassword ? encrypt(b.rootPassword) : null,
         terminationDate: null,
         suspendReason: null,
         config: cfg as Prisma.InputJsonValue,
@@ -421,7 +455,7 @@ adminCore.post(
     const old = await provisioningQueue().getJob(`create-${s.id}`);
     if (old && ["failed", "completed"].includes(await old.getState())) await old.remove();
     await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
-    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.recreate", entity: "service", entityId: s.id, details: { previousVpsId: s.remoteId, ...b } });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.recreate", entity: "service", entityId: s.id, details: { previousVpsId: s.remoteId, osTemplateId: b.osTemplateId, hostname: b.hostname, billing: b.billing, passwordChosen: !!b.rootPassword } });
     res.status(202).json({ queued: true });
   }),
 );

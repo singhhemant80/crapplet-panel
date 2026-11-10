@@ -3,6 +3,7 @@ import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge } from "@/components/live-state";
+import { PasswordField, passwordProblem } from "@/components/password-field";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -165,12 +166,15 @@ function RecreatePanel({ s, onDone }: { s: any; onDone: () => void }) {
   const [os, setOs] = useState<string>(s.osTemplateId ?? "");
   const [hostname, setHostname] = useState<string>(s.hostname ?? "");
   const [billing, setBilling] = useState<"keep" | "restart">("keep");
+  const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const osList = s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => x.osTemplate);
   async function go() {
+    const bad = passwordProblem(pw);
+    if (bad) return toast.error(`Root password: ${bad}`);
     setBusy(true);
     try {
-      await api(`/admin/services/${s.id}/recreate`, { body: { osTemplateId: os || undefined, hostname: hostname || undefined, billing } });
+      await api(`/admin/services/${s.id}/recreate`, { body: { osTemplateId: os || undefined, hostname: hostname || undefined, billing, rootPassword: pw || undefined } });
       toast.success("New VPS queued — follow it in the tracker");
       setOpen(false);
       onDone();
@@ -201,6 +205,10 @@ function RecreatePanel({ s, onDone }: { s: any; onDone: () => void }) {
               <option value="restart">Restart the cycle from today</option>
             </Select>
           </Field>
+          <div className="sm:col-span-3">
+            <div className="mb-1.5 text-sm font-bold text-ink">Root password</div>
+            <PasswordField value={pw} onChange={setPw} optionalHint="Leave empty to generate one — it's emailed to the customer" />
+          </div>
           <div className="flex gap-2 sm:col-span-3">
             <Button icon="rocket_launch" loading={busy} onClick={go}>Create VPS</Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
