@@ -11,7 +11,7 @@ import { ah, badRequest, clientIp, HttpError, notFound, parse } from "../../lib/
 import { decrypt, encrypt, randomToken, sha256 } from "../../lib/crypto";
 import { getSettings } from "../../lib/settings";
 import { audit } from "../../lib/audit";
-import { requireAuth, signAccessToken } from "../../middleware/auth";
+import { requireAuth, requireStaff, signAccessToken } from "../../middleware/auth";
 import { queueEmail } from "../email/mailer";
 import { resolveStateCode } from "./states";
 import { verifyPassword } from "../../lib/passwords";
@@ -76,11 +76,12 @@ function clearAuthCookies(res: Response) {
   res.clearCookie("cc_rt", { path: "/api/auth" });
 }
 
-async function startSession(req: Request, res: Response, user: { id: string; type: string }) {
+async function startSession(req: Request, res: Response, user: { id: string; type: string }, opts: { impersonatedById?: string } = {}) {
   const refresh = randomToken(48);
   const session = await prisma.session.create({
     data: {
       userId: user.id,
+      impersonatedById: opts.impersonatedById ?? null,
       refreshTokenHash: sha256(refresh),
       ip: clientIp(req),
       userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300),
@@ -255,7 +256,60 @@ authRouter.get(
   "/me",
   requireAuth,
   ah(async (req, res) => {
-    res.json({ user: await publicUser(req.user!.id) });
+    const sess = req.user!.sessionId ? await prisma.session.findUnique({ where: { id: req.user!.sessionId }, select: { impersonatedById: true } }) : null;
+    const by = sess?.impersonatedById ? await prisma.user.findUnique({ where: { id: sess.impersonatedById }, select: { firstName: true, lastName: true, email: true } }) : null;
+    res.json({ user: { ...(await publicUser(req.user!.id)), impersonatedBy: by ? { name: [by.firstName, by.lastName].filter(Boolean).join(" ") || by.email } : null } });
+  }),
+);
+
+// ───── Login as client (staff) ─────
+const IMP_KEY = (t: string) => `crapplet:imp:${t}`;
+
+/** Staff open the client area as a customer. The staff session is set aside and restored by /impersonate/end. */
+authRouter.post(
+  "/impersonate",
+  requireAuth,
+  requireStaff("clients.manage"),
+  ah(async (req, res) => {
+    const { userId } = parse(z.object({ userId: z.string() }), req.body);
+    const target = await prisma.user.findUnique({ where: { id: userId } });
+    if (!target || target.type !== "CLIENT") throw badRequest("That account isn't a customer");
+    if (target.status !== "ACTIVE") throw badRequest(`The customer's account is ${target.status.toLowerCase()}`);
+    const staffId = req.user!.id;
+    if (req.user!.sessionId) await prisma.session.update({ where: { id: req.user!.sessionId }, data: { revokedAt: new Date() } }).catch(() => null);
+    await startSession(req, res, target, { impersonatedById: staffId });
+    const ticket = randomToken(32);
+    const { redis } = await import("../../jobs/queues");
+    await redis().set(IMP_KEY(ticket), JSON.stringify({ staffId, clientId: target.id }), "EX", 12 * 3600);
+    const secure = config.cookieSecure === "auto" ? !!req.secure : config.cookieSecure;
+    res.cookie("cc_imp", ticket, { httpOnly: true, secure, sameSite: "lax", path: "/api/auth", maxAge: 12 * 3600 * 1000 });
+    await audit({ actorId: staffId, userId: target.id, action: "client.login_as", entity: "user", entityId: target.id, ip: clientIp(req) });
+    res.json({ ok: true, redirect: "/client" });
+  }),
+);
+
+/** Leave the customer's area and return to the admin as the staff member who started it. */
+authRouter.post(
+  "/impersonate/end",
+  requireAuth,
+  ah(async (req, res) => {
+    const sess = req.user!.sessionId ? await prisma.session.findUnique({ where: { id: req.user!.sessionId } }) : null;
+    if (!sess?.impersonatedById) throw badRequest("You aren't signed in as a customer");
+    const ticket = String(req.cookies?.cc_imp ?? "");
+    const { redis } = await import("../../jobs/queues");
+    const raw = ticket ? await redis().get(IMP_KEY(ticket)) : null;
+    const data = raw ? (JSON.parse(raw) as { staffId: string; clientId: string }) : null;
+    await prisma.session.update({ where: { id: sess.id }, data: { revokedAt: new Date() } });
+    res.clearCookie("cc_imp", { path: "/api/auth" });
+    if (ticket) await redis().del(IMP_KEY(ticket));
+    const staff = data && data.staffId === sess.impersonatedById ? await prisma.user.findUnique({ where: { id: data.staffId } }) : null;
+    if (!staff || staff.type !== "STAFF" || staff.status !== "ACTIVE") {
+      clearAuthCookies(res);
+      return res.json({ ok: true, redirect: "/admin/login" });
+    }
+    await startSession(req, res, staff);
+    await audit({ actorId: staff.id, userId: sess.userId, action: "client.login_as_ended", entity: "user", entityId: sess.userId, ip: clientIp(req) });
+    res.json({ ok: true, redirect: `/admin/clients/${sess.userId}` });
   }),
 );
 

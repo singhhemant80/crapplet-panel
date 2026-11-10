@@ -106,6 +106,8 @@ model Session {
   lastUsedAt       DateTime  @default(now())
   expiresAt        DateTime
   revokedAt        DateTime?
+  /** staff user who opened this client session with "Login as client" */
+  impersonatedById String?
 
   @@index([userId])
 }

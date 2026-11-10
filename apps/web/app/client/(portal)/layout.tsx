@@ -84,6 +84,25 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
         </aside>
         <main className="min-w-0 fade-up">
+          {me.impersonatedBy && (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+              <span className="flex items-center gap-2"><Icon name="admin_panel_settings" className="shrink-0 text-[20px]" /><span>You're signed in as <b>{me.firstName} {me.lastName}</b> ({me.email}) by {me.impersonatedBy.name}. Everything you do is recorded as staff.</span></span>
+              <button
+                type="button"
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+                onClick={async () => {
+                  try {
+                    const r = await api<{ redirect: string }>("/auth/impersonate/end", { body: {} });
+                    window.location.href = r.redirect;
+                  } catch (e: any) {
+                    toast.error(e.message);
+                  }
+                }}
+              >
+                Back to admin
+              </button>
+            </div>
+          )}
           {!me.emailVerified && (
             <Alert tone="warn" className="mb-5">
               <div className="flex flex-wrap items-center justify-between gap-2">

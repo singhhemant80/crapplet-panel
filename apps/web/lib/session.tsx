@@ -15,6 +15,8 @@ export interface Me {
   profile: any;
   reseller: { id: string; status: string; brandName: string } | null;
   affiliate: { code: string } | null;
+  /** set when a staff member opened this client session with "Login as client" */
+  impersonatedBy?: { name: string } | null;
 }
 
 const Ctx = createContext<{ me: Me | null; loading: boolean; reload: () => Promise<void>; logout: () => Promise<void> }>({ me: null, loading: true, reload: async () => {}, logout: async () => {} });

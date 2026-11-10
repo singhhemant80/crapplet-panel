@@ -15,7 +15,6 @@ export default function AdminService() {
   const { data, loading, reload } = useApi(`/admin/services/${id}`);
   const os = useApi("/admin/os-templates");
   const [live, setLive] = useState<any>(null);
-  const [cred, setCred] = useState<any>(null);
   const [edit, setEdit] = useState<any>(null);
   useEffect(() => {
     if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
@@ -81,7 +80,7 @@ export default function AdminService() {
                 )}
               </>
             )}
-            <dt className="text-mute">Credentials</dt><dd>{cred ? <span className="font-mono text-[13px]">{cred.username} / {cred.password} <Copy text={cred.password} /></span> : s.hasPassword ? <button className="text-sm font-bold text-primary-dark" onClick={() => api(`/admin/services/${id}/password`).then(setCred)}>Reveal (logged)</button> : "—"}</dd>
+            <dt className="text-mute">Credentials</dt><dd>{s.hasPassword || s.username ? <Credentials id={id} username={s.username} hasPassword={s.hasPassword} /> : "—"}</dd>
           </dl>
         </Card>
         <Card title="Billing & overrides">
@@ -215,6 +214,46 @@ function RecreatePanel({ s, onDone }: { s: any; onDone: () => void }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Username + root password, masked with show/hide and copy buttons. */
+function Credentials({ id, username, hasPassword }: { id: string; username?: string | null; hasPassword?: boolean }) {
+  const [cred, setCred] = useState<{ username: string | null; password: string | null } | null>(null);
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!hasPassword) return;
+    api<{ username: string | null; password: string | null }>(`/admin/services/${id}/password`).then(setCred).catch((e) => setErr(e.message));
+  }, [id, hasPassword]);
+  const user = cred?.username ?? username ?? "root";
+  const pw = cred?.password ?? null;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <span className="w-20 text-xs text-mute">Username</span>
+        <span className="font-mono text-[13px] font-semibold text-ink">{user}</span>
+        <Copy text={user} />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="w-20 text-xs text-mute">Password</span>
+        {hasPassword ? (
+          pw ? (
+            <>
+              <span className="select-all font-mono text-[13px] font-semibold text-ink">{show ? pw : "•".repeat(Math.min(pw.length, 14))}</span>
+              <button type="button" title={show ? "Hide" : "Show"} className="inline-grid h-7 w-7 place-items-center rounded-lg text-slate-500 hover:bg-primary-soft hover:text-primary-dark" onClick={() => setShow(!show)}>
+                <Icon name={show ? "visibility_off" : "visibility"} className="text-[16px]" />
+              </button>
+              <Copy text={pw} />
+            </>
+          ) : (
+            <span className="text-xs text-mute">{err || "Loading…"}</span>
+          )
+        ) : (
+          <span className="text-xs text-mute">Not stored</span>
+        )}
+      </div>
     </div>
   );
 }

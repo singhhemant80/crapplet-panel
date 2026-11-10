@@ -328,15 +328,48 @@ export function Pager({ page, pageSize, total, onPage }: { page: number; pageSiz
   );
 }
 
+/**
+ * Copies text. navigator.clipboard only exists on https / localhost, so on a plain-http panel this falls
+ * back to a hidden textarea + execCommand("copy"), which every browser still supports.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (typeof window !== "undefined" && window.isSecureContext && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;";
+    document.body.appendChild(ta);
+    const active = document.activeElement as HTMLElement | null;
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    active?.focus?.();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function Copy({ text }: { text: string }) {
   const [ok, setOk] = useState(false);
   return (
     <button
       type="button"
-      onClick={() => {
-        navigator.clipboard?.writeText(text);
-        setOk(true);
-        setTimeout(() => setOk(false), 1500);
+      onClick={async () => {
+        if (await copyText(text)) {
+          setOk(true);
+          setTimeout(() => setOk(false), 1500);
+        } else toast.error("Couldn't copy — select the text and press Ctrl+C");
       }}
       className="inline-grid h-7 w-7 place-items-center rounded-lg text-slate-500 hover:bg-primary-soft hover:text-primary-dark"
       title="Copy"

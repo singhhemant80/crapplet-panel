@@ -19,6 +19,10 @@ export default function ClientDetail() {
       <PageHeader back="/admin/clients" title={<span className="flex items-center gap-3">{c.firstName} {c.lastName} <Badge status={c.status} /></span>} subtitle={`${c.email} · ${c.phone ?? ""} · customer since ${date(c.createdAt)}`}
         actions={<>
           <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
+          <Button variant="outline" size="sm" icon="login" disabled={c.status !== "ACTIVE"} title={c.status !== "ACTIVE" ? "Only active accounts" : "Open the client area as this customer"} onClick={async () => {
+            if (!confirm(`Sign in to the client area as ${c.email}? You'll leave the admin until you click "Back to admin".`)) return;
+            try { const r = await api<{ redirect: string }>("/auth/impersonate", { body: { userId: c.id } }); window.location.href = r.redirect; } catch (e: any) { toast.error(e.message); }
+          }}>Login as client</Button>
           <Button variant="outline" size="sm" icon="add_card" onClick={() => setCredit(true)}>Adjust credit</Button>
           <Button variant="outline" size="sm" icon="receipt" onClick={() => setInvoice(true)}>New invoice</Button>
           <Select className="h-9 w-36" value={c.status} onChange={(e) => api(`/admin/clients/${id}`, { method: "PUT", body: { status: e.target.value } }).then(() => { toast.success("Status updated"); reload(); })}><option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></Select>
