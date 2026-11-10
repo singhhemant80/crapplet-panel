@@ -61,3 +61,21 @@ test("storage choice: node's primary storage with room, else the roomiest attach
   assert.equal(pickStorage(st, "5", 50)?.stid, 3, "primary too small → biggest attached storage");
   assert.equal(pickStorage(st, "9", 50), null, "nothing attached to node 9");
 });
+
+test("storage is only sent when the master ties it to the node (else the node's primary is used)", () => {
+  // shape many masters return: no node mapping at all
+  const unmapped = parseStorages({ storage: { "1": { stid: "1", st_uuid: "abc123", name: "local", primary_storage: "1", free: "900" } } });
+  assert.equal(unmapped[0].uuid, "abc123");
+  assert.equal(pickStorage(unmapped, "2", 40), null, "unknown mapping → send no storage");
+  // attached through a server group
+  const grouped = parseStorages({ storage: { "7": { stid: "7", name: "ceph", primary_storage: "1", sgid: "3", free: "5000" } } });
+  assert.equal(pickStorage(grouped, "2", 40, "3")?.stid, 7);
+  assert.equal(pickStorage(grouped, "2", 40, "4"), null);
+});
+
+test("storage-type refusals from Virtualizor are recognised", async () => {
+  const { isStorageError } = await import("../src/modules/provisioning/provisioner");
+  for (const m of ['Virtualizor addvs: ["The storage you submitted is invalid"]', 'Virtualizor addvs: {"no_storage":"The primary storage could not be found"}', "Virtualizor addvs: not enough space"])
+    assert.ok(isStorageError(new Error(m)), m);
+  assert.ok(!isStorageError(new Error('Virtualizor addvs: {"osid":"Invalid OS"}')));
+});

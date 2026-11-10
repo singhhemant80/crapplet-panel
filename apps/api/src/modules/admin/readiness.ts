@@ -84,5 +84,31 @@ export async function productReadiness(productId: string): Promise<{ ready: bool
     add(ok.length ? { key: "nodes", label: "Nodes", status: "ok", detail: `${ok.length} usable node${ok.length === 1 ? "" : "s"} (${mc.placement === "fixed" ? "fixed" : "least loaded"})` } : { key: "nodes", label: "Nodes", status: "error", detail: "None of the selected nodes is online and accepting new VPS", fix: "Check Node Monitoring or change the placement", href: "/admin/monitoring" });
   }
 
+  // storage (Virtualizor): every node new VPS can land on needs a primary storage with room
+  if (type === "VIRTUALIZOR") {
+    const { virtualizorFor } = await import("../provisioning/provisioner");
+    const { parseStorages, storagesOfNode } = await import("../provisioning/virtualizor");
+    const masters = await prisma.server.findMany({ where: { id: { in: serverIds }, enabled: true }, include: { nodes: true } });
+    const missing: string[] = [];
+    let unknown = false;
+    let failed = "";
+    for (const m of masters) {
+      try {
+        const st = parseStorages(await virtualizorFor(m).storagesRaw());
+        if (!st.some((x) => x.serids.length || x.sgids.length)) { unknown = true; continue; }
+        const usable = m.nodes.filter((n) => n.enabled && n.online && n.externalId !== null && (!mc.nodeIds?.length || mc.placement === "auto" || mc.nodeIds.includes(n.externalId)));
+        for (const n of usable) {
+          const list = storagesOfNode(st, n.externalId!, ((n.meta ?? {}) as { sgid?: string | null }).sgid ?? null);
+          if (!list.some((x) => x.primary && (x.freeGb === null || x.freeGb >= (p.diskGb ?? 0)))) missing.push(n.name);
+        }
+      } catch (e) {
+        failed = (e as Error).message;
+      }
+    }
+    if (failed) add({ key: "storage", label: "Storage", status: "warn", detail: `Couldn't read storage from Virtualizor (${failed.slice(0, 120)})` });
+    else if (missing.length) add({ key: "storage", label: "Storage", status: "warn", detail: `No primary storage with ${p.diskGb ?? "enough"} GB free on ${missing.join(", ")} — the panel skips to another node or lets Virtualizor pick`, fix: "In Virtualizor → Storage, tick “Primary storage” for these nodes", href: "/admin/monitoring" });
+    else add({ key: "storage", label: "Storage", status: "ok", detail: unknown ? "Each node's primary storage is used (the master doesn't map storage to nodes)" : "Every usable node has a primary storage with room" });
+  }
+
   return { ready: !checks.some((c) => c.status === "error"), checks };
 }

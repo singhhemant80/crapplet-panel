@@ -8,6 +8,7 @@ import { encrypt } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
 import { adminAssignIp, importCidr, importCsv, logIp, setIpStatus } from "../ipam/service";
 import { proxmoxFor, virtualizorFor } from "../provisioning/provisioner";
+import { parseStorages, storagesOfNode } from "../provisioning/virtualizor";
 import { checkServer } from "../../jobs/health";
 import { syncVirtualizorOs } from "../provisioning/virtualizor-os";
 import { syncVirtualizorIps } from "../provisioning/virtualizor-ips";
@@ -242,6 +243,32 @@ adminInfra.get(
     const ids = Object.keys(vps.vs ?? {});
     const linked = await prisma.service.findMany({ where: { serverId: s.id, remoteId: { in: ids } }, select: { id: true, remoteId: true, status: true, user: { select: { email: true } } } });
     res.json({ vps: Object.entries(vps.vs ?? {}).map(([id, v]) => ({ vpsid: id, ...v, service: linked.find((l) => l.remoteId === id) ?? null })), plans: Object.values(plans.plans ?? {}) });
+  }),
+);
+
+/** Storages of each Virtualizor master and the nodes they're attached to (Node Monitoring + diagnosis). */
+adminInfra.get(
+  "/virtualizor/:serverId/storages",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const servers = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", ...(req.params.serverId === "all" ? { enabled: true } : { id: req.params.serverId }) }, include: { nodes: { select: { externalId: true, name: true, meta: true } } } });
+    const results = await Promise.all(
+      servers.map(async (srv) => {
+        try {
+          const raw = await virtualizorFor(srv).storagesRaw();
+          const storages = parseStorages(raw);
+          const byNode = Object.fromEntries(
+            srv.nodes.filter((n) => n.externalId !== null).map((n) => [n.externalId!, storagesOfNode(storages, n.externalId!, ((n.meta ?? {}) as { sgid?: string | null }).sgid ?? null)]),
+          );
+          // the raw reply (trimmed) lets staff/support see exactly what the master reports
+          const rawText = JSON.stringify(raw.storage ?? raw.storages ?? raw, null, 1).slice(0, 6000);
+          return { serverId: srv.id, serverName: srv.name, ok: true, storages, byNode, mappingKnown: storages.some((x) => x.serids.length || x.sgids.length), raw: rawText };
+        } catch (e) {
+          return { serverId: srv.id, serverName: srv.name, ok: false, error: (e as Error).message };
+        }
+      }),
+    );
+    res.json({ results });
   }),
 );
 

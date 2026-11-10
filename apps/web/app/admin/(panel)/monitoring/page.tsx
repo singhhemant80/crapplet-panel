@@ -39,7 +39,30 @@ function Meter({ label, value, detail }: { label: string; value: number; detail:
   );
 }
 
-function NodeCard({ n, server, onChanged }: { n: Node & { enabled: boolean }; server: Srv; onChanged: () => void }) {
+type Storage = { stid: number; uuid: string | null; name: string; type: string; primary: boolean; serids: string[]; sgids: string[]; totalGb: number | null; freeGb: number | null };
+type StorageInfo = { serverId: string; serverName: string; ok: boolean; error?: string; storages?: Storage[]; byNode?: Record<string, Storage[]>; mappingKnown?: boolean; raw?: string };
+
+function NodeStorage({ list, info }: { list?: Storage[]; info?: StorageInfo }) {
+  if (!info) return null;
+  if (!info.ok) return <div className="mt-3 text-[11.5px] text-mute">Storage: couldn&apos;t read ({info.error})</div>;
+  if (!list?.length)
+    return (
+      <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-600 ring-1 ring-line">
+        <b>Storage:</b> {info.mappingKnown ? "none attached to this node in Virtualizor — new VPS can't be built here" : "the master doesn't say which storage belongs to which node — the node's primary storage is used"}
+      </div>
+    );
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {list.map((st) => (
+        <span key={st.stid} className={cx("inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold ring-1", st.primary ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-50 text-slate-600 ring-line")} title={`id ${st.stid}${st.uuid ? ` · ${st.uuid}` : ""} · ${st.type}`}>
+          <Icon name="hard_drive" className="text-[14px]" />{st.name}{st.freeGb !== null && <span className="font-semibold opacity-75">· {Math.round(st.freeGb)} GB free</span>}{st.primary && <span className="rounded bg-emerald-600 px-1 text-[9.5px] uppercase text-white">primary</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function NodeCard({ n, server, onChanged, storage }: { n: Node & { enabled: boolean }; server: Srv; onChanged: () => void; storage?: StorageInfo }) {
   const ram = p(n.ramUsedMb, n.ramTotalMb);
   const disk = p(n.diskUsedGb, n.diskTotalGb);
   const m = n.meta ?? {};
@@ -93,6 +116,7 @@ function NodeCard({ n, server, onChanged }: { n: Node & { enabled: boolean }; se
           />
         </label>
       )}
+      {server.type === "VIRTUALIZOR" && n.externalId !== null && <NodeStorage list={storage?.byNode?.[n.externalId]} info={storage} />}
       {m.usageError && <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">Live usage unavailable — {m.usageError.replace(/^Virtualizor manageserver: /, "").replace(/[\[\]"]/g, "")}</div>}
     </div>
   );
@@ -100,6 +124,7 @@ function NodeCard({ n, server, onChanged }: { n: Node & { enabled: boolean }; se
 
 export default function Monitoring() {
   const { data, loading, error, reload } = useApi("/admin/monitoring");
+  const st = useApi<{ results: StorageInfo[] }>("/admin/virtualizor/all/storages");
   const [busy, setBusy] = useState(false);
   const [serverId, setServerId] = useState("");
   const [q, setQ] = useState("");
@@ -202,9 +227,35 @@ export default function Monitoring() {
 
           {rows.length ? (
             <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-              {rows.map(({ n, s }) => <NodeCard key={n.id} n={n as any} server={s} onChanged={reload} />)}
+              {rows.map(({ n, s }) => <NodeCard key={n.id} n={n as any} server={s} onChanged={reload} storage={st.data?.results.find((r) => r.serverId === s.id)} />)}
             </div>
-          ) : (
+          ) : null}
+          {rows.length > 0 && st.data?.results.map((r) => (
+            <Card key={r.serverId} className="mt-6" title={<span className="flex items-center gap-2"><Icon name="hard_drive" className="text-primary-dark" /> Storage on {r.serverName}</span>} action={<Button size="sm" variant="outline" icon="refresh" onClick={st.reload}>Reload</Button>}>
+              {!r.ok ? <Alert tone="error">{r.error}</Alert> : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[560px] text-left text-sm">
+                      <thead><tr className="text-[11px] font-bold uppercase tracking-wider text-mute"><th className="py-2 pr-3">Storage</th><th className="pr-3">Type</th><th className="pr-3">Free / size</th><th className="pr-3">Primary</th><th>Nodes</th></tr></thead>
+                      <tbody className="divide-y divide-[#f3effb]">
+                        {r.storages!.map((x) => (
+                          <tr key={x.stid}>
+                            <td className="py-2 pr-3 font-semibold">{x.name} <span className="font-mono text-xs text-mute">#{x.stid}</span></td>
+                            <td className="pr-3 text-mute">{x.type || "—"}</td>
+                            <td className="pr-3">{x.freeGb !== null ? `${Math.round(x.freeGb)} GB` : "—"}{x.totalGb !== null ? ` / ${Math.round(x.totalGb)} GB` : ""}</td>
+                            <td className="pr-3">{x.primary ? <span className="font-bold text-emerald-700">Yes</span> : "No"}</td>
+                            <td className="text-xs">{x.serids.length ? x.serids.map((id) => servers.find((sv) => sv.id === r.serverId)?.nodes.find((nd) => nd.externalId === id)?.name ?? `#${id}`).join(", ") : x.sgids.length ? `group ${x.sgids.join(", ")}` : <span className="text-mute">not reported</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <details className="mt-3 text-xs"><summary className="cursor-pointer font-bold text-mute">Raw reply from Virtualizor (for support)</summary><pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-slate-50 p-3 font-mono text-[11px] text-slate-600">{r.raw}</pre></details>
+                </>
+              )}
+            </Card>
+          ))}
+          {!rows.length && (
             <Card>
               <Empty icon="search_off" title={q ? "No node matches your search" : "No nodes fetched yet"}>
                 {!q && <>Click <b>Refresh now</b> to pull the node list from your servers.</>}

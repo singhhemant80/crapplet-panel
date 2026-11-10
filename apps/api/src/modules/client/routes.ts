@@ -118,7 +118,7 @@ clientRouter.get(
     const logs = (
       await prisma.provisioningLog.findMany({ where: { serviceId: s.id, action: { in: ["create", "reinstall", "reboot", "start", "stop", "shutdown", "reset_password"] } }, orderBy: { createdAt: "desc" }, take: 60, select: { action: true, success: true, createdAt: true, message: true } })
     )
-      .filter((l) => l.action !== "create" || (l.success ? /^(Virtualizor VPS \S+ created|VPS \S+ running on)/.test(l.message ?? "") : !/trying the next node/.test(l.message ?? "")))
+      .filter((l) => l.action !== "create" || (l.success ? /^(Virtualizor VPS \S+ created|VPS \S+ running on)/.test(l.message ?? "") : !/— trying /.test(l.message ?? "")))
       .slice(0, 10)
       .map(({ message: _m, ...l }) => l);
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });

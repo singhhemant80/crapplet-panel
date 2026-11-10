@@ -21,6 +21,14 @@ export class VirtualizorError extends Error {
   }
 }
 
+/** PHP-style form fields: arrays of scalars → k[]=v, objects/arrays of objects → k[0][size]=v. */
+function appendForm(form: URLSearchParams, key: string, v: unknown) {
+  if (v === undefined || v === null) return;
+  if (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object")) return v.forEach((x) => form.append(`${key}[]`, String(x)));
+  if (typeof v === "object") return Object.entries(v as Record<string, unknown>).forEach(([k2, x]) => appendForm(form, `${key}[${k2}]`, x));
+  form.set(key, String(v));
+}
+
 export class VirtualizorClient {
   private agent: Agent;
   constructor(private creds: VirtualizorCreds) {
@@ -44,8 +52,7 @@ export class VirtualizorClient {
       const form = new URLSearchParams();
       for (const [k, v] of Object.entries(post)) {
         if (v === undefined || v === null) continue;
-        if (Array.isArray(v)) v.forEach((x) => form.append(`${k}[]`, String(x)));
-        else form.set(k, String(v));
+        appendForm(form, k, v);
       }
       body = form.toString();
     }
@@ -134,7 +141,12 @@ export class VirtualizorClient {
     /** with automatic placement: limit Virtualizor's choice to this server group */
     serverGroupId?: number;
     /** storage to put the disk on; omit = the node's primary storage */
-    storageId?: number;
+    storage?: { stid: number; uuid?: string | null };
+    /**
+     * how the disk is described: "scalar" = space=<GB> (classic), "array" = space[0][size]+st_uuid
+     * (newer masters), "plan" = send no ram/disk/cpu overrides and let the Virtualizor plan decide
+     */
+    diskMode?: "scalar" | "array" | "plan";
     /** extra addvs fields from the plan's advanced settings (vnc, nic_type, …) */
     extra?: Record<string, string>;
     userEmail: string;
@@ -157,7 +169,7 @@ export class VirtualizorClient {
       ...(p.serverId !== undefined
         ? { slave_server: p.serverId, serid: p.serverId }
         : { node_select: 1, ...(p.serverGroupId !== undefined ? { server_group: p.serverGroupId } : {}) }),
-      ...(p.storageId !== undefined ? { stid: p.storageId } : {}),
+      ...(p.storage ? { stid: p.storage.stid } : {}),
       user_email: p.userEmail,
       user_pass: p.userPass,
       hostname: p.hostname,
@@ -165,9 +177,13 @@ export class VirtualizorClient {
       osid: p.osId,
       ...(p.ips.length ? { ips: p.ips } : {}),
       num_ips: p.ips.length || p.numIps || 1,
-      ram: p.ramMb,
-      space: p.diskGb,
-      cores: p.cores,
+      ...(p.diskMode === "plan" && p.planId
+        ? {}
+        : {
+            ram: p.ramMb,
+            cores: p.cores,
+            space: p.diskMode === "array" && p.diskGb ? { 0: { size: p.diskGb, ...(p.storage?.uuid ? { st_uuid: p.storage.uuid } : {}) } } : p.diskGb,
+          }),
       bandwidth: p.bandwidthGb ?? 0,
       ...(p.extra ?? {}),
     });
@@ -178,7 +194,10 @@ export class VirtualizorClient {
 
   /** All storages with the nodes they're attached to (act=storage). */
   async storages(): Promise<VirtStorage[]> {
-    return parseStorages(await this.call<Record<string, unknown>>("storage", { reslen: 1000 }));
+    return parseStorages(await this.storagesRaw());
+  }
+  storagesRaw() {
+    return this.call<Record<string, unknown>>("storage", { reslen: 1000 });
   }
 
   suspend(vpsid: string) {
@@ -209,11 +228,14 @@ export class VirtualizorClient {
 
 export interface VirtStorage {
   stid: number;
+  uuid: string | null;
   name: string;
   type: string;
   primary: boolean;
-  /** Virtualizor serids the storage is attached to; empty = not reported (treat as usable anywhere) */
+  /** Virtualizor serids the storage is attached to (empty = the master didn't say) */
   serids: string[];
+  /** server groups the storage is attached to */
+  sgids: string[];
   totalGb: number | null;
   freeGb: number | null;
 }
@@ -252,10 +274,12 @@ export function parseStorages(r: Record<string, unknown>): VirtStorage[] {
       const stid = Number(s.stid ?? s.id);
       return {
         stid,
+        uuid: s.st_uuid ? String(s.st_uuid) : s.uuid ? String(s.uuid) : null,
         name: String(s.name ?? s.path ?? `Storage ${stid}`),
         type: String(s.type ?? ""),
         primary: String(s.primary_storage ?? s.primary ?? "0") === "1",
         serids: seridList(s.serid, s.servers, s.server_ids, s.storage_servers, map?.[String(stid)]),
+        sgids: seridList(s.sgid, s.sgids, s.server_groups),
         totalGb: numOrNull(s.size ?? s.total ?? s.total_size),
         freeGb: numOrNull(s.free ?? s.free_size ?? s.available),
       };
@@ -264,14 +288,20 @@ export function parseStorages(r: Record<string, unknown>): VirtStorage[] {
 }
 
 /**
- * Best storage for a new disk on a node: its primary storage when it has room, otherwise the
- * attached storage with the most free space. null = nothing suitable is known (let Virtualizor decide).
+ * Best storage for a new disk on a node — only storages the master says are attached to that node
+ * (directly or through its server group). Its primary storage when it has room, else the roomiest.
+ * null = the panel can't be sure, so the caller sends no storage and Virtualizor uses the node's primary.
  */
-export function pickStorage(storages: VirtStorage[], serid: string, diskGb = 0): VirtStorage | null {
-  const onNode = storages.filter((s) => !s.serids.length || s.serids.includes(serid));
+export function pickStorage(storages: VirtStorage[], serid: string, diskGb = 0, sgid?: string | null): VirtStorage | null {
+  const onNode = storages.filter((s) => s.serids.includes(serid) || (!!sgid && s.sgids.includes(sgid)));
   const fits = (s: VirtStorage) => s.freeGb === null || s.freeGb >= diskGb;
   const primary = onNode.filter((s) => s.primary && fits(s)).sort((a, b) => (b.freeGb ?? 0) - (a.freeGb ?? 0));
   if (primary.length) return primary[0];
   const any = onNode.filter(fits).sort((a, b) => (b.freeGb ?? 0) - (a.freeGb ?? 0));
   return any[0] ?? null;
+}
+
+/** Storages attached to a node, for display (same rules as pickStorage). */
+export function storagesOfNode(storages: VirtStorage[], serid: string, sgid?: string | null) {
+  return storages.filter((s) => s.serids.includes(serid) || (!!sgid && s.sgids.includes(sgid)));
 }
