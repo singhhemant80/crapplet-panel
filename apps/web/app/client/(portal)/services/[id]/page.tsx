@@ -89,6 +89,7 @@ export default function ServicePage() {
               <Button size="sm" variant="outline" icon="restart_alt" disabled={!running} loading={busy === "reboot"} onClick={() => act("reboot")}>Reboot</Button>
               <Button size="sm" variant="outline" icon="power_settings_new" disabled={!running} loading={busy === "shutdown"} onClick={() => confirm("Shut down the server gracefully?") && act("shutdown")}>Shutdown</Button>
               <Button size="sm" variant="outline" icon="stop" disabled={!running} loading={busy === "stop"} onClick={() => confirm("Force power-off? Unsaved data may be lost.") && act("stop")}>Power off</Button>
+              {svc.product?.provisioner === "VIRTUALIZOR" && <Button size="sm" icon="terminal" href={`/client/services/${id}/console`}>Console</Button>}
               <Button size="sm" variant="secondary" icon="install_desktop" onClick={() => setModal("reinstall")}>Reinstall</Button>
             </div>
           </div>

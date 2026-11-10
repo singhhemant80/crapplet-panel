@@ -219,6 +219,23 @@ export class VirtualizorClient {
     return want;
   }
 
+  /**
+   * Console (noVNC) details for a VPS — like the official module's act=vnc&novnc=1. The password is a
+   * VNC password Virtualizor generates; the websocket is served by the master on port 4083
+   * (https) at /novnc/?virttoken=<vpsid>.
+   */
+  async vncInfo(vpsid: string): Promise<{ password: string; virt?: string; host?: string }> {
+    const r = await this.call<Record<string, unknown>>("vnc", { novnc: 1, vpsid }, { vpsid, novnc: 1 });
+    const info = (r.info ?? r.vnc ?? r) as Record<string, unknown>;
+    let password = String(info.password ?? info.vncpass ?? "");
+    if (!password) {
+      const form = await this.call<{ vps?: Record<string, unknown> }>("editvs", { vpsid }).catch(() => null);
+      password = String(form?.vps?.vncpass ?? "");
+    }
+    if (!password) throw new VirtualizorError("Virtualizor didn't return a console password — make sure VNC is enabled for this VPS (Virtualizor → Manage VPS → VNC)", r);
+    return { password, virt: info.virt ? String(info.virt) : undefined, host: info.host ? String(info.host) : undefined };
+  }
+
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
   }

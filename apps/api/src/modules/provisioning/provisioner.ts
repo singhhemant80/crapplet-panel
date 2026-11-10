@@ -261,7 +261,10 @@ export async function virtualizorNodeCandidates(
   virt?: string,
 ): Promise<NodeChoice[]> {
   const one = (serid: string | number, reason: string): NodeChoice[] => [{ serid: Number(serid), name: String(serid), reason }];
-  if (svc.node && /^\d+$/.test(svc.node)) return one(svc.node, `node ${svc.node} chosen by staff`);
+  if (svc.node && /^\d+$/.test(svc.node)) {
+    const nm = (await prisma.serverNode.findFirst({ where: { serverId: server.id, externalId: svc.node }, select: { name: true } }))?.name;
+    return [{ serid: Number(svc.node), name: nm ?? svc.node, reason: `node ${nm ? `${nm} (#${svc.node})` : svc.node} chosen by staff` }];
+  }
   let placement = mc.placement ?? (mc.slaveServerId !== undefined && mc.slaveServerId !== null ? "fixed" : "auto");
   let allowed = placement === "least_loaded" && mc.nodeIds?.length ? mc.nodeIds : null;
   if (ipNodes.length) {
@@ -828,7 +831,7 @@ export async function liveStatus(serviceId: string) {
     const n = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Number(x));
     return {
       ...st,
-      cpuPct: n(v.used_cpu ?? v.cpu_percent),
+      cpuPct: n(v.used_cpu),
       memUsedMb: n(v.used_ram),
       memTotalMb: n(v.ram),
       diskTotalGb: n(v.space),

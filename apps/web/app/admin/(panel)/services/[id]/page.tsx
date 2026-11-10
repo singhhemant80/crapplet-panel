@@ -35,6 +35,7 @@ export default function AdminService() {
       <Card title="Actions" className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : s.status === "PROVISIONING" ? "Re-run provisioning" : "Provision now"}</Button>}
+          {s.product.provisioner === "VIRTUALIZOR" && s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) && <Button size="sm" icon="terminal" href={`/admin/services/${id}/console`}>Console</Button>}
           {isVps && s.status === "ACTIVE" && <>
             <Button variant="outline" size="sm" icon="play_arrow" onClick={() => act("start")}>Start</Button>
             <Button variant="outline" size="sm" icon="restart_alt" onClick={() => act("reboot")}>Reboot</Button>
@@ -52,7 +53,7 @@ export default function AdminService() {
         <Card title="Server">
           <dl className="grid grid-cols-[140px_1fr] gap-y-2.5 text-sm">
             <dt className="text-mute">Hypervisor</dt><dd className="font-semibold">{s.server ? `${s.server.name} (${s.server.type})` : "—"}</dd>
-            <dt className="text-mute">Node / VMID</dt><dd className="font-semibold">{s.node ?? "—"} / {s.remoteId ?? "—"} {s.virtType && <span className="text-mute">({s.virtType})</span>}</dd>
+            <dt className="text-mute">Node / VPS id</dt><dd className="font-semibold">{s.nodeName ?? s.node ?? "—"}{s.nodeName && s.node && s.nodeName !== s.node && <span className="font-normal text-mute"> (#{s.node})</span>} / {s.remoteId ?? "—"} {s.virtType && <span className="text-mute">({s.virtType})</span>}</dd>
             <dt className="text-mute">OS</dt><dd className="flex items-center gap-2 font-semibold">{s.osTemplate && <OsLogo os={s.osTemplate} size={22} className="rounded-md" />}{s.osTemplate?.name ?? "—"}</dd>
             <dt className="text-mute">IPs</dt><dd className="space-y-1">{s.ips.map((i: any) => <div key={i.id} className="flex items-center gap-1 font-mono text-[13px]">{i.address}{i.isPrimary && <Badge>primary</Badge>}<Copy text={i.address} /><span className="text-xs text-mute">{i.subnet?.cidr} gw {i.subnet?.gateway}</span></div>)}{!s.ips.length && "—"}</dd>
             <dt className="text-mute">Live state</dt>

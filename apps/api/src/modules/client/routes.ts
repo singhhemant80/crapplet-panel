@@ -126,6 +126,16 @@ clientRouter.get(
   }),
 );
 
+/** One-time browser console session for the customer's own VPS. */
+clientRouter.post(
+  "/services/:id/console",
+  ah(async (req, res) => {
+    const s = await ownService(req.user!.id, req.params.id);
+    const { openConsole } = await import("../console");
+    res.json(await openConsole(s.id, { userId: req.user!.id, staff: false, ip: req.ip }));
+  }),
+);
+
 /** Live state of all the customer's VPSes (Online / Offline / Suspended / Locked). */
 clientRouter.get(
   "/services-live",

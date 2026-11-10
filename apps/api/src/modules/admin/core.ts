@@ -342,7 +342,9 @@ adminCore.get(
     if (!s) throw notFound();
     const { passwordEnc, server, ...rest } = s;
     const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, dueDate: true } });
-    res.json({ service: { ...rest, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname } : null, hasPassword: !!passwordEnc }, invoices });
+    // node id → node name (Virtualizor serid / Proxmox node)
+    const nodeRow = s.node && server ? await prisma.serverNode.findFirst({ where: { serverId: server.id, OR: [{ externalId: s.node }, { name: s.node }] }, select: { name: true } }) : null;
+    res.json({ service: { ...rest, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname } : null, hasPassword: !!passwordEnc }, invoices });
   }),
 );
 
@@ -421,6 +423,18 @@ adminCore.post(
     await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: s.userId, action: "service.recreate", entity: "service", entityId: s.id, details: { previousVpsId: s.remoteId, ...b } });
     res.status(202).json({ queued: true });
+  }),
+);
+
+/** One-time browser console session (noVNC through the panel). */
+adminCore.post(
+  "/services/:id/console",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const { openConsole } = await import("../console");
+    const r = await openConsole(req.params.id, { userId: req.user!.id, staff: true, ip: req.ip });
+    await audit({ actorId: req.user!.id, action: "service.console_opened", entity: "service", entityId: req.params.id });
+    res.json(r);
   }),
 );
 
