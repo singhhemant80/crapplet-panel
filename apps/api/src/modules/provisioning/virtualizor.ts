@@ -224,7 +224,7 @@ export class VirtualizorClient {
    * VNC password Virtualizor generates; the websocket is served by the master on port 4083
    * (https) at /novnc/?virttoken=<vpsid>.
    */
-  async vncInfo(vpsid: string): Promise<{ password: string; virt?: string; host?: string }> {
+  async vncInfo(vpsid: string): Promise<{ password: string; virt?: string; host?: string; method?: string }> {
     const pick = (r: Record<string, unknown>) => {
       const info = (r.info ?? r.vnc ?? r) as Record<string, unknown>;
       return { password: String(info.password ?? info.vncpass ?? ""), virt: info.virt ? String(info.virt) : undefined, host: info.host ? String(info.host) : undefined };
@@ -233,7 +233,7 @@ export class VirtualizorClient {
     // 1) exactly like the WHMCS module: end-user API on 4083 with the admin key, acting on VPS "svs"
     try {
       const r = pick(await this.call<Record<string, unknown>>("vnc", { novnc: 1, svs: vpsid }, undefined, { port: 4083 }));
-      if (r.password) return r;
+      if (r.password) return { ...r, method: "end-user API (4083)" };
       errors.push("end-user API (4083) returned no console password");
     } catch (e) {
       errors.push(`end-user API (4083): ${(e as Error).message}`);
@@ -241,7 +241,7 @@ export class VirtualizorClient {
     // 2) admin API
     try {
       const r = pick(await this.call<Record<string, unknown>>("vnc", { novnc: 1, vpsid, svs: vpsid }, { vpsid, novnc: 1 }));
-      if (r.password) return r;
+      if (r.password) return { ...r, method: `admin API (end-user API failed: ${errors.join("; ")})` };
       errors.push("admin API returned no console password");
     } catch (e) {
       errors.push(`admin API: ${(e as Error).message}`);
@@ -249,7 +249,7 @@ export class VirtualizorClient {
     // 3) the VNC password stored on the VPS
     const form = await this.call<{ vps?: Record<string, unknown> }>("editvs", { vpsid }).catch(() => null);
     const vncpass = form?.vps?.vncpass ? String(form.vps.vncpass) : "";
-    if (vncpass && String(form?.vps?.vnc ?? "1") !== "0") return { password: vncpass, virt: form?.vps?.virt ? String(form.vps.virt) : undefined };
+    if (vncpass && String(form?.vps?.vnc ?? "1") !== "0") return { password: vncpass, virt: form?.vps?.virt ? String(form.vps.virt) : undefined, method: `stored VNC password (${errors.join("; ")})` };
     throw new VirtualizorError(`Couldn't get console access for VPS ${vpsid} — ${errors.join("; ")}. Check that VNC is enabled for the VPS (Virtualizor → Manage VPS → VNC) and that this panel can reach the master on port 4083.`);
   }
 

@@ -15,7 +15,7 @@ import { virtualizorFor } from "../provisioning/provisioner";
  */
 const KEY = (t: string) => `crapplet:console:${t}`;
 const ERR = (t: string) => `crapplet:console:err:${t}`;
-type Ticket = { hosts: string[]; port: number; token: string; verifyTls: boolean; serviceId: string };
+type Ticket = { hosts: string[]; port: number; token: string; verifyTls: boolean; serviceId: string; method?: string };
 
 const bareHost = (h: string) => h.replace(/^https?:\/\//, "").replace(/[:/].*$/, "");
 
@@ -38,9 +38,9 @@ export async function openConsole(serviceId: string, who: { userId: string; staf
   const hosts = [...new Set((xcp ? [node, master] : [master, node]).filter(Boolean))];
   const token = xcp ? `${svc.remoteId}-${info.password}` : svc.remoteId;
   const ticket = crypto.randomBytes(24).toString("base64url");
-  const t: Ticket = { hosts, port: 4083, token, verifyTls: svc.server.verifyTls, serviceId: svc.id };
+  const t: Ticket = { hosts, port: 4083, token, verifyTls: svc.server.verifyTls, serviceId: svc.id, method: info.method };
   await redis().set(KEY(ticket), JSON.stringify(t), "EX", 60);
-  await prisma.provisioningLog.create({ data: { serviceId: svc.id, action: "console", success: true, message: `Console opened by ${who.staff ? "staff" : "customer"}${who.ip ? ` from ${who.ip}` : ""} (${info.virt ?? "kvm"}, via ${hosts[0]}:4083)` } });
+  await prisma.provisioningLog.create({ data: { serviceId: svc.id, action: "console", success: true, message: `Console opened by ${who.staff ? "staff" : "customer"}${who.ip ? ` from ${who.ip}` : ""} (${info.virt ?? "kvm"}, via ${hosts[0]}:4083, access from ${info.method ?? "?"})` } });
   return { path: `/api/console/ws?t=${ticket}`, statusPath: `/api/console/status?t=${ticket}`, password: info.password, vpsid: svc.remoteId };
 }
 
@@ -54,6 +54,23 @@ async function recordFailure(ticket: string, t: Ticket, reason: string) {
   await prisma.provisioningLog.create({ data: { serviceId: t.serviceId, action: "console", success: false, message: reason.slice(0, 500) } }).catch(() => null);
 }
 
+class GatewayError extends Error {}
+
+/** Virtualizor starts its websocket proxy when act=vnc is called — give it a few seconds before giving up. */
+async function connectWithRetry(t: Ticket, host: string, protocols: string[], isClosed: () => boolean): Promise<WebSocket> {
+  let last: Error = new Error("no attempt");
+  for (let i = 0; i < 4 && !isClosed(); i++) {
+    try {
+      return await connectUpstream(t, host, protocols);
+    } catch (e) {
+      last = e as Error;
+      if (!(e instanceof GatewayError)) throw e;
+      await new Promise((ok) => setTimeout(ok, 1500 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 function connectUpstream(t: Ticket, host: string, protocols: string[]): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`wss://${host}:${t.port}/novnc/?virttoken=${encodeURIComponent(t.token)}`, protocols, {
@@ -64,7 +81,9 @@ function connectUpstream(t: Ticket, host: string, protocols: string[]): Promise<
     });
     ws.once("open", () => resolve(ws));
     ws.once("unexpected-response", (_req, res) => {
-      reject(new Error(`${host}:${t.port} answered HTTP ${res.statusCode}${res.statusCode === 404 ? " (no noVNC websocket there)" : ""}`));
+      const code = res.statusCode ?? 0;
+      const msg = `${host}:${t.port} answered HTTP ${code}${code === 404 ? " (no noVNC websocket there)" : code >= 502 && code <= 504 ? " (Virtualizor's noVNC proxy isn't responding)" : ""}`;
+      reject(code >= 502 && code <= 504 ? new GatewayError(msg) : new Error(msg));
       ws.terminate();
     });
     ws.once("error", (e) => reject(new Error(`${host}:${t.port} — ${(e as Error).message}`)));
@@ -102,7 +121,7 @@ export function attachConsoleProxy(server: HttpServer) {
       const errors: string[] = [];
       for (const host of ticket.hosts) {
         try {
-          upstream = await connectUpstream(ticket, host, protocols);
+          upstream = await connectWithRetry(ticket, host, protocols, () => closed);
           break;
         } catch (e) {
           errors.push((e as Error).message);
@@ -110,7 +129,10 @@ export function attachConsoleProxy(server: HttpServer) {
       }
       if (closed) return upstream?.terminate();
       if (!upstream) {
-        const reason = `Couldn't open the console websocket: ${errors.join("; ")}. The panel server must reach the Virtualizor master on port 4083${ticket.verifyTls ? " (and its SSL certificate must be valid — or turn off 'Verify SSL' for this server)" : ""}.`;
+        const gateway = errors.some((e) => /HTTP 50[234]/.test(e));
+        const reason = gateway
+          ? `Virtualizor's noVNC proxy on the master isn't responding (${errors.join("; ")}, tried 4 times). Fix it on the Virtualizor master: Configuration → Master Settings → enable noVNC (and "Master Proxy Only" for slave nodes), make sure the websockify process is running (ps aux | grep websock) and the VPS is powered on. Check that VNC opens from Virtualizor's own panel for this VPS. Console access came from: ${ticket.method ?? "unknown"}.`
+          : `Couldn't open the console websocket: ${errors.join("; ")}. The panel server must reach the Virtualizor master on port 4083${ticket.verifyTls ? " (and its SSL certificate must be valid — or turn off 'Verify SSL' for this server)" : ""}.`;
         await recordFailure(tk, ticket, reason);
         return client.close(1011, "console unreachable");
       }
