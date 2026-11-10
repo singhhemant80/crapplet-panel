@@ -79,3 +79,14 @@ test("storage-type refusals from Virtualizor are recognised", async () => {
     assert.ok(isStorageError(new Error(m)), m);
   assert.ok(!isStorageError(new Error('Virtualizor addvs: {"osid":"Invalid OS"}')));
 });
+
+test("storage rows are found in the shapes masters use (grouped per node, arrays, other keys)", () => {
+  const grouped = parseStorages({ storage: { "2": { "5": { stid: "5", name: "thin-2", primary_storage: "1", free: "900" } }, "0": { "6": { stid: "6", name: "thin-0", free: "800" } } } });
+  assert.deepEqual(grouped.map((x) => [x.stid, x.serids]).sort((a, b) => (a[0] as number) - (b[0] as number)), [[5, ["2"]], [6, ["0"]]]);
+  assert.equal(pickStorage(grouped, "2", 40)?.stid, 5);
+  const arr = parseStorages({ storages: [{ stid: 9, st_uuid: "u9", name: "zfs", primary_storage: 1, serid: "3" }] });
+  assert.deepEqual([arr[0].stid, arr[0].uuid, arr[0].primary, arr[0].serids], [9, "u9", true, ["3"]]);
+  const other = parseStorages({ title: "Create VPS", server_storage: { "4": { stid: "4", name: "lvm" } } });
+  assert.equal(other[0]?.stid, 4);
+  assert.deepEqual(parseStorages({ title: "Create VPS", plans: { "1": { plid: "1" } } }), []);
+});

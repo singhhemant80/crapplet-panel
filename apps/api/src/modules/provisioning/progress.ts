@@ -65,14 +65,17 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   const created = attempt.find((l) => l.success && CREATED.test(l.message ?? ""));
   const lastFail = [...attempt].reverse().find((l) => !l.success);
   const inv = s.order?.invoice ?? null;
-  const paid = !inv || inv.total === 0 || inv.status === "PAID";
+  const invoicePaid = !inv || inv.total === 0 || inv.status === "PAID";
+  // staff can provision before payment (Provision now / Retry) — then payment no longer blocks setup
+  const setupStarted = logs.length > 0 || ["PROVISIONING", "ACTIVE", "SUSPENDED", "FAILED"].includes(s.status);
+  const paid = invoicePaid || setupStarted;
   const job = ["PENDING", "PROVISIONING", "FAILED"].includes(s.status) ? await jobInfo(s.id) : null;
 
   const steps: Step[] = [
     { key: "order", label: "Order placed", state: "done", at: s.order?.createdAt ?? s.createdAt },
     {
       key: "payment",
-      label: paid ? (inv && inv.total > 0 ? "Payment received" : "No payment needed") : "Waiting for payment",
+      label: invoicePaid ? (inv && inv.total > 0 ? "Payment received" : "No payment needed") : paid ? (admin ? "Unpaid — started by staff" : "Payment pending") : "Waiting for payment",
       state: paid ? "done" : "current",
       at: inv?.paidAt ?? null,
     },
@@ -103,7 +106,8 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   const error = failed || (job?.state === "delayed" && job.lastError) ? lastFail?.message ?? job?.lastError ?? null : null;
   if (failed) {
     const cur = steps.find((x) => x.state === "current") ?? steps.find((x) => x.state === "pending");
-    if (cur) Object.assign(cur, { state: "failed", detail: admin ? error ?? undefined : undefined });
+    // the full error is in the header — keep the step short
+    if (cur) Object.assign(cur, { state: "failed", detail: admin && error ? (error.length > 140 ? `${error.slice(0, 140)}…` : error) : undefined });
   }
 
   const done = steps.filter((x) => x.state === "done").length;
@@ -151,7 +155,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     headline,
     message,
     steps: steps.map((x) => ({ ...x, detail: x.detail })),
-    invoiceId: !paid ? inv?.id : null,
+    invoiceId: !invoicePaid ? inv?.id : null,
     job: admin ? job : null,
     error: admin ? error : null,
     startedAt: lastStart?.createdAt ?? attempt[0]?.createdAt ?? null,

@@ -199,6 +199,14 @@ export class VirtualizorClient {
   storagesRaw() {
     return this.call<Record<string, unknown>>("storage", { reslen: 1000 });
   }
+  /**
+   * Storages Virtualizor offers for one node — read from its own Create VPS form (act=addvs without
+   * submitting), the same list the admin panel's storage dropdown shows for that server.
+   */
+  async storagesForServer(serid: number): Promise<VirtStorage[]> {
+    const r = await this.call<Record<string, unknown>>("addvs", { serid, slave_server: serid });
+    return parseStorages(r).map((x) => (x.serids.length ? x : { ...x, serids: [String(serid)] }));
+  }
 
   suspend(vpsid: string) {
     return this.call("vs", { suspend: vpsid });
@@ -264,9 +272,31 @@ function seridList(...vals: unknown[]): string[] {
   return [...out];
 }
 
+const isStorageRow = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v) && ("stid" in (v as object) || "st_uuid" in (v as object));
+
+/**
+ * Finds storage rows wherever a master puts them: {storage:{1:{…}}}, {storages:[…]}, or grouped per
+ * node {storage:{<serid>:{<stid>:{…}}}} (the node id is then remembered on each row).
+ */
+function findStorageRows(r: Record<string, unknown>): Record<string, unknown>[] {
+  const keys = ["storage", "storages", "storage_list", "server_storage", "storage_details", ...Object.keys(r)];
+  for (const k of [...new Set(keys)]) {
+    const v = r[k];
+    if (!v || typeof v !== "object") continue;
+    const entries = Array.isArray(v) ? v.map((x, i) => [String(i), x] as const) : Object.entries(v as Record<string, unknown>);
+    if (entries.some(([, x]) => isStorageRow(x))) return entries.filter(([, x]) => isStorageRow(x)).map(([key, x]) => ({ stid: key, ...(x as object) }));
+    // grouped by node
+    const grouped = entries.filter(([, x]) => x && typeof x === "object" && Object.values(x as object).some(isStorageRow));
+    if (grouped.length)
+      return grouped.flatMap(([serid, x]) =>
+        Object.entries(x as Record<string, unknown>).filter(([, y]) => isStorageRow(y)).map(([key, y]) => ({ stid: key, _serid: serid, ...(y as object) })),
+      );
+  }
+  return [];
+}
+
 export function parseStorages(r: Record<string, unknown>): VirtStorage[] {
-  const raw = (r.storage ?? r.storages ?? {}) as Record<string, Record<string, unknown>> | Record<string, unknown>[];
-  const rows = Array.isArray(raw) ? raw : Object.entries(raw).map(([k, v]) => ({ stid: k, ...(v as object) }) as Record<string, unknown>);
+  const rows = findStorageRows(r);
   const map = (r.storage_servers ?? r.storages_servers ?? null) as Record<string, unknown> | null;
   return rows
     .filter((s) => s && typeof s === "object")
@@ -278,7 +308,7 @@ export function parseStorages(r: Record<string, unknown>): VirtStorage[] {
         name: String(s.name ?? s.path ?? `Storage ${stid}`),
         type: String(s.type ?? ""),
         primary: String(s.primary_storage ?? s.primary ?? "0") === "1",
-        serids: seridList(s.serid, s.servers, s.server_ids, s.storage_servers, map?.[String(stid)]),
+        serids: seridList(s._serid, s.serid, s.servers, s.server_ids, s.storage_servers, map?.[String(stid)]),
         sgids: seridList(s.sgid, s.sgids, s.server_groups),
         totalGb: numOrNull(s.size ?? s.total ?? s.total_size),
         freeGb: numOrNull(s.free ?? s.free_size ?? s.available),

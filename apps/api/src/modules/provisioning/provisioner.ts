@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { VirtualizorClient, pickStorage } from "./virtualizor";
+import { VirtualizorClient, storagesOfNode, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 
 export class ProvisionError extends Error {
@@ -383,34 +383,48 @@ async function virtualizorCreate(svc: FullService) {
       const nodeRows = await prisma.serverNode.findMany({ where: { serverId: server.id }, select: { externalId: true, meta: true } });
       const sgidOf = (serid: number) => ((nodeRows.find((r) => r.externalId === String(serid))?.meta ?? {}) as { sgid?: string | null }).sgid ?? null;
       // up to 3 nodes; on each, try the ways a master may want the disk described before moving on
+      const anyMapped = storages.some((x) => x.serids.length || x.sgids.length);
+      const diskGb = p.diskGb ?? 0;
+      const rank = (list: VirtStorage[]) =>
+        [...new Map(list.map((x) => [x.stid, x])).values()]
+          .filter((x) => x.freeGb === null || x.freeGb >= diskGb)
+          .sort((a, b) => Number(b.primary) - Number(a.primary) || (b.freeGb ?? 0) - (a.freeGb ?? 0));
       for (const n of candidates.slice(0, 3)) {
-        const st = pickStorage(storages, String(n.serid), p.diskGb ?? 0, sgidOf(n.serid));
-        const attempts: { label: string; storage?: { stid: number; uuid?: string | null }; diskMode: "scalar" | "array" | "plan" }[] = [];
-        if (st) attempts.push({ label: `storage ${st.name} (id ${st.stid}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})`, storage: { stid: st.stid, uuid: st.uuid }, diskMode: st.uuid ? "array" : "scalar" });
-        attempts.push({ label: "node's primary storage", diskMode: "scalar" });
-        if (mc.planId) attempts.push({ label: "Virtualizor plan defaults", diskMode: "plan" });
-        await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}`);
+        // 1) what Virtualizor's own Create VPS form offers for this node, 2) storages the list ties to it,
+        // 3) when the master doesn't map storage to nodes at all: every storage (a wrong one is just refused)
+        const own = await client.storagesForServer(n.serid).catch(() => [] as VirtStorage[]);
+        const mapped = rank([...own, ...storagesOfNode(storages, String(n.serid), sgidOf(n.serid))]);
+        const guesses = mapped.length || anyMapped ? [] : rank(storages);
+        const attempts: { label: string; storage?: { stid: number; uuid?: string | null }; diskMode: "scalar" | "array" | "plan" }[] = [
+          ...[...mapped, ...guesses].slice(0, 8).map((st) => ({
+            label: `storage ${st.name} (id ${st.stid}${st.freeGb !== null ? `, ${Math.round(st.freeGb)} GB free` : ""})`,
+            storage: { stid: st.stid, uuid: st.uuid },
+            diskMode: (st.uuid ? "array" : "scalar") as "array" | "scalar",
+          })),
+          { label: "node's primary storage", diskMode: "scalar" },
+          ...(mc.planId ? [{ label: "Virtualizor plan defaults", diskMode: "plan" as const }] : []),
+        ];
+        await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}${attempts.length > 2 ? ` (${attempts.length} ways to try)` : ""}`);
         const errs: string[] = [];
-        for (const [i, a] of attempts.entries()) {
+        for (const a of attempts) {
           try {
             vpsid = await client.createVps({ ...base, serverId: n.serid, storage: a.storage, diskMode: a.diskMode });
-            if (i > 0) await log(svc.id, "create", true, `Created on ${n.name} using ${a.label}`);
+            if (a !== attempts[0]) await log(svc.id, "create", true, `Created on ${n.name} using ${a.label}`);
             await prisma.service.update({ where: { id: svc.id }, data: { node: String(n.serid) } });
             break;
           } catch (e) {
             if (!isStorageError(e)) throw e;
             errs.push(`${a.label}: ${short(e)}`);
-            const next = attempts[i + 1];
-            await log(svc.id, "create", false, `Node ${n.name} refused ${a.label} (${short(e)})${next ? ` — trying ${next.label}` : ""}`, i === 0 ? { storages } : undefined);
           }
         }
         if (vpsid) break;
-        tried.push(`${n.name} → ${errs.join(" / ")}`);
-        await log(svc.id, "create", false, `Node ${n.name} has no usable storage — trying the next node`);
+        const distinct = [...new Set(errs.map((x) => x.replace(/^.*?: /, "")))];
+        tried.push(`${n.name} (${attempts.length} tries: ${distinct.join(" / ")})`);
+        await log(svc.id, "create", false, `Node ${n.name} refused all ${attempts.length} storage options — trying the next node`, { attempts: errs, storagesOffered: own, storagesListed: storages });
       }
       if (!vpsid)
         throw new ProvisionError(
-          `Virtualizor refused the disk on every node tried: ${tried.join("; ")}. In Virtualizor open Storage and make sure these nodes have a storage ticked as “Primary storage” with room for ${p.diskGb ?? "the plan's"} GB, and that the Virtualizor plan's disk fits. Admin → Node Monitoring → Storage shows what the panel sees.`,
+          `No storage could be used on ${tried.join("; ")}. In Virtualizor → Storage, add or edit a storage, attach it to these servers and tick “Primary storage” (it needs ${p.diskGb ?? "the plan's"} GB free). Admin → Node Monitoring shows the storage each node reports.`,
           false,
         );
     }

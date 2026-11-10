@@ -119,6 +119,8 @@ test("WHMCS legacy crypto round-trips and rejects a wrong key", () => {
 });
 
 test("WHMCS import: dry run writes nothing, real run imports everything, re-run is idempotent", async () => {
+  // the 198.19.<oct>.x range comes from 200 slots — free addresses left by an earlier run
+  await prisma.ipAddress.deleteMany({ where: { address: { startsWith: `198.19.${oct}.` } } });
   const data = fakeWhmcs();
   const opts = { entities: [...ENTITIES], ccEncryptionHash: CC, overwritePricing: false };
 

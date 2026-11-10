@@ -255,14 +255,23 @@ adminInfra.get(
     const results = await Promise.all(
       servers.map(async (srv) => {
         try {
-          const raw = await virtualizorFor(srv).storagesRaw();
+          const client = virtualizorFor(srv);
+          const raw = await client.storagesRaw();
           const storages = parseStorages(raw);
+          // per node: what Virtualizor's own Create VPS form offers, else what the storage list ties to it
           const byNode = Object.fromEntries(
-            srv.nodes.filter((n) => n.externalId !== null).map((n) => [n.externalId!, storagesOfNode(storages, n.externalId!, ((n.meta ?? {}) as { sgid?: string | null }).sgid ?? null)]),
+            await Promise.all(
+              srv.nodes
+                .filter((n) => n.externalId !== null)
+                .map(async (n) => {
+                  const own = await client.storagesForServer(Number(n.externalId)).catch(() => []);
+                  return [n.externalId!, own.length ? own : storagesOfNode(storages, n.externalId!, ((n.meta ?? {}) as { sgid?: string | null }).sgid ?? null)] as const;
+                }),
+            ),
           );
           // the raw reply (trimmed) lets staff/support see exactly what the master reports
           const rawText = JSON.stringify(raw.storage ?? raw.storages ?? raw, null, 1).slice(0, 6000);
-          return { serverId: srv.id, serverName: srv.name, ok: true, storages, byNode, mappingKnown: storages.some((x) => x.serids.length || x.sgids.length), raw: rawText };
+          return { serverId: srv.id, serverName: srv.name, ok: true, storages, byNode, mappingKnown: storages.some((x) => x.serids.length || x.sgids.length) || Object.values(byNode).some((l) => l.length), raw: rawText };
         } catch (e) {
           return { serverId: srv.id, serverName: srv.name, ok: false, error: (e as Error).message };
         }
