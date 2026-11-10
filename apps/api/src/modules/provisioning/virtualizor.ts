@@ -173,6 +173,52 @@ export class VirtualizorClient {
     return this.call<Record<string, unknown>>("addvs", { virt, serid, slave_server: serid }, undefined, { cookies: name ? { [`${name}_server`]: String(serid) } : {} });
   }
 
+  /**
+   * Free IPv4 addresses Virtualizor offers for a node in its Create VPS form (its own pools). null when
+   * the master doesn't include the list — then the panel can't check and lets Virtualizor assign.
+   */
+  async formFreeIps(serid: number | string, virt: string): Promise<Set<string> | null> {
+    const r = await this.addvsForm(serid, virt);
+    const list = r.ips as Record<string, { ip?: string }> | { ip?: string }[] | undefined;
+    if (!list || typeof list !== "object") return null;
+    const ips = (Array.isArray(list) ? list : Object.values(list)).map((x) => String(x?.ip ?? "")).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    return new Set(ips);
+  }
+
+  /**
+   * Power state codes for many VPSes in one call (act=vs&vs_status=1,2,3 — the official SDK's status()):
+   * 1 = online, 0 = offline, 2 = suspended.
+   */
+  async vpsStatus(vpsids: (string | number)[]): Promise<Record<string, number>> {
+    if (!vpsids.length) return {};
+    const r = await this.call<{ status?: Record<string, unknown> }>("vs", { vs_status: vpsids.join(",") });
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(r.status ?? {})) {
+      const code = typeof v === "object" && v !== null ? Number((v as Record<string, unknown>).status ?? (v as Record<string, unknown>).stat) : Number(v);
+      if (Number.isFinite(code)) out[k] = code;
+    }
+    return out;
+  }
+
+  /**
+   * Replace a VPS's IPv4 addresses the way the official WHMCS module changes a package: read the VPS
+   * from the edit form, swap the ips list, post it back with editvps=1. With no list given, the same
+   * number of free IPs from Virtualizor's own pools for that node are used.
+   */
+  async replaceIps(vpsid: string, newIps?: string[]): Promise<string[]> {
+    const form = await this.call<{ vps?: Record<string, unknown>; ips?: Record<string, { ip?: string }> | { ip?: string }[] }>("editvs", { vpsid });
+    const vps = form.vps;
+    if (!vps) throw new VirtualizorError(`Virtualizor didn't return VPS ${vpsid} for editing`, form);
+    const current = Object.values((vps.ips ?? {}) as Record<string, string>).map(String).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    const free = (Array.isArray(form.ips) ? form.ips : Object.values(form.ips ?? {})).map((x) => String(x?.ip ?? "")).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    const want = newIps?.length ? newIps : free.filter((ip) => !current.includes(ip)).slice(0, Math.max(1, current.length));
+    if (!want.length) throw new VirtualizorError("Virtualizor has no free IPs for this VPS's node", form);
+    const post: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(vps)) if (v === null || typeof v !== "object") post[k] = v;
+    await this.call("editvs", { vpsid }, { ...post, hostname: vps.hostname, ips: want, editvps: 1 });
+    return want;
+  }
+
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
   }

@@ -8,6 +8,7 @@ import { api, CYCLES, date, gb, invNo, money } from "@/lib/api";
 import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, toast, useApi } from "@/components/ui";
 import { Sparkline } from "@/components/sparkline";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
+import { LiveBadge } from "@/components/live-state";
 
 export default function ServicePage() {
   const { id } = useParams<{ id: string }>();
@@ -78,9 +79,8 @@ export default function ServicePage() {
         <Card className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className={`h-3 w-3 rounded-full ${running ? "bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,.2)]" : live ? "bg-slate-400" : "bg-amber-400"}`} />
               <div>
-                <div className="text-sm font-extrabold text-ink">{live ? (running ? "Running" : live.state ?? "Unknown") : "Checking status…"}</div>
+                <div className="flex items-center gap-2"><LiveBadge state={live?.state} reason={live?.reason} loading={!live} className="text-[13px]" />{live?.state === "locked" && <span className="text-xs text-mute">A task is running on this server — try again in a minute</span>}</div>
                 {live?.uptimeSec ? <div className="text-xs text-mute">Up {Math.floor(live.uptimeSec / 3600)}h {Math.floor((live.uptimeSec % 3600) / 60)}m</div> : null}
               </div>
             </div>

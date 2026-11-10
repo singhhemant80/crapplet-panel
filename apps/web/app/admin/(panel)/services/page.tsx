@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { date, money } from "@/lib/api";
 import { Badge, Card, Input, Loading, PageHeader, Pager, Select, Table, Td, useApi } from "@/components/ui";
+import { LiveBadge, useLiveStates } from "@/components/live-state";
 
 function Services() {
   const sp = useSearchParams();
@@ -13,6 +14,8 @@ function Services() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const { data, loading } = useApi(`/admin/services?page=${page}&status=${status}&vps=${vps}&q=${encodeURIComponent(query)}`, [page, status, vps, query]);
+  const liveIds = (data?.items ?? []).filter((s: any) => s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s: any) => s.id).join(",");
+  const live = useLiveStates(liveIds ? `/admin/live-states?ids=${liveIds}` : null);
   return (
     <>
       <PageHeader title="VPS & Services" subtitle="Every customer service. Open a VPS to run power actions, reinstall or suspend." />
@@ -31,7 +34,7 @@ function Services() {
                   <Td><Link href={`/admin/clients/${s.user.id}`} className="text-sm text-primary-dark">{s.user.email}</Link></Td>
                   <Td className="font-mono text-xs">{s.ips.map((i: any) => i.address).join(", ") || "—"}</Td>
                   <Td className="text-xs">{s.server?.name ?? "—"}{s.remoteId && <div className="text-mute">{s.node ? `${s.node} · ` : ""}#{s.remoteId}</div>}</Td>
-                  <Td><Badge status={s.status} /></Td>
+                  <Td><div className="flex flex-col items-start gap-1"><Badge status={s.status} />{s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) && <LiveBadge state={live.states[s.id]?.state} reason={live.states[s.id]?.reason} loading={live.loading} />}</div></Td>
                   <Td>{money(s.recurringAmount, s.currency)}</Td>
                   <Td className="whitespace-nowrap text-mute">{date(s.nextDueDate)}</Td>
                 </tr>

@@ -489,11 +489,25 @@ async function virtualizorCreate(svc: FullService) {
         }
         if (mc.planId) attempts.push({ label: "node's primary storage with the plan's sizes", diskMode: "scalar" });
         const virtMismatch = hints?.virts.length && !hints.virts.includes(virt) ? hints.virts : null;
+        // like the WHMCS module: IPs must be free IPs of this node in Virtualizor's own pools. A panel IP
+        // that Virtualizor doesn't list (typo'd range, another node's pool, already used) would be set on
+        // the VPS as-is — so only send panel IPs that Virtualizor confirms, else let it assign them.
+        let nodeIps = base.ips;
+        if (nodeIps.length) {
+          const free = await client.formFreeIps(n.serid, virt).catch(() => null);
+          const bad = free && free.size ? nodeIps.filter((ip) => !free.has(ip)) : [];
+          if (bad.length) {
+            if (mc.ipSource === "panel")
+              throw new ProvisionError(`${bad.join(", ")} ${bad.length === 1 ? "isn't a free IP" : "aren't free IPs"} of node ${n.name} in Virtualizor. Fix the range in IP Management (Sync from Virtualizor) or set “IPv4 addresses come from” to Automatic.`, false);
+            await log(svc.id, "create", true, `${bad.join(", ")} ${bad.length === 1 ? "isn't a free IP" : "aren't free IPs"} of ${n.name} in Virtualizor — letting Virtualizor assign the IPs`);
+            nodeIps = [];
+          }
+        }
         await log(svc.id, "create", true, `Placing VPS: ${n.reason} · ${attempts[0].label}${attempts.length > 2 ? ` (${attempts.length} ways to try)` : ""}`);
         const errs: string[] = [];
         for (const a of attempts) {
           try {
-            vpsid = await createOrAdopt({ ...base, serverId: n.serid, storage: a.storage, diskMode: a.diskMode });
+            vpsid = await createOrAdopt({ ...base, ips: nodeIps, numIps: ipCount, serverId: n.serid, storage: a.storage, diskMode: a.diskMode });
             if (a !== attempts[0]) await log(svc.id, "create", true, `Created on ${n.name} using ${a.label}`);
             await prisma.service.update({ where: { id: svc.id }, data: { node: String(n.serid) } });
             break;
@@ -514,18 +528,10 @@ async function virtualizorCreate(svc: FullService) {
         );
     }
   }
-  let addresses = ips.map((i) => i.address);
-  if (!usePanelIps) {
-    // Virtualizor picked the IPs — record them so the panel, invoices and rDNS know about them
-    addresses = await client.vpsIps(vpsid).catch(() => []);
-    for (const [n, address] of addresses.entries()) {
-      await prisma.ipAddress.upsert({
-        where: { address },
-        update: { status: "ALLOCATED", serviceId: svc.id, serverId: server.id, isPrimary: n === 0, reservedById: null, reservedOrderId: null, reservedUntil: null },
-        create: { address, version: 4, status: "ALLOCATED", serviceId: svc.id, serverId: server.id, isPrimary: n === 0, notes: "Assigned by Virtualizor" },
-      });
-    }
-  }
+  // record the IPs the VPS really has in Virtualizor (whatever was requested)
+  const actual = await client.vpsIps(vpsid).catch(() => [] as string[]);
+  const addresses = actual.length ? actual : ips.map((i) => i.address);
+  if (actual.length) await recordServiceIps(svc.id, server.id, actual);
   await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id } });
   await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
   return { password, username: "root", hostname, ip: addresses[0] ?? "" };
@@ -699,6 +705,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         return { ok: true };
       }
       case "sync": {
+        if (svc.product.provisioner === "VIRTUALIZOR" && svc.remoteId) return { ok: true, status: await syncVirtualizorService(svc.id) };
         const status = await liveStatus(svc.id);
         return { ok: true, status };
       }
@@ -724,6 +731,93 @@ export async function markCreateFailed(serviceId: string, error: string) {
 
 // ───────────────────────── read-only live data ─────────────────────────
 
+/**
+ * Make IP Management match the VPS: its real IPs become ALLOCATED to the service (first = primary);
+ * IPs the panel had given the service but the VPS doesn't have go back to the pool.
+ */
+export async function recordServiceIps(serviceId: string, serverId: string, actual: string[]) {
+  await prisma.$transaction(async (tx) => {
+    await tx.ipAddress.updateMany({
+      where: { serviceId, address: { notIn: actual } },
+      data: { serviceId: null, status: "AVAILABLE", isPrimary: false, reservedById: null, reservedOrderId: null, reservedUntil: null },
+    });
+    for (const [n, address] of actual.entries()) {
+      await tx.ipAddress.upsert({
+        where: { address },
+        update: { status: "ALLOCATED", serviceId, serverId, isPrimary: n === 0, reservedById: null, reservedOrderId: null, reservedUntil: null },
+        create: { address, version: 4, status: "ALLOCATED", serviceId, serverId, isPrimary: n === 0, notes: "Assigned by Virtualizor" },
+      });
+    }
+  });
+}
+
+export type LiveState = "running" | "stopped" | "suspended" | "locked" | "unknown";
+/** Virtualizor's status codes + the VPS row → one state with a human reason. */
+function virtualizorState(code: number | undefined, row: Record<string, unknown> = {}): { state: LiveState; reason?: string } {
+  const suspended = String(row.suspended ?? "0") !== "0" && row.suspended !== "" && row.suspended !== false;
+  if (suspended || code === 2) return { state: "suspended", reason: row.suspend_reason ? String(row.suspend_reason) : undefined };
+  const lock = row.locked ?? row.lock;
+  if (lock && String(lock) !== "0" && String(lock) !== "") return { state: "locked", reason: String(lock) === "1" ? "Locked by Virtualizor (a task is running)" : String(lock) };
+  if (code === 1) return { state: "running" };
+  if (code === 0) return { state: "stopped" };
+  if (row.status !== undefined) return { state: String(row.status) === "1" ? "running" : "stopped" };
+  return { state: "unknown" };
+}
+
+/** Live state for many services at once — one Virtualizor call per master (list pages, client area). */
+export async function liveStates(serviceIds: string[]) {
+  const svcs = await prisma.service.findMany({ where: { id: { in: serviceIds.slice(0, 200) }, remoteId: { not: null } }, include: { server: true, product: { select: { provisioner: true } } } });
+  const out: Record<string, { state: LiveState; reason?: string }> = {};
+  const byServer = new Map<string, typeof svcs>();
+  for (const s of svcs) if (s.server && s.product.provisioner === "VIRTUALIZOR") byServer.set(s.server.id, [...(byServer.get(s.server.id) ?? []), s]);
+  await Promise.all(
+    [...byServer.values()].map(async (list) => {
+      const codes = await virtualizorFor(list[0].server!).vpsStatus(list.map((s) => s.remoteId!)).catch(() => null);
+      for (const s of list) out[s.id] = codes ? virtualizorState(codes[s.remoteId!]) : { state: "unknown", reason: "Virtualizor didn't answer" };
+    }),
+  );
+  await Promise.all(
+    svcs
+      .filter((s) => s.product.provisioner === "PROXMOX")
+      .slice(0, 30)
+      .map(async (s) => {
+        const l = await liveStatus(s.id).catch(() => null);
+        out[s.id] = l ? { state: (l.state === "running" ? "running" : l.state === "stopped" ? "stopped" : "unknown") as LiveState } : { state: "unknown" };
+      }),
+  );
+  return out;
+}
+
+/** Pull the truth from Virtualizor for one service: IPs, node, hostname, state. */
+export async function syncVirtualizorService(serviceId: string) {
+  const svc = await loadService(serviceId);
+  if (svc.product.provisioner !== "VIRTUALIZOR" || !svc.server || !svc.remoteId) throw new ProvisionError("This service has no Virtualizor VPS yet", false);
+  const client = virtualizorFor(svc.server);
+  const r = await client.getVps(svc.remoteId);
+  const row = (r.vs?.[svc.remoteId] ?? Object.values(r.vs ?? {})[0]) as Record<string, unknown> | undefined;
+  if (!row) throw new ProvisionError(`VPS ${svc.remoteId} wasn't found on ${svc.server.name} — it may have been deleted in Virtualizor`, false);
+  const ips = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
+  if (ips.length) await recordServiceIps(svc.id, svc.server.id, ips);
+  await prisma.service.update({ where: { id: svc.id }, data: { ...(row.serid !== undefined ? { node: String(row.serid) } : {}), ...(row.hostname ? { hostname: String(row.hostname) } : {}) } });
+  const codes = await client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>);
+  const st = virtualizorState(codes[svc.remoteId], row);
+  await log(svc.id, "sync", true, `Synced from Virtualizor: ${ips.join(", ") || "no IPs"} · node ${row.serid ?? "?"} · ${st.state}`);
+  return { ips, node: row.serid ?? null, hostname: row.hostname ?? null, ...st };
+}
+
+/** Give the VPS correct IPs from Virtualizor's own pools for its node (or the given ones). */
+export async function replaceVirtualizorIps(serviceId: string, newIps?: string[]) {
+  const svc = await loadService(serviceId);
+  if (svc.product.provisioner !== "VIRTUALIZOR" || !svc.server || !svc.remoteId) throw new ProvisionError("This service has no Virtualizor VPS yet", false);
+  const client = virtualizorFor(svc.server);
+  const before = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
+  await client.replaceIps(svc.remoteId, newIps);
+  const after = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
+  if (after.length) await recordServiceIps(svc.id, svc.server.id, after);
+  await log(svc.id, "change_ip", true, `IPs changed in Virtualizor: ${before.join(", ") || "none"} → ${after.join(", ") || "?"}`);
+  return { before, after };
+}
+
 export async function liveStatus(serviceId: string) {
   const svc = await ensureNode(await loadService(serviceId));
   if (!svc.server || !svc.remoteId) return null;
@@ -742,9 +836,22 @@ export async function liveStatus(serviceId: string) {
     };
   }
   if (svc.product.provisioner === "VIRTUALIZOR") {
-    const r = await virtualizorFor(svc.server).getVps(svc.remoteId);
-    const v = Object.values(r.vs ?? {})[0] ?? {};
-    return { state: v.status === 1 || v.status === "1" ? "running" : "stopped", raw: v };
+    const client = virtualizorFor(svc.server);
+    const [r, codes] = await Promise.all([client.getVps(svc.remoteId), client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>)]);
+    const v = (r.vs?.[svc.remoteId] ?? Object.values(r.vs ?? {})[0] ?? {}) as Record<string, unknown>;
+    const st = virtualizorState(codes[svc.remoteId], v);
+    const n = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Number(x));
+    return {
+      ...st,
+      cpuPct: n(v.used_cpu ?? v.cpu_percent),
+      memUsedMb: n(v.used_ram),
+      memTotalMb: n(v.ram),
+      diskTotalGb: n(v.space),
+      bandwidthUsedGb: n(v.used_bandwidth),
+      bandwidthGb: n(v.bandwidth),
+      ips: Object.values((v.ips ?? {}) as Record<string, string>).map(String),
+      node: v.serid !== undefined ? String(v.serid) : undefined,
+    };
   }
   return null;
 }

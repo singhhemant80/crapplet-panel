@@ -13,7 +13,7 @@ import { adjustCredit, applyPayment, cancelInvoice, createInvoice, invoiceEmailV
 import { renderInvoicePdf } from "../billing/pdf";
 import { reviewOfflinePayment, refundTransaction } from "../payments/service";
 import { releaseOrderReservations } from "../ipam/service";
-import { liveStatus } from "../provisioning/provisioner";
+import { liveStates, liveStatus, replaceVirtualizorIps, syncVirtualizorService } from "../provisioning/provisioner";
 import { provisioningProgress } from "../provisioning/progress";
 import { queueEmail } from "../email/mailer";
 import { profileSchema, resolveStateCode, publicUser } from "../auth/routes";
@@ -361,6 +361,39 @@ adminCore.get(
   requireStaff("services.view"),
   ah(async (req, res) => {
     res.json({ live: await liveStatus(req.params.id).catch((e) => ({ error: String((e as Error).message) })) });
+  }),
+);
+
+/** Live state (online / offline / suspended / locked) for many services — one call per master. */
+adminCore.get(
+  "/live-states",
+  requireStaff("services.view"),
+  ah(async (req, res) => {
+    const ids = String(req.query.ids ?? "").split(",").filter(Boolean).slice(0, 200);
+    res.json({ states: await liveStates(ids) });
+  }),
+);
+
+/** Pull IPs, node, hostname and state from Virtualizor into the panel. */
+adminCore.post(
+  "/services/:id/virtualizor-sync",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const r = await syncVirtualizorService(req.params.id);
+    await audit({ actorId: req.user!.id, action: "service.virtualizor_sync", entity: "service", entityId: req.params.id, details: r });
+    res.json(r);
+  }),
+);
+
+/** Replace the VPS's IPs in Virtualizor with free IPs of its node (or the ones given). */
+adminCore.post(
+  "/services/:id/replace-ips",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ ips: z.array(z.string().ip({ version: "v4" })).max(32).optional() }), req.body ?? {});
+    const r = await replaceVirtualizorIps(req.params.id, b.ips);
+    await audit({ actorId: req.user!.id, action: "service.ips_replaced", entity: "service", entityId: req.params.id, details: r });
+    res.json(r);
   }),
 );
 

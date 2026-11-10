@@ -95,6 +95,12 @@ export async function productReadiness(productId: string): Promise<{ ready: bool
   } else if (free < Math.max(1, p.ipv4Count)) {
     add({ key: "ips", label: "IPv4 addresses", status: "error", detail: `${free} free IP${free === 1 ? "" : "s"} for this plan's server${serverIds.length === 1 ? "" : "s"}`, fix: type === "VIRTUALIZOR" ? "IP Management → Sync from Virtualizor, or add a subnet" : "Add a subnet in IP Management", href: "/admin/ips" });
   } else add({ key: "ips", label: "IPv4 addresses", status: free < 5 ? "warn" : "ok", detail: `${free} free${free < 5 ? " — running low" : ""}` });
+  if (type === "VIRTUALIZOR") {
+    // IPs typed in by hand for a Virtualizor master (not imported from its pools) are the usual cause of
+    // a VPS getting a wrong address — the panel now checks them against Virtualizor before use
+    const manual = await prisma.ipAddress.count({ where: { serverId: { in: serverIds }, status: "AVAILABLE", OR: [{ subnetId: null }, { subnet: { externalPoolId: null } }] } });
+    if (manual) add({ key: "ip-source", label: "IP ranges", status: "warn", detail: `${manual} free IP${manual === 1 ? " was" : "s were"} added by hand, not imported from Virtualizor — any that Virtualizor doesn't list as free for the node are skipped and Virtualizor assigns the IP instead`, fix: "IP Management → Sync from Virtualizor, then remove ranges that aren't in Virtualizor", href: "/admin/ips" });
+  }
 
   // node placement (Virtualizor)
   if (type === "VIRTUALIZOR" && (mc.placement === "least_loaded" || mc.placement === "fixed")) {

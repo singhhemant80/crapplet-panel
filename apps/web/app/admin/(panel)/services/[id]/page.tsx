@@ -2,6 +2,7 @@
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
+import { LiveBadge } from "@/components/live-state";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,7 +17,7 @@ export default function AdminService() {
   const [cred, setCred] = useState<any>(null);
   const [edit, setEdit] = useState<any>(null);
   useEffect(() => {
-    if (data?.service?.status === "ACTIVE" && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
+    if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
     if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "" });
   }, [data, id]);
   if (loading || !data || !edit) return <Loading />;
@@ -53,7 +54,30 @@ export default function AdminService() {
             <dt className="text-mute">Node / VMID</dt><dd className="font-semibold">{s.node ?? "—"} / {s.remoteId ?? "—"} {s.virtType && <span className="text-mute">({s.virtType})</span>}</dd>
             <dt className="text-mute">OS</dt><dd className="flex items-center gap-2 font-semibold">{s.osTemplate && <OsLogo os={s.osTemplate} size={22} className="rounded-md" />}{s.osTemplate?.name ?? "—"}</dd>
             <dt className="text-mute">IPs</dt><dd className="space-y-1">{s.ips.map((i: any) => <div key={i.id} className="flex items-center gap-1 font-mono text-[13px]">{i.address}{i.isPrimary && <Badge>primary</Badge>}<Copy text={i.address} /><span className="text-xs text-mute">{i.subnet?.cidr} gw {i.subnet?.gateway}</span></div>)}{!s.ips.length && "—"}</dd>
-            <dt className="text-mute">Live state</dt><dd className="font-semibold">{live ? (live.error ? <span className="text-rose-600">{live.error}</span> : `${live.state} · CPU ${live.cpuPct ?? "?"}% · RAM ${live.memUsedMb ?? "?"}/${live.memTotalMb ?? "?"} MB`) : "—"}</dd>
+            <dt className="text-mute">Live state</dt>
+            <dd className="font-semibold">
+              {live ? (
+                live.error ? <span className="text-rose-600">{live.error}</span> : (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <LiveBadge state={live.state} reason={live.reason} />
+                    {live.reason && <span className="text-xs font-normal text-mute">{live.reason}</span>}
+                    {[live.cpuPct != null && `CPU ${live.cpuPct}%`, live.memTotalMb != null && `RAM ${live.memUsedMb ?? "?"}/${live.memTotalMb} MB`, live.diskTotalGb != null && `${live.diskTotalGb} GB disk`, live.bandwidthGb != null && `BW ${live.bandwidthUsedGb ?? 0}/${live.bandwidthGb || "∞"} GB`].filter(Boolean).map((x) => <span key={x as string} className="text-xs font-normal text-slate-600">{x}</span>)}
+                  </span>
+                )
+              ) : s.remoteId ? <LiveBadge loading /> : "—"}
+            </dd>
+            {s.server?.type === "VIRTUALIZOR" && s.remoteId && (
+              <>
+                <dt className="text-mute">Virtualizor</dt>
+                <dd className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" icon="sync" onClick={async () => { try { const r = await api(`/admin/services/${id}/virtualizor-sync`, { body: {} }); toast.success(`Synced: ${r.ips.join(", ") || "no IPs"} · ${r.state}`); reload(); api(`/admin/services/${id}/live`).then((x) => setLive(x.live)).catch(() => {}); } catch (e: any) { toast.error(e.message); } }}>Sync from Virtualizor</Button>
+                  <Button size="sm" variant="outline" icon="swap_horiz" onClick={async () => { if (!confirm("Replace this VPS's IPs with free IPs from Virtualizor's pool for its node? The VPS will get new addresses — tell the customer.")) return; try { const r = await api(`/admin/services/${id}/replace-ips`, { body: {} }); toast.success(`IPs changed: ${r.before.join(", ") || "—"} → ${r.after.join(", ")}`); reload(); } catch (e: any) { toast.error(e.message); } }}>Use Virtualizor's free IPs</Button>
+                </dd>
+                {live && !live.error && live.ips?.length > 0 && live.ips.join(",") !== s.ips.map((i: any) => i.address).join(",") && (
+                  <><dt /><dd className="text-xs font-semibold text-amber-700">Virtualizor shows {live.ips.join(", ")} — click “Sync from Virtualizor” to update the panel.</dd></>
+                )}
+              </>
+            )}
             <dt className="text-mute">Credentials</dt><dd>{cred ? <span className="font-mono text-[13px]">{cred.username} / {cred.password} <Copy text={cred.password} /></span> : s.hasPassword ? <button className="text-sm font-bold text-primary-dark" onClick={() => api(`/admin/services/${id}/password`).then(setCred)}>Reveal (logged)</button> : "—"}</dd>
           </dl>
         </Card>

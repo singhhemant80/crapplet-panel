@@ -10,7 +10,7 @@ import { enqueueProvision } from "../../jobs/queues";
 import { profileSchema, resolveStateCode } from "../auth/routes";
 import { applyCreditToInvoice, createInvoice, invoiceLabel } from "../billing/invoices";
 import { renderInvoicePdf } from "../billing/pdf";
-import { assertClientCan, liveStatus, usageHistory } from "../provisioning/provisioner";
+import { assertClientCan, liveStates, liveStatus, usageHistory } from "../provisioning/provisioner";
 import { attachmentPath, openTicket, replyTicket, ticketUpload } from "../tickets/service";
 import { getSettings } from "../../lib/settings";
 
@@ -123,6 +123,15 @@ clientRouter.get(
       .map(({ message: _m, ...l }) => l);
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });
     res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy });
+  }),
+);
+
+/** Live state of all the customer's VPSes (Online / Offline / Suspended / Locked). */
+clientRouter.get(
+  "/services-live",
+  ah(async (req, res) => {
+    const mine = await prisma.service.findMany({ where: { userId: req.user!.id, status: { in: ["ACTIVE", "SUSPENDED"] }, remoteId: { not: null } }, select: { id: true } });
+    res.json({ states: await liveStates(mine.map((m) => m.id)) });
   }),
 );
 

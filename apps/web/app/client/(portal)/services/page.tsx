@@ -1,5 +1,6 @@
 "use client";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
+import { LiveBadge, useLiveStates } from "@/components/live-state";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -19,6 +20,7 @@ function Services() {
   const sp = useSearchParams();
   const status = sp.get("status") ?? "";
   const { data, loading } = useApi(`/client/services${status ? `?status=${status}` : ""}`, [status]);
+  const live = useLiveStates("/client/services-live");
   return (
     <>
       <PageHeader title="My Services" subtitle="Your VPS, hosting and other services." actions={<Button href="/order" icon="add">Order new</Button>} />
@@ -60,7 +62,10 @@ function Services() {
                       <div className="truncate text-sm text-mute">{s.hostname ?? "—"}</div>
                     </div>
                   </div>
-                  <Badge status={s.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge status={s.status} />
+                    {live.states[s.id] && <LiveBadge state={live.states[s.id].state} reason={live.states[s.id].reason} />}
+                  </div>
                 </div>
                 {vps && ["PENDING", "PROVISIONING", "FAILED"].includes(s.status) && (
                   <div className="mt-4 rounded-xl bg-[#fbf9ff] px-3 py-2.5">
