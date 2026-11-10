@@ -115,7 +115,7 @@ adminCore.get(
   ah(async (req, res) => {
     const user = await publicUser(req.params.id).catch(() => null);
     if (!user || user.type !== "CLIENT") throw notFound("Client not found");
-    const [services, invoices, tickets, domains, transactions, logins, ledger, notesUser] = await Promise.all([
+    const [services, invoices, tickets, domains, transactions, logins, ledger, notesUser, orders] = await Promise.all([
       prisma.service.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, include: { product: { select: { name: true } }, ips: { select: { address: true } } } }),
       prisma.invoice.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 50 }),
       prisma.ticket.findMany({ where: { userId: req.params.id }, orderBy: { lastReplyAt: "desc" }, take: 20, include: { department: true } }),
@@ -124,8 +124,9 @@ adminCore.get(
       prisma.loginHistory.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 15 }),
       prisma.creditLedger.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 30 }),
       prisma.user.findUnique({ where: { id: req.params.id }, select: { status: true } }),
+      prisma.order.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 50, select: { id: true, number: true, status: true, total: true, currency: true, createdAt: true } }),
     ]);
-    res.json({ client: { ...user, status: notesUser?.status }, services, invoices, tickets, domains, transactions, logins, ledger });
+    res.json({ client: { ...user, status: notesUser?.status }, services, invoices, tickets, domains, transactions, logins, ledger, orders });
   }),
 );
 

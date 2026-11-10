@@ -65,6 +65,67 @@ model User {
   reservedIps    IpAddress[]           @relation("IpReservedBy")
   paymentIntents PaymentIntent[]
   activity       ActivityLog[]         @relation("ActivityUser")
+  contacts       ClientContact[]
+  files          ClientFile[]
+  payMethods     PayMethod[]
+}
+
+/** Extra people on a customer's account (billing, technical…) — WHMCS "Contacts". */
+model ClientContact {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String   @default("")
+  email       String
+  phone       String?
+  companyName String?
+  /** which emails they get: general | invoice | support | product | domain */
+  emails      String[] @default([])
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+/** Files kept on a customer's account (contracts, KYC…). adminOnly files aren't shown to the customer. */
+model ClientFile {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  filename     String
+  storedAs     String
+  size         Int
+  mime         String?
+  adminOnly    Boolean  @default(true)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+/**
+ * A saved way to pay (card / UPI AutoPay / e-mandate / bank). Only the gateway's token or mandate id is
+ * kept (encrypted) — never card numbers. autopay = charge renewal invoices to it automatically.
+ */
+model PayMethod {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // CARD | UPI | MANDATE | BANK | OTHER
+  gateway    String // razorpay | cashfree | stripe | manual…
+  label      String // "HDFC Visa •••• 4242", "UPI AutoPay — name@okhdfc"
+  brand      String?
+  last4      String?
+  expiry     String? // MM/YY
+  tokenEnc   String? // gateway customer/token/mandate id, encrypted
+  isDefault  Boolean   @default(false)
+  autopay    Boolean   @default(false)
+  status     String    @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model ClientProfile {

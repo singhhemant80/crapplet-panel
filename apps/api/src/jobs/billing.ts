@@ -12,11 +12,11 @@ import { CYCLE_LABEL } from "../lib/money";
 
 const dayDiff = (a: Date, b: Date) => Math.round((istDayStart(a).getTime() - istDayStart(b).getTime()) / 86400000);
 
-export async function generateRenewalInvoices() {
+export async function generateRenewalInvoices(opts: { userId?: string } = {}) {
   const s = await getSettings();
   const horizon = addDays(new Date(), s.automation.invoiceDaysBeforeDue);
   const services = await prisma.service.findMany({
-    where: { status: { in: ["ACTIVE", "SUSPENDED"] }, billingCycle: { not: "ONETIME" }, nextDueDate: { lte: horizon, not: null }, recurringAmount: { gt: 0 } },
+    where: { ...(opts.userId ? { userId: opts.userId } : {}), status: { in: ["ACTIVE", "SUSPENDED"] }, billingCycle: { not: "ONETIME" }, nextDueDate: { lte: horizon, not: null }, recurringAmount: { gt: 0 } },
     include: { product: true, user: true, addons: { where: { status: "ACTIVE" }, include: { addon: true } } },
   });
   let created = 0;
@@ -40,7 +40,7 @@ export async function generateRenewalInvoices() {
   }
 
   // domain renewals
-  const domains = await prisma.domain.findMany({ where: { status: "ACTIVE", autoRenew: true, nextDueDate: { lte: addDays(new Date(), 30), not: null } }, include: { user: true } });
+  const domains = await prisma.domain.findMany({ where: { ...(opts.userId ? { userId: opts.userId } : {}), status: "ACTIVE", autoRenew: true, nextDueDate: { lte: addDays(new Date(), 30), not: null } }, include: { user: true } });
   for (const d of domains) {
     const periodStart = d.nextDueDate!;
     const exists = await prisma.invoiceItem.count({ where: { relId: d.id, type: "DOMAIN", periodStart, invoice: { status: { notIn: ["CANCELLED"] } } } });

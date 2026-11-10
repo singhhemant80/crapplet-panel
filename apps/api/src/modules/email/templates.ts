@@ -111,4 +111,9 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
     subject: "[Action needed] Provisioning failed for service {{serviceId}}",
     body: `<p>Provisioning of <b>{{productName}}</b> for {{clientEmail}} failed.</p><pre style="white-space:pre-wrap">{{error}}</pre>`,
   },
+  "staff.message": {
+    name: "Message from staff (Send Email on the client page)",
+    subject: "{{subject}}",
+    body: `<p>Hi {{name}},</p>{{{messageHtml}}}`,
+  },
 };
