@@ -10,6 +10,8 @@ import { adminAssignIp, importCidr, importCsv, logIp, setIpStatus } from "../ipa
 import { proxmoxFor, virtualizorFor } from "../provisioning/provisioner";
 import { checkServer } from "../../jobs/health";
 import { syncVirtualizorOs } from "../provisioning/virtualizor-os";
+import { syncVirtualizorIps } from "../provisioning/virtualizor-ips";
+import { productReadiness } from "./readiness";
 import { crud } from "./crud";
 
 export const adminInfra = Router();
@@ -265,6 +267,35 @@ adminInfra.patch(
     const n = await prisma.serverNode.update({ where: { id: req.params.id }, data: { enabled } });
     await audit({ actorId: req.user!.id, action: enabled ? "node.enabled" : "node.disabled", entity: "serverNode", entityId: n.id, details: { name: n.name } });
     res.json({ ok: true });
+  }),
+);
+
+/** Import IP pools + IPs from one Virtualizor master (or all with :serverId = "all") into IP Management. */
+adminInfra.post(
+  "/virtualizor/:serverId/sync-ips",
+  requireStaff("ips.manage"),
+  ah(async (req, res) => {
+    const servers = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", ...(req.params.serverId === "all" ? { enabled: true } : { id: req.params.serverId }) } });
+    if (!servers.length) throw badRequest("Add a Virtualizor server first (Infrastructure → Servers)");
+    const results = await Promise.all(
+      servers.map((s) =>
+        syncVirtualizorIps(s).then(
+          (r) => ({ serverId: s.id, serverName: s.name, ok: true as const, ...r }),
+          (e) => ({ serverId: s.id, serverName: s.name, ok: false as const, error: String((e as Error).message ?? e) }),
+        ),
+      ),
+    );
+    await audit({ actorId: req.user!.id, action: "ips.synced", entity: "server", entityId: req.params.serverId, details: results });
+    res.json({ results });
+  }),
+);
+
+/** Setup checklist for a plan (servers, connection, plan, OS, IPs, nodes, pricing). */
+adminInfra.get(
+  "/products/:id/readiness",
+  requireStaff("products.manage"),
+  ah(async (req, res) => {
+    res.json(await productReadiness(req.params.id));
   }),
 );
 

@@ -11,6 +11,7 @@ import { runBillingCycle } from "./jobs/billing";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
 import { syncVirtualizorOs } from "./modules/provisioning/virtualizor-os";
+import { syncVirtualizorIps } from "./modules/provisioning/virtualizor-ips";
 import { getSettings } from "./lib/settings";
 import { prisma } from "./db";
 import { executeMigrationRun } from "./modules/migration/service";
@@ -48,7 +49,13 @@ const maintenance = new Worker(
       case "sync-os": {
         // keep OS templates in step with every Virtualizor master
         const masters = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", enabled: true } });
-        return Promise.all(masters.map((m) => syncVirtualizorOs(m).catch((e) => ({ server: m.name, error: String(e.message ?? e) }))));
+        return Promise.all(
+          masters.map(async (m) => ({
+            server: m.name,
+            os: await syncVirtualizorOs(m).catch((e) => ({ error: String(e.message ?? e) })),
+            ips: await syncVirtualizorIps(m).catch((e) => ({ error: String(e.message ?? e) })),
+          })),
+        );
       }
       case "fx-rates": {
         if (!(await getSettings()).currency.autoUpdateRates) return { skipped: "auto-update off" };

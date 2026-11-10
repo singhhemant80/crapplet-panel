@@ -25,12 +25,7 @@ export default function AdminService() {
   return (
     <>
       <PageHeader back="/admin/services" title={<span className="flex items-center gap-3">{s.product.name} <Badge status={s.status} /></span>} subtitle={<span>{s.hostname} · <Link className="font-bold text-primary-dark" href={`/admin/clients/${s.user.id}`}>{s.user.email}</Link>{s.order && <> · order <Link className="font-bold text-primary-dark" href={`/admin/orders/${s.order.id}`}>{s.order.number}</Link></>}{s.reseller && ` · via reseller ${s.reseller.brandName}`}</span>} />
-      {s.status === "FAILED" && (
-        <Alert tone="error" className="mb-5">
-          <b>Provisioning failed.</b> {s.logs.find((l: any) => !l.success)?.message ?? "See the log below."}
-          <div className="mt-1 text-xs">Fix the cause (operating system, capacity, IPs) — e.g. change the OS under “Billing &amp; overrides” — then click Retry provisioning.</div>
-        </Alert>
-      )}
+      {s.status === "FAILED" && <FailurePanel s={s} />}
       <Card title="Actions" className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && <Button icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : "Provision now"}</Button>}
@@ -100,5 +95,36 @@ export default function AdminService() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** Why provisioning failed + the plan's setup checklist, so staff can fix it and retry. */
+function FailurePanel({ s }: { s: any }) {
+  const ready = useApi(`/admin/products/${s.product.id}/readiness`);
+  const err = s.logs.find((l: any) => !l.success);
+  const problems = (ready.data?.checks ?? []).filter((c: any) => c.status !== "ok");
+  return (
+    <div className="mb-5 overflow-hidden rounded-2xl border border-rose-200 bg-rose-50/70">
+      <div className="flex gap-3 px-5 py-4">
+        <Icon name="error" className="text-rose-600" />
+        <div className="min-w-0 text-sm">
+          <div className="font-extrabold text-rose-800">Provisioning failed{err ? ` · ${date(err.createdAt, true)}` : ""}</div>
+          <div className="mt-0.5 break-words text-rose-800">{err?.message ?? "See the log below."}</div>
+          <div className="mt-1 text-xs text-rose-700">Fix the cause, then click <b>Retry provisioning</b>. You can change the OS and node under “Billing &amp; overrides”.</div>
+        </div>
+      </div>
+      {problems.length > 0 && (
+        <ul className="divide-y divide-rose-100 border-t border-rose-100 bg-white/70">
+          {problems.map((c: any) => (
+            <li key={c.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 text-sm">
+              <Icon name={c.status === "warn" ? "warning" : "cancel"} className={c.status === "warn" ? "text-amber-500" : "text-rose-600"} />
+              <span className="font-semibold text-ink">{c.label}</span>
+              <span className="min-w-0 flex-1 text-mute">{c.detail}</span>
+              {c.fix && <a href={c.href ?? `/admin/products/${s.product.id}`} className="text-xs font-bold text-primary-dark hover:underline">{c.fix} →</a>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

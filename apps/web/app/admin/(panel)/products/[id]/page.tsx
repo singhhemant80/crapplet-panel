@@ -52,6 +52,15 @@ export default function ProductEditor() {
     }
   }, [isNew, prod.data]);
 
+  const readiness = useApi(isNew ? null : `/admin/products/${id}/readiness`, [id]);
+  // a VPS plan with no server ticked: pre-select the only matching server so orders can be built
+  useEffect(() => {
+    if (!p || !servers.data || p.serverIds.length) return;
+    const type = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : p.provisioner === "PROXMOX" ? "PROXMOX" : null;
+    const match = type ? servers.data.servers.filter((s: any) => s.type === type && s.enabled) : [];
+    if (match.length === 1) setP((cur: any) => ({ ...cur, serverIds: [match[0].id] }));
+  }, [p?.provisioner, servers.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!p) return <Loading />;
   const set = (patch: any) => setP({ ...p, ...patch });
   const usdRate: number | undefined = currencies.data?.items?.find((c: any) => c.code === "USD")?.rate;
@@ -90,6 +99,7 @@ export default function ProductEditor() {
         await api(`/admin/products/${id}`, { method: "PUT", body });
         toast.success("Product saved");
         prod.reload();
+        readiness.reload();
       }
     } catch (e: any) {
       toast.error(e.message);
@@ -101,6 +111,7 @@ export default function ProductEditor() {
   const srvType = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : "PROXMOX";
   return (
     <>
+      {!isNew && readiness.data && <Readiness data={readiness.data} onRecheck={readiness.reload} loading={readiness.loading} />}
       <PageHeader back="/admin/products" title={isNew ? "New product" : p.name} actions={<>{!isNew && <Button variant="danger" size="sm" onClick={() => confirm("Delete product?") && api(`/admin/products/${id}`, { method: "DELETE" }).then(() => router.replace("/admin/products")).catch((e) => toast.error(e.message))}>Delete</Button>}<Button loading={busy} icon="save" onClick={save}>Save product</Button></>} />
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title="Details">
@@ -224,7 +235,28 @@ export default function ProductEditor() {
         <Card title="Servers, operating systems & add-ons">
           {isVps && !p.serverIds.length && <Alert tone="warn" className="mb-3">Assign at least one {srvType === "PROXMOX" ? "Proxmox" : "Virtualizor"} server — its IP pool is what customers choose from.</Alert>}
           <div className="space-y-4">
-            <Chips label="Servers" items={(servers.data?.servers ?? []).filter((s: any) => !isVps || s.type === srvType).map((s: any) => ({ id: s.id, label: `${s.name} · ${s.freeIps} free IPs` }))} selected={p.serverIds} onToggle={(v) => toggleIn("serverIds", v)} />
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-[13px] font-bold text-slate-700">
+                <span>Servers {isVps && <span className="font-semibold text-mute">· VPS of this plan are built on the ticked server</span>}</span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(servers.data?.servers ?? []).filter((s: any) => !isVps || s.type === srvType).map((s: any) => {
+                  const on = p.serverIds.includes(s.id);
+                  return (
+                    <button key={s.id} type="button" onClick={() => toggleIn("serverIds", s.id)}
+                      className={cx("flex items-center gap-3 rounded-xl border p-3 text-left transition", on ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line bg-white hover:border-primary/40")}>
+                      <span className={cx("grid h-5 w-5 shrink-0 place-items-center rounded-md border-2", on ? "border-primary bg-primary text-white" : "border-slate-300")}>{on && <Icon name="check" className="text-[14px]" />}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-ink">{s.name}</span>
+                        <span className="block text-xs text-mute">{s.type === "VIRTUALIZOR" ? "Virtualizor" : "Proxmox"} · {s.freeIps} free IPs in panel{s.enabled ? "" : " · disabled"}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {isVps && !p.serverIds.length && <Alert tone="warn" className="mt-2">Tick the server new VPS should be built on.</Alert>}
+              {!(servers.data?.servers ?? []).some((s: any) => !isVps || s.type === srvType) && <span className="text-xs text-mute">None configured — add one under Infrastructure → Servers.</span>}
+            </div>
             {isVps && (
               <OsPicker
                 all={os.data?.items ?? []}
@@ -396,6 +428,13 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
           </div>
         </div>
       )}
+      <Field label="IPv4 addresses come from" hint={value.ipSource === "virtualizor" ? "Virtualizor assigns IPs from its pools; the panel records them after creation. Customers can't pick an IP." : value.ipSource === "panel" ? "Always use IP Management (sync pools from Virtualizor there). Customers can pick an IP." : "Uses IP Management when it has IPs for the server, otherwise lets Virtualizor assign them."}>
+        <Select value={value.ipSource ?? "auto"} onChange={(e) => onChange({ ipSource: e.target.value })}>
+          <option value="auto">Automatic (recommended)</option>
+          <option value="panel">IP Management (customer can choose)</option>
+          <option value="virtualizor">Virtualizor assigns</option>
+        </Select>
+      </Field>
       <Field label="Advanced: extra Virtualizor parameters" hint="One key=value per line, sent when the VPS is created — e.g. vnc=1, nic_type=virtio, kvm_cache=writeback. # starts a comment.">
         <Textarea rows={3} className="font-mono text-xs" value={value.extraParams ?? ""} placeholder={"vnc=1\nnic_type=virtio"} onChange={(e) => onChange({ extraParams: e.target.value })} />
       </Field>
@@ -482,6 +521,37 @@ function OsPicker({ all, provisioner, serverIds, virt, selected, onChange, onSyn
       <button type="button" className="text-xs font-bold text-primary-dark hover:underline" onClick={() => setShowAll(!showAll)}>
         {showAll ? "Show only matching templates" : `Show all templates (${all.length})`}
       </button>
+    </div>
+  );
+}
+
+/** Setup checklist from /admin/products/:id/readiness — so problems show up before customers order. */
+function Readiness({ data, onRecheck, loading }: { data: { ready: boolean; checks: any[] }; onRecheck: () => void; loading: boolean }) {
+  const [open, setOpen] = useState(!data.ready);
+  const bad = data.checks.filter((c) => c.status !== "ok");
+  const tone = data.ready ? (bad.length ? "amber" : "emerald") : "rose";
+  return (
+    <div className={cx("mb-5 overflow-hidden rounded-2xl border", tone === "rose" ? "border-rose-200 bg-rose-50/60" : tone === "amber" ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60")}>
+      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+        <Icon name={data.ready ? (bad.length ? "info" : "verified") : "error"} className={tone === "rose" ? "text-rose-600" : tone === "amber" ? "text-amber-600" : "text-emerald-600"} />
+        <span className="flex-1 text-sm font-bold text-ink">
+          {data.ready ? (bad.length ? `Ready to sell — ${bad.length} thing${bad.length === 1 ? "" : "s"} to look at` : "Ready to sell — every check passed") : `Not ready: ${data.checks.filter((c) => c.status === "error").length} problem(s) will stop orders from being provisioned`}
+        </span>
+        <span className="text-xs font-bold text-primary-dark" onClick={(e) => { e.stopPropagation(); onRecheck(); }}>{loading ? "Checking…" : "Re-check"}</span>
+        <Icon name={open ? "expand_less" : "expand_more"} className="text-mute" />
+      </button>
+      {open && (
+        <ul className="divide-y divide-black/5 border-t border-black/5 bg-white/70">
+          {data.checks.map((c) => (
+            <li key={c.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm">
+              <Icon name={c.status === "ok" ? "check_circle" : c.status === "warn" ? "warning" : "cancel"} className={cx("text-[20px]", c.status === "ok" ? "text-emerald-600" : c.status === "warn" ? "text-amber-500" : "text-rose-600")} />
+              <span className="w-44 font-semibold text-ink">{c.label}</span>
+              <span className="min-w-0 flex-1 text-mute">{c.detail}</span>
+              {c.fix && (c.href ? <a href={c.href} className="text-xs font-bold text-primary-dark hover:underline">{c.fix} →</a> : <span className="text-xs font-bold text-primary-dark">{c.fix}</span>)}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

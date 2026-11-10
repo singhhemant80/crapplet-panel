@@ -56,8 +56,13 @@ async function pickServer(svc: FullService): Promise<Server> {
     if (ip?.server?.enabled) return ip.server;
   }
   const type = svc.product.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : "PROXMOX";
-  const candidates = svc.product.servers.map((ps) => ps.server).filter((s) => s.enabled && s.type === type);
-  if (!candidates.length) throw new ProvisionError(`No enabled ${type} server is assigned to product "${svc.product.name}"`, false);
+  let candidates = svc.product.servers.map((ps) => ps.server).filter((s) => s.enabled && s.type === type);
+  if (!candidates.length) {
+    // nothing ticked on the plan: fall back to the enabled server(s) of the right type
+    candidates = await prisma.server.findMany({ where: { type, enabled: true } });
+    if (!candidates.length) throw new ProvisionError(`No enabled ${type === "VIRTUALIZOR" ? "Virtualizor" : "Proxmox"} server exists — add one under Infrastructure → Servers`, false);
+    await log(svc.id, "create", true, `Plan "${svc.product.name}" has no server ticked — using ${candidates.map((c) => c.name).join(" / ")} (tick it under Products → ${svc.product.name} → Servers)`);
+  }
   // prefer the server with the most free IPs (they all serve the product)
   const withIps = await Promise.all(
     candidates.map(async (s) => ({ s, free: await prisma.ipAddress.count({ where: { serverId: s.id, status: "AVAILABLE", version: 4 } }) })),
@@ -217,6 +222,8 @@ export type VirtualizorModuleConfig = {
   serverGroupId?: number | null;
   /** "key=value" per line, sent with addvs */
   extraParams?: string;
+  /** panel = IPs from IP Management (customer can choose); virtualizor = Virtualizor assigns from its pools; auto = panel if it has IPs for the server */
+  ipSource?: "auto" | "panel" | "virtualizor";
 };
 
 /** "vnc=1\nnic_type=virtio" → { vnc: "1", nic_type: "virtio" } (comments and blank lines ignored) */
@@ -237,8 +244,20 @@ export function parseExtraParams(text?: string): Record<string, string> {
  *  2. the plan's placement: fixed node / least-loaded allowed node (from the 5-minute monitoring data,
  *     skipping offline, locked, disabled and over-threshold nodes) / Virtualizor's own node_select.
  */
-export async function chooseVirtualizorNode(svc: { node: string | null }, server: Server, mc: VirtualizorModuleConfig): Promise<{ serid?: number; serverGroupId?: number; reason: string }> {
+export async function chooseVirtualizorNode(
+  svc: { node: string | null },
+  server: Server,
+  mc: VirtualizorModuleConfig,
+  /** nodes that can use the VPS's IP (from the Virtualizor pool the IP belongs to); empty = any */
+  ipNodes: string[] = [],
+): Promise<{ serid?: number; serverGroupId?: number; reason: string }> {
   if (svc.node && /^\d+$/.test(svc.node)) return { serid: Number(svc.node), reason: `node ${svc.node} chosen by staff` };
+  if (ipNodes.length) {
+    const allowed = mc.nodeIds?.length ? ipNodes.filter((n) => mc.nodeIds!.includes(n)) : ipNodes;
+    const pick = allowed.length ? allowed : ipNodes;
+    if (pick.length === 1) return { serid: Number(pick[0]), reason: `node ${pick[0]} — the only node attached to the IP's pool` };
+    mc = { ...mc, placement: "least_loaded", nodeIds: pick };
+  }
   const placement = mc.placement ?? (mc.slaveServerId !== undefined && mc.slaveServerId !== null ? "fixed" : "auto");
   if (placement === "fixed") {
     const id = mc.nodeIds?.[0] ?? (mc.slaveServerId !== undefined ? String(mc.slaveServerId) : undefined);
@@ -273,14 +292,25 @@ async function virtualizorCreate(svc: FullService) {
     if (!same?.virtualizorOsId) throw new ProvisionError(`"${svc.osTemplate.name}" isn't available on ${server.name} — sync OS templates for that master`, false);
     osId = same.virtualizorOsId;
   }
-  const ips = await prisma.$transaction((tx) =>
-    allocateIpsForService(tx, { serviceId: svc.id, userId: svc.userId, serverId: server.id, orderId: svc.orderId, requestedIpId: (cfg.requestedIpId as string) ?? null, count: Math.max(1, p.ipv4Count) }),
-  );
+  // IPs: from IP Management (customer-chosen or next free), or left to Virtualizor's own pools
+  const ipCount = Math.max(1, p.ipv4Count);
+  const panelHasIps = (await prisma.ipAddress.count({ where: { serverId: server.id, version: 4 } })) > 0;
+  const usePanelIps = mc.ipSource === "panel" || !!cfg.requestedIpId || (mc.ipSource !== "virtualizor" && panelHasIps);
+  if (mc.ipSource === "panel" && !panelHasIps) throw new ProvisionError(`IP Management has no IPs for "${server.name}" — click "Sync from Virtualizor" in IP Management or add a subnet`, false);
+  const ips = usePanelIps
+    ? await prisma.$transaction((tx) =>
+        allocateIpsForService(tx, { serviceId: svc.id, userId: svc.userId, serverId: server.id, orderId: svc.orderId, requestedIpId: (cfg.requestedIpId as string) ?? null, count: ipCount }),
+      )
+    : [];
+  // a Virtualizor pool is attached to specific nodes — the VPS must land on one of them
+  const ipNodes = ips.length
+    ? ((await prisma.ipAddress.findMany({ where: { id: { in: ips.map((i) => i.id) } }, include: { subnet: { select: { nodeIds: true } } } }))[0]?.subnet?.nodeIds ?? [])
+    : [];
   const password = svc.passwordEnc ? decrypt(svc.passwordEnc) : generatePassword(18);
   const hostname = (svc.hostname || `vps-${svc.id.slice(-6)}.crapplet.cloud`).toLowerCase();
   let vpsid = svc.remoteId;
   if (!vpsid) {
-    const placement = await chooseVirtualizorNode(svc, server, mc);
+    const placement = await chooseVirtualizorNode(svc, server, mc, ipNodes);
     await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root", ...(placement.serid !== undefined ? { node: String(placement.serid) } : {}) } });
     await log(svc.id, "create", true, `Placing VPS: ${placement.reason}`);
     vpsid = await client.createVps({
@@ -295,15 +325,28 @@ async function virtualizorCreate(svc: FullService) {
       rootPass: password,
       osId,
       ips: ips.map((i) => i.address),
+      numIps: ipCount,
       ramMb: p.ramMb ?? undefined,
       diskGb: p.diskGb ?? undefined,
       cores: p.cpuCores ?? undefined,
       bandwidthGb: p.bandwidthGb ?? 0,
     });
   }
+  let addresses = ips.map((i) => i.address);
+  if (!usePanelIps) {
+    // Virtualizor picked the IPs — record them so the panel, invoices and rDNS know about them
+    addresses = await client.vpsIps(vpsid).catch(() => []);
+    for (const [n, address] of addresses.entries()) {
+      await prisma.ipAddress.upsert({
+        where: { address },
+        update: { status: "ALLOCATED", serviceId: svc.id, serverId: server.id, isPrimary: n === 0, reservedById: null, reservedOrderId: null, reservedUntil: null },
+        create: { address, version: 4, status: "ALLOCATED", serviceId: svc.id, serverId: server.id, isPrimary: n === 0, notes: "Assigned by Virtualizor" },
+      });
+    }
+  }
   await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id } });
-  await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${ips.map((i) => i.address).join(", ")}`);
-  return { password, username: "root", hostname, ip: ips[0].address };
+  await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
+  return { password, username: "root", hostname, ip: addresses[0] ?? "" };
 }
 
 // ───────────────────────── dispatcher ─────────────────────────

@@ -102,6 +102,21 @@ export class VirtualizorClient {
   serverUsage(serid: number | string) {
     return this.call<{ usage?: Record<string, any>; info?: Record<string, any> }>("manageserver", { changeserid: serid });
   }
+  /** IP pools (ippid → gateway, netmask, servers…). */
+  ipPools() {
+    return this.call<{ ippools?: Record<string, Record<string, unknown>> }>("ippool", { page: 1, reslen: 1000 });
+  }
+  /** One page of IP addresses (ipid → ip, ippid, vpsid, locked…). */
+  ips(page = 1, reslen = 1000) {
+    return this.call<{ ips?: Record<string, Record<string, unknown>> }>("ips", { page, reslen });
+  }
+  /** Details of one VPS, including the IPs Virtualizor gave it. */
+  async vpsIps(vpsid: string): Promise<string[]> {
+    const r = await this.call<{ vs?: Record<string, { ips?: Record<string, string> | string[] }> }>("vs", { vpsid });
+    const v = r.vs?.[vpsid] ?? Object.values(r.vs ?? {})[0];
+    const raw = v?.ips ? (Array.isArray(v.ips) ? v.ips : Object.values(v.ips)) : [];
+    return raw.map(String).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+  }
   /** Server groups (used for automatic node selection). */
   serverGroups() {
     return this.call<{ servergroups?: Record<string, Record<string, unknown>> }>("servergroups");
@@ -125,7 +140,9 @@ export class VirtualizorClient {
     hostname: string;
     rootPass: string;
     osId: number;
+    /** IPs the panel allocated; leave empty to let Virtualizor assign `numIps` from its own pools */
     ips: string[];
+    numIps?: number;
     ramMb?: number;
     diskGb?: number;
     cores?: number;
@@ -143,8 +160,8 @@ export class VirtualizorClient {
       hostname: p.hostname,
       rootpass: p.rootPass,
       osid: p.osId,
-      ips: p.ips,
-      num_ips: p.ips.length || 1,
+      ...(p.ips.length ? { ips: p.ips } : {}),
+      num_ips: p.ips.length || p.numIps || 1,
       ram: p.ramMb,
       space: p.diskGb,
       cores: p.cores,

@@ -34,3 +34,11 @@ test("node placement: staff choice, fixed, least-loaded under limits, auto with 
   assert.equal(auto.serid, undefined);
   assert.equal(auto.serverGroupId, 7);
 });
+
+test("Virtualizor pools map to the right subnet", async () => {
+  const { poolCidr } = await import("../src/modules/provisioning/virtualizor-ips");
+  assert.deepEqual(poolCidr("163.5.191.1", "255.255.255.0"), { cidr: "163.5.191.0/24", prefix: 24 });
+  assert.deepEqual(poolCidr("10.0.0.65", "255.255.255.192"), { cidr: "10.0.0.64/26", prefix: 26 });
+  assert.deepEqual(poolCidr("10.0.0.1", "28"), { cidr: "10.0.0.0/28", prefix: 28 });
+});
+

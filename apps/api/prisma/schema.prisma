@@ -507,6 +507,9 @@ model IpSubnet {
   location   Location?   @relation(fields: [locationId], references: [id])
   vlan       Int?
   notes      String?
+  /// imported from a Virtualizor IP pool: its ippid and the node serids the pool is attached to (empty = all)
+  externalPoolId Int?
+  nodeIds    String[]    @default([])
   createdAt  DateTime    @default(now())
   ips        IpAddress[]
 }

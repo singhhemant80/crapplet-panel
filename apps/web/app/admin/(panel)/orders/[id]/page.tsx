@@ -209,6 +209,7 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
         <div className="mt-4 rounded-xl bg-rose-50 p-3 text-xs text-rose-800 ring-1 ring-rose-100">
           <div className="mb-0.5 font-extrabold uppercase tracking-wider">Last error · {date(lastError.createdAt, true)}</div>
           <div className="break-words">{lastError.message}</div>
+          <Link href={`/admin/products/${s.product.id}`} className="mt-1 inline-block font-bold text-primary-dark hover:underline">Check the plan's setup →</Link>
         </div>
       )}
 
