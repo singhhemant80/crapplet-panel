@@ -33,6 +33,15 @@ export default function Migration() {
     return () => clearInterval(t);
   }, [active, runs.reload]);
 
+  // ticking a step also ticks what it needs (a service needs its client and plan); unticking a step unticks what needs it
+  const dep: Record<string, string[]> = runs.data?.depends ?? {};
+  const needs = (e: string, acc = new Set<string>()): Set<string> => { for (const d of dep[e] ?? []) if (!acc.has(d)) { acc.add(d); needs(d, acc); } return acc; };
+  function toggleEntity(e: string, on: boolean) {
+    if (on) return [...new Set([...entities, e, ...needs(e)])];
+    return entities.filter((x) => x !== e && !needs(x).has(e));
+  }
+  const requiredBy = (e: string) => entities.filter((x) => x !== e && needs(x).has(e));
+
   async function test() {
     setBusy("test");
     setConnErr(null); try { setInfo(await api("/admin/migration/whmcs/test", { body: { connection: conn } })); } catch (e: any) { toast.error("Couldn't connect to the WHMCS database — see the details below"); setConnErr(e.message); setInfo(null); } finally { setBusy(null); }
@@ -92,8 +101,8 @@ export default function Migration() {
             <div className="grid gap-2 sm:grid-cols-2">
               {(runs.data?.entities ?? []).map((e: string) => (
                 <label key={e} className={cx("flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-sm", entities.includes(e) ? "border-primary bg-primary-tint font-semibold" : "border-line")}>
-                  <input type="checkbox" className="accent-[#7c3aed]" checked={entities.includes(e)} onChange={(ev) => setEntities(ev.target.checked ? [...entities, e] : entities.filter((x) => x !== e))} />
-                  {LABELS[e] ?? e}
+                  <input type="checkbox" className="accent-[#7c3aed]" checked={entities.includes(e)} onChange={(ev) => setEntities(toggleEntity(e, ev.target.checked))} />
+                  <span className="min-w-0">{LABELS[e] ?? e}{entities.includes(e) && requiredBy(e).length > 0 && <span className="block text-[11px] font-normal text-mute">needed by {requiredBy(e).map((x) => (LABELS[x] ?? x).split(" (")[0]).join(", ")}</span>}</span>
                   {runs.data?.mapped?.[e.replace(/s$/, "")] ? <span className="ml-auto text-xs text-mute">{runs.data.mapped[e.replace(/s$/, "")]} linked</span> : null}
                 </label>
               ))}

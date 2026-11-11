@@ -96,7 +96,7 @@ test("WHMCS import: dry run writes nothing, real run imports everything, re-run 
   const suspended = await prisma.service.findFirstOrThrow({ where: { hostname: "legacy.sharma.in", userId: ravi.id } });
   assert.equal(suspended.status, "SUSPENDED");
   assert.equal(suspended.overrideAutoSuspend, true);
-  assert.equal(suspended.serverId, null, "cPanel server not mapped");
+  assert.equal((await prisma.server.findUniqueOrThrow({ where: { id: suspended.serverId! } })).type, "CPANEL", "cPanel server imported and linked");
   assert.equal(suspended.passwordEnc, null, "undecryptable password left empty");
   assert.ok(res.warnings.some((w) => /could not be decrypted/.test(w.message)));
   const dead = await prisma.ipAddress.findUnique({ where: { address: `198.19.${oct}.30` } });
@@ -172,6 +172,24 @@ test("WHMCS import: dry run writes nothing, real run imports everything, re-run 
   assert.equal(ravi2.phone, "+91.9000000001");
   assert.equal(await prisma.ticketMessage.count({ where: { ticketId: t.id } }), 5);
   assert.equal(await prisma.ipAddress.count({ where: { serviceId: svc.id } }), 3);
+});
+
+test("services import even when plans weren't ticked; deleted plans go to a placeholder; cPanel servers import; placeholder GSTINs are dropped quietly", async () => {
+  const data = fakeWhmcs();
+  data.tblhosting.push({ id: id(44), userid: id(10), packageid: 777777, regdate: "2024-01-01", domain: "old-plan.sharma.in", amount: "99.00", billingcycle: "Monthly", nextduedate: "2026-12-01", domainstatus: "Active" });
+  data.tblclients[1].tax_id = "NA";
+  // only "Services" ticked — exactly what left 3,485 services skipped before
+  const r = await runWhmcsImport(source(data), { entities: ["services"], ccEncryptionHash: CC, overwritePricing: false, dryRun: true });
+  assert.equal(r.counts.services.created + r.counts.services.updated, 4, "3 normal services + 1 on the placeholder plan (the orphan without a client is skipped)");
+  assert.equal(r.counts.services.skipped, 1);
+  assert.ok(r.counts.products, "plans step ran automatically");
+  assert.ok(r.counts.clients, "clients step ran automatically");
+  assert.ok(r.warnings.some((w) => w.entity === "products" && /included automatically/.test(w.message)));
+  assert.ok(r.warnings.some((w) => /plan #777777 no longer exists in WHMCS/.test(w.message)));
+  assert.ok(!r.warnings.some((w) => /cPanel1: module/.test(w.message)), "cPanel server is no longer rejected");
+  assert.ok(!r.warnings.some((w) => /module "cpanel" has no equivalent/.test(w.message)));
+  assert.ok(!r.warnings.some((w) => /"NA"/.test(w.message)), "placeholder GSTIN dropped without a warning");
+  for (const e of ["services", "products", "productGroups", "clients", "servers", "orders", "addons", "currencies"]) assert.ok(r.counts[e], `${e} appears in the report`);
 });
 
 test("default entity list excludes staff", () => {

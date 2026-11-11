@@ -97,6 +97,29 @@ export const ENTITIES = [
 export type Entity = (typeof ENTITIES)[number];
 export const DEFAULT_ENTITIES: Entity[] = ENTITIES.filter((e) => e !== "staff");
 
+/** Steps another step can't work without (a service needs its client and its plan). */
+export const ENTITY_DEPENDS: Partial<Record<Entity, Entity[]>> = {
+  products: ["productGroups", "currencies"],
+  addons: ["products"],
+  promotions: ["products"],
+  orders: ["clients"],
+  services: ["clients", "products", "servers", "orders", "addons"],
+  domains: ["clients"],
+  invoices: ["clients"],
+  transactions: ["invoices"],
+  tickets: ["clients"],
+  affiliates: ["clients"],
+};
+/** The selected steps plus everything they depend on. */
+export function withDependencies(list: readonly Entity[]): Entity[] {
+  const out = new Set<Entity>(list);
+  const add = (e: Entity) => {
+    for (const d of ENTITY_DEPENDS[e] ?? []) if (!out.has(d)) { out.add(d); add(d); }
+  };
+  for (const e of list) add(e);
+  return ENTITIES.filter((e) => out.has(e));
+}
+
 export interface ImportOptions {
   entities: Entity[];
   dryRun: boolean;
@@ -185,7 +208,8 @@ export async function inspectSource(src: SourceDb) {
 
 export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgress: Progress = () => {}): Promise<ImportResult> {
   const started = Date.now();
-  const want = (e: Entity) => opts.entities.includes(e);
+  const entities = withDependencies(opts.entities);
+  const want = (e: Entity) => entities.includes(e);
   const since = opts.historySince ? new Date(opts.historySince) : null;
   const counts: Record<string, Counts> = {};
   const warnings: ImportResult["warnings"] = [];
@@ -193,6 +217,8 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
   const warn = (entity: string, id: unknown, message: string) => {
     if (warnings.length < 5000) warnings.push({ entity, id: String(id), message });
   };
+  for (const e of entities) c(e); // every step shows in the report, even when nothing was found
+  for (const e of entities.filter((e) => !opts.entities.includes(e))) warn(e, "*", `included automatically — ${entities.filter((x) => ENTITY_DEPENDS[x]?.includes(e)).join(", ")} needs it`);
 
   // read everything up front (outside the write transaction)
   const T = async (name: string) => src.table(name);
@@ -263,7 +289,11 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         if (!email || !email.includes("@")) { warn("clients", r.id, "no valid email — skipped"); c("clients").skipped++; continue; }
         const country = (str(r.country) || "IN").toUpperCase().slice(0, 2);
         let gstin: string | null = (str(r.tax_id) || str(cfValue(gstFields, r.id))).toUpperCase().replace(/\s/g, "") || null;
-        if (gstin && !GSTIN_RE.test(gstin)) { warn("clients", r.id, `${email}: invalid GSTIN "${gstin}" not imported`); gstin = null; }
+        if (gstin && !GSTIN_RE.test(gstin)) {
+          // "NA", "NIL", "0", "INDIA"… are placeholders, not GST numbers — drop them quietly; warn only for near-misses
+          if (/^[0-9]{2}[A-Z0-9]{11,14}$/.test(gstin)) warn("clients", r.id, `${email}: GSTIN "${gstin}" fails the GST format check — not imported (fix it on the client if it's real)`);
+          gstin = null;
+        }
         let pan: string | null = str(cfValue(panFields, r.id)).toUpperCase() || null;
         if (pan && !PAN_RE.test(pan)) pan = null;
         const state = str(r.state);
@@ -333,14 +363,17 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
     if (want("servers")) {
       for (const s of servers) {
         const type = str(s.type).toLowerCase();
-        const kind = type.includes("proxmox") ? "PROXMOX" : type.includes("virtualizor") ? "VIRTUALIZOR" : null;
+        const kind = type.includes("proxmox") ? "PROXMOX" : type.includes("virtualizor") ? "VIRTUALIZOR" : type === "cpanel" || type === "whm" ? "CPANEL" : null;
         if (!kind) { warn("servers", s.id, `${s.name}: module "${type}" has no equivalent here — services on it are imported as manual`); c("servers").skipped++; continue; }
         if (get("server", s.id)) { c("servers").skipped++; continue; }
-        const secret = whmcsDecrypt(s.password, opts.ccEncryptionHash ?? "") ?? "";
-        if (s.password && !secret) warn("servers", s.id, `${s.name}: could not decrypt the stored password (check cc_encryption_hash)`);
+        // WHM: the access hash / API token works as-is ("WHM root:<key>"); others need the decrypted password
+        const accessHash = kind === "CPANEL" ? str(s.accesshash).replace(/\s+/g, "") : "";
+        const secret = accessHash || (whmcsDecrypt(s.password, opts.ccEncryptionHash ?? "") ?? "");
+        if (!secret && kind === "CPANEL") warn("servers", s.id, `${s.name}: no WHM API token in WHMCS — create one in WHM (Manage API Tokens) and add it to the server here`);
+        else if (s.password && !secret) warn("servers", s.id, `${s.name}: could not decrypt the stored password — enter the cc_encryption_hash, or set the credentials on the server here`);
         const local = await tx.server.create({
           data: {
-            name: `${str(s.name)} (WHMCS)`, type: kind, hostname: str(s.hostname) || str(s.ipaddress), port: Number(s.port) || (kind === "PROXMOX" ? 8006 : 4085),
+            name: `${str(s.name)} (WHMCS)`, type: kind, hostname: str(s.hostname) || str(s.ipaddress), port: Number(s.port) || (kind === "PROXMOX" ? 8006 : kind === "CPANEL" ? 2087 : 4085),
             apiUser: nul(s.username), apiSecretEnc: secret ? encrypt(secret) : null, verifyTls: false, enabled: false,
           },
         });
@@ -392,18 +425,22 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
           let slug = slugify(str(p.name));
           if (await tx.product.findUnique({ where: { slug } })) slug = `${slug}-${p.id}`;
           const st = str(p.servertype).toLowerCase();
-          const provisioner = st.includes("proxmox") ? "PROXMOX" : st.includes("virtualizor") ? "VIRTUALIZOR" : "MANUAL";
+          const provisioner = st.includes("proxmox") ? "PROXMOX" : st.includes("virtualizor") ? "VIRTUALIZOR" : st === "cpanel" ? "CPANEL" : "MANUAL";
+          const isVm = provisioner === "PROXMOX" || provisioner === "VIRTUALIZOR";
+          // WHMCS cPanel module: configoption1 = WHM package name
+          const moduleConfig = provisioner === "CPANEL" ? { cpanel: { package: nul(p.configoption1) ?? undefined, reseller: str(p.type) === "reselleraccount" } } : {};
           const created = await tx.product.create({
             data: {
               groupId: gid, legacyPid: Number(p.id), name: str(p.name), slug, type: guessType(str(p.name), groupName.get(String(p.gid)) ?? "", str(p.type)) as never,
-              description: nul(p.description), provisioner, allowIpSelection: provisioner !== "MANUAL", ipv4Count: provisioner !== "MANUAL" ? 1 : 0,
+              description: nul(p.description), provisioner, allowIpSelection: isVm, ipv4Count: isVm ? 1 : 0, moduleConfig,
               enabled: !Number(p.retired), hidden: !!Number(p.hidden), sortOrder: Number(p.order) || 0, autoSetup: provisioner === "MANUAL" ? "MANUAL" : "ON_PAYMENT",
               pricing: { create: prices },
             },
           });
           if (serverIds.length) await tx.productServer.createMany({ data: serverIds.map((serverId) => ({ productId: created.id, serverId })), skipDuplicates: true });
           await setMap("product", p.id, created.id);
-          if (provisioner !== "MANUAL") warn("products", p.id, `${p.name}: set CPU/RAM/disk and OS templates before selling it again`);
+          if (isVm) warn("products", p.id, `${p.name}: set CPU/RAM/disk and OS templates before selling it again`);
+          if (provisioner === "CPANEL" && !nul(p.configoption1)) warn("products", p.id, `${p.name}: no WHM package set in WHMCS — choose one on the product before selling it`);
           c("products").created++;
         }
         await tick("products", i, products.length);
@@ -475,14 +512,33 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         const bucket = /^(vpsid|vps ?id|vmid|vm ?id|vserverid|proxmox ?(vm)? ?id)$/i.test(name) ? vmFields : /^node$/i.test(name) ? nodeFields : null;
         if (bucket) (bucket.get(String(f.relid)) ?? bucket.set(String(f.relid), new Set()).get(String(f.relid))!).add(String(f.id));
       }
+      // plan / currency lookups for services
+      const sourcePids = new Set(products.map((p) => String(p.id)));
+      if (!products.length && hosting.length) warn("services", "*", "tblproducts is empty in this WHMCS data — services are linked to plans already in this panel (by WHMCS pid) or to a placeholder plan");
+      const clientCurrency = new Map(clientRows.map((r) => [String(r.id), currencyCode.get(String(r.currency)) ?? defaultCurrency]));
+      const placeholder = new Map<string, string>();
+      const productFor = async (pid: unknown): Promise<string | undefined> => {
+        const mapped = get("product", pid) ?? (await tx.product.findUnique({ where: { legacyPid: Number(pid) || -1 } }))?.id;
+        if (mapped) return mapped;
+        // the plan was deleted in WHMCS (or never exported): keep the service on a hidden placeholder plan
+        const key = String(pid);
+        if (placeholder.has(key)) return placeholder.get(key);
+        const group = (await tx.productGroup.upsert({ where: { slug: "imported" }, update: {}, create: { name: "Imported from WHMCS", slug: "imported", hidden: true, sortOrder: 99 } })).id;
+        const slug = `whmcs-plan-${key}`;
+        const p = (await tx.product.findUnique({ where: { slug } })) ?? (await tx.product.create({ data: { groupId: group, name: `WHMCS plan #${key}${sourcePids.has(key) ? "" : " (deleted)"}`, slug, type: "VPS_LINUX" as never, provisioner: "MANUAL", hidden: true, enabled: false, autoSetup: "MANUAL", description: "Placeholder for services whose plan no longer exists in WHMCS" } }));
+        placeholder.set(key, p.id);
+        warn("services", "*", `plan #${key} ${sourcePids.has(key) ? "couldn't be imported" : "no longer exists in WHMCS"} — its services were put on the hidden placeholder plan "${p.name}"`);
+        return p.id;
+      };
       let i = 0;
       let undecrypted = 0;
       for (const h of hosting) {
         i++;
         await tick("services", i, hosting.length);
         const userId = get("client", h.userid);
-        const productId = get("product", h.packageid);
-        if (!userId || !productId) { warn("services", h.id, `${h.domain || "service"}: ${!userId ? "client" : "product"} not imported — skipped`); c("services").skipped++; continue; }
+        if (!userId) { warn("services", h.id, `${h.domain || "service"}: client #${h.userid} wasn't imported (see the clients warnings) — skipped`); c("services").skipped++; continue; }
+        const productId = await productFor(h.packageid);
+        if (!productId) { warn("services", h.id, `${h.domain || "service"}: plan #${h.packageid} not found — skipped`); c("services").skipped++; continue; }
         const cycle = CYCLE_MAP[str(h.billingcycle).toLowerCase()] ?? "MONTHLY";
         const status = SERVICE_STATUS[str(h.domainstatus).toLowerCase()] ?? "ACTIVE";
         let passwordEnc: string | null = null;
@@ -517,7 +573,7 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
           c("services").updated++;
         } else {
           const created = await tx.service.create({
-            data: { ...data, userId, productId, orderId: get("order", h.orderid) ?? null, currency: "INR", firstAmount: paise(h.firstpaymentamount), registrationDate: dt(h.regdate) ?? new Date(), virtType: product.provisioner === "MANUAL" ? null : product.virtType, config: { importedFrom: "whmcs", whmcsId: String(h.id) } },
+            data: { ...data, userId, productId, orderId: get("order", h.orderid) ?? null, currency: clientCurrency.get(String(h.userid)) ?? defaultCurrency, firstAmount: paise(h.firstpaymentamount), registrationDate: dt(h.regdate) ?? new Date(), virtType: product.provisioner === "PROXMOX" || product.provisioner === "VIRTUALIZOR" ? product.virtType : null, config: { importedFrom: "whmcs", whmcsId: String(h.id) } },
           });
           localId = created.id;
           await setMap("service", h.id, localId);
@@ -544,7 +600,7 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
             : await tx.ipAddress.create({ data: { address, version: v6 ? 6 : 4, status: "ALLOCATED", serviceId: localId, isPrimary: idx === 0, serverId: data.serverId } });
           if (!ip || ip.serviceId !== localId) await tx.ipHistory.create({ data: { ipId: row.id, action: "allocated", fromStatus: ip?.status ?? null, toStatus: "ALLOCATED", userId, serviceId: localId, note: `imported from WHMCS service #${h.id}` } });
         }
-        if (product.provisioner !== "MANUAL" && status === "ACTIVE" && !remoteId) warn("services", h.id, `${h.domain || h.id}: no VM/VPS id custom field found — set it on the service to enable power controls`);
+        if ((product.provisioner === "PROXMOX" || product.provisioner === "VIRTUALIZOR") && status === "ACTIVE" && !remoteId) warn("services", h.id, `${h.domain || h.id}: no VM/VPS id custom field found — set it on the service to enable power controls`);
       }
       if (undecrypted) warn("services", "*", `${undecrypted} service passwords could not be decrypted (wrong or missing cc_encryption_hash) — customers can use "Reset password"`);
       // hosting add-ons

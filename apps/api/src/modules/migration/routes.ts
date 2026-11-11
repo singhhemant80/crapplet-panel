@@ -6,7 +6,7 @@ import { encryptJson } from "../../lib/crypto";
 import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
 import { migrationQueue } from "../../jobs/queues";
-import { DEFAULT_ENTITIES, ENTITIES, inspectSource, mysqlSource } from "./whmcs";
+import { DEFAULT_ENTITIES, ENTITIES, ENTITY_DEPENDS, inspectSource, mysqlSource } from "./whmcs";
 import { dumpRouter, readState } from "./dumps";
 
 export const migrationRouter = Router();
@@ -73,7 +73,7 @@ migrationRouter.get(
   ah(async (_req, res) => {
     const runs = await prisma.migrationRun.findMany({ orderBy: { createdAt: "desc" }, take: 30, select: { id: true, status: true, dryRun: true, entities: true, summary: true, error: true, createdAt: true, startedAt: true, finishedAt: true, progress: true } });
     const mapped = await prisma.legacyMap.groupBy({ by: ["entity"], where: { source: "whmcs" }, _count: true });
-    res.json({ runs, mapped: Object.fromEntries(mapped.map((m) => [m.entity, m._count])), entities: ENTITIES, defaults: DEFAULT_ENTITIES });
+    res.json({ runs, mapped: Object.fromEntries(mapped.map((m) => [m.entity, m._count])), entities: ENTITIES, defaults: DEFAULT_ENTITIES, depends: ENTITY_DEPENDS });
   }),
 );
 
