@@ -2,7 +2,7 @@
  * Turns low-level connection errors (undici / Node) into a message that says what to check.
  * Used by the Proxmox and Virtualizor clients so "Test connection" explains the problem.
  */
-export function explainNetError(e: unknown, host: string, port: number, panel: "Virtualizor" | "Proxmox"): Error {
+export function explainNetError(e: unknown, host: string, port: number, panel: "Virtualizor" | "Proxmox" | "WHM"): Error {
   const err = e as { code?: string; cause?: { code?: string; message?: string }; message?: string };
   const code = err?.code ?? err?.cause?.code ?? "";
   const raw = err?.message ?? String(e);

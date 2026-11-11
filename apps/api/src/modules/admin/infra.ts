@@ -39,6 +39,7 @@ const serverSchema = z.object({
   maxRamPct: z.number().int().min(10).max(100).default(90),
   maxDiskPct: z.number().int().min(10).max(100).default(90),
   maxServices: z.number().int().min(0).default(0),
+  nameservers: z.array(z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Nameservers look like ns1.example.com")).max(4).optional(),
   enabled: z.boolean().default(true),
 });
 
@@ -104,6 +105,38 @@ adminInfra.post(
   ah(async (req, res) => {
     const s = await prisma.server.findUniqueOrThrow({ where: { id: req.params.id } });
     res.json(await checkServer(s.id));
+  }),
+);
+
+/** WHM packages and reseller ACL lists on a cPanel server (for the product editor). */
+adminInfra.get(
+  "/servers/:id/cpanel-packages",
+  requireStaff("catalog.manage"),
+  ah(async (req, res) => {
+    const s = await prisma.server.findUniqueOrThrow({ where: { id: req.params.id } });
+    if (s.type !== "CPANEL") throw badRequest("Not a cPanel/WHM server");
+    const { whmFor } = await import("../provisioning/cpanel-provisioner");
+    const w = whmFor(s);
+    const [packages, acls] = await Promise.all([w.packages(), w.aclLists()]).catch((e: Error) => {
+      throw badRequest(`Couldn't read packages from ${s.name}: ${e.message}`);
+    });
+    res.json({ packages, acls });
+  }),
+);
+
+/** Staff: one-click login to WHM as the API user (root). */
+adminInfra.post(
+  "/servers/:id/whm-login",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const s = await prisma.server.findUniqueOrThrow({ where: { id: req.params.id } });
+    if (s.type !== "CPANEL") throw badRequest("Not a cPanel/WHM server");
+    const { whmFor } = await import("../provisioning/cpanel-provisioner");
+    const url = await whmFor(s).loginUrl(s.apiUser || "root", "whostmgrd").catch((e: Error) => {
+      throw badRequest(e.message);
+    });
+    await audit({ actorId: req.user!.id, action: "server.whm_login", entity: "server", entityId: s.id });
+    res.json({ url });
   }),
 );
 

@@ -12,6 +12,7 @@ import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
 import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, storagesOfNode, type NodeHints, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
+import { HostingError, cpanelChangePackage, cpanelCreate, cpanelPassword, cpanelStatus, cpanelSuspend, cpanelTerminate, cpanelUnsuspend } from "./cpanel-provisioner";
 
 export class ProvisionError extends Error {
   constructor(message: string, public retryable = true) {
@@ -576,6 +577,19 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
     switch (action) {
       case "create": {
         if (svc.status === "ACTIVE") return { skipped: "already active" };
+        if (prov === "CPANEL") {
+          await prisma.service.update({ where: { id: svc.id }, data: { status: "PROVISIONING" } });
+          await log(svc.id, "create", true, `Provisioning started — hosting account${svc.status === "FAILED" ? " (retry)" : ""}`);
+          const r = await cpanelCreate(svc);
+          const host = r.server.hostname.replace(/^https?:\/\//, "").replace(/[:/].*$/, "");
+          await queueEmail(
+            "service.hosting_ready",
+            svc.user.email,
+            { ...vars, domain: r.domain, username: r.username, password: r.password, ip: r.ip, serverHost: host, cpanelUrl: `https://${host}:2083`, whmUrl: r.reseller ? `https://${host}:2087` : "", webmailUrl: `https://${host}:2096`, nameservers: r.nameservers.join(", "), reseller: r.reseller ? "yes" : "" },
+            svc.userId,
+          );
+          return { ok: true, username: r.username };
+        }
         if (prov !== "PROXMOX" && prov !== "VIRTUALIZOR") {
           await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE" } });
           await queueEmail("service.activated", svc.user.email, vars, svc.userId);
@@ -589,7 +603,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
       }
       case "suspend": {
         const reason = String(params.reason ?? "Suspended by administrator");
-        if (prov === "PROXMOX") {
+        if (prov === "CPANEL") await cpanelSuspend(svc, reason);
+        else if (prov === "PROXMOX") {
           const { server, remoteId, node } = requireRemote(svc);
           const c = proxmoxFor(server);
           const st = await c.guestStatus(node, kindOf(svc), remoteId);
@@ -604,7 +619,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         return { ok: true };
       }
       case "unsuspend": {
-        if (prov === "PROXMOX") {
+        if (prov === "CPANEL") await cpanelUnsuspend(svc);
+        else if (prov === "PROXMOX") {
           const { server, remoteId, node } = requireRemote(svc);
           await proxmoxFor(server).power(node, kindOf(svc), remoteId, "start");
         } else if (prov === "VIRTUALIZOR") {
@@ -617,7 +633,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         return { ok: true };
       }
       case "terminate": {
-        if (svc.remoteId && svc.server) {
+        if (prov === "CPANEL") await cpanelTerminate(svc);
+        else if (svc.remoteId && svc.server) {
           if (prov === "PROXMOX" && svc.node) {
             const c = proxmoxFor(svc.server);
             const kind = kindOf(svc);
@@ -640,6 +657,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
       case "stop":
       case "shutdown":
       case "reboot": {
+        if (prov === "CPANEL") throw new ProvisionError("Power actions don't apply to hosting accounts", false);
         if (svc.status !== "ACTIVE") throw new ProvisionError(`Power actions are not allowed while the service is ${svc.status}`, false);
         const { server, remoteId, node } = requireRemote(svc);
         if (prov === "PROXMOX") await proxmoxFor(server).power(node, kindOf(svc), remoteId, action);
@@ -653,7 +671,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
       case "reset_password": {
         const { server, remoteId, node } = requireRemote(svc);
         const password = (params.password as string) || generatePassword(18);
-        if (prov === "PROXMOX") {
+        if (prov === "CPANEL") await cpanelPassword(svc, password);
+        else if (prov === "PROXMOX") {
           if (kindOf(svc) === "lxc") throw new ProvisionError("Password reset for LXC containers is not supported by the Proxmox API — use Reinstall", false);
           const c = proxmoxFor(server);
           await c.setConfig(node, "qemu", remoteId, { cipassword: password });
@@ -664,7 +683,16 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         await log(svc.id, action, true);
         return { ok: true };
       }
+      case "change_package": {
+        if (prov !== "CPANEL") throw new ProvisionError("Package changes are for hosting accounts", false);
+        const pkg = String(params.package ?? "");
+        if (!pkg) throw new ProvisionError("Choose the WHM package", false);
+        await cpanelChangePackage(svc, pkg);
+        await log(svc.id, action, true, `Package changed to ${pkg}`);
+        return { ok: true };
+      }
       case "reinstall": {
+        if (prov === "CPANEL") throw new ProvisionError("Reinstall doesn't apply to hosting accounts", false);
         const osTemplateId = String(params.osTemplateId ?? svc.osTemplateId);
         const os = await prisma.osTemplate.findUniqueOrThrow({ where: { id: osTemplateId } });
         const password = generatePassword(18);
@@ -701,7 +729,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
     const msg = e instanceof Error ? e.message : String(e);
     await log(svc.id, action, false, msg);
     if (action === "create") {
-      const retryable = !(e instanceof ProvisionError) || e.retryable;
+      const retryable = e instanceof ProvisionError || e instanceof HostingError ? e.retryable : true;
       if (!retryable) await markCreateFailed(svc.id, msg);
     }
     throw e;
@@ -757,6 +785,8 @@ export async function liveStates(serviceIds: string[]) {
   const out: Record<string, { state: LiveState; reason?: string }> = {};
   const byServer = new Map<string, typeof svcs>();
   for (const s of svcs) if (s.server && s.product.provisioner === "VIRTUALIZOR") byServer.set(s.server.id, [...(byServer.get(s.server.id) ?? []), s]);
+  // hosting accounts: the panel's own status is authoritative (WHM has no cheap bulk status call)
+  for (const s of svcs) if (s.product.provisioner === "CPANEL") out[s.id] = { state: s.status === "SUSPENDED" ? "suspended" : s.status === "ACTIVE" ? "running" : "unknown" };
   await Promise.all(
     [...byServer.values()].map(async (list) => {
       const codes = await virtualizorFor(list[0].server!).vpsStatus(list.map((s) => s.remoteId!)).catch(() => null);
@@ -807,6 +837,10 @@ export async function replaceVirtualizorIps(serviceId: string, newIps?: string[]
 }
 
 export async function liveStatus(serviceId: string) {
+  {
+    const s = await loadService(serviceId);
+    if (s.product.provisioner === "CPANEL") return s.server && s.remoteId ? cpanelStatus(s) : { state: "unknown" as const, reason: "Not created yet" };
+  }
   const svc = await ensureNode(await loadService(serviceId));
   if (!svc.server || !svc.remoteId) return null;
   if (svc.product.provisioner === "PROXMOX" && svc.node) {

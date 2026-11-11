@@ -65,6 +65,22 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
 <tr><td>Operating system</td><td>{{os}}</td></tr></table>
 <p>Manage your server at <a href="{{appUrl}}/client/services/{{serviceId}}">your client area</a>. Please change the password after your first login.</p>`,
   },
+  "service.hosting_ready": {
+    name: "Hosting account ready (cPanel)",
+    subject: "Your hosting for {{domain}} is ready",
+    body: `<p>Hi {{name}},</p><p>Your <b>{{productName}}</b> account for <b>{{domain}}</b> is ready.</p>
+<table style="border-collapse:collapse;margin:12px 0">
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">cPanel</td><td><a href="{{cpanelUrl}}">{{cpanelUrl}}</a></td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">Username</td><td><b>{{username}}</b></td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">Password</td><td><b>{{password}}</b></td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">Webmail</td><td><a href="{{webmailUrl}}">{{webmailUrl}}</a></td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">Server IP</td><td>{{ip}}</td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#64748b">Nameservers</td><td>{{nameservers}}</td></tr>
+</table>
+<p>Point your domain's nameservers to the ones above (or an A record to the server IP). DNS changes can take a few hours to spread.</p>
+<p>You can also open cPanel with one click from your client area: <a href="{{appUrl}}/client/services/{{serviceId}}">{{appUrl}}/client/services/{{serviceId}}</a></p>
+<p style="color:#64748b">Reseller accounts can manage their customers in WHM: {{whmUrl}}</p>`,
+  },
   "service.activated": {
     name: "Service activated",
     subject: "Your {{productName}} service is active",

@@ -12,13 +12,16 @@ type Resolver = Awaited<ReturnType<typeof priceResolver>>;
  * Root password chosen at order time. 10–64 characters with lower case, upper case and a digit; no
  * spaces, quotes or backslashes (they break cloud-init / hypervisor APIs).
  */
-export const rootPasswordSchema = z
-  .string()
-  .min(10, "Root password must be at least 10 characters")
-  .max(64, "Root password can be at most 64 characters")
-  .regex(/^[\x21-\x7e]+$/, "Root password can't contain spaces or non-ASCII characters")
-  .refine((v) => !/['"`\\]/.test(v), "Root password can't contain quotes or backslashes")
-  .refine((v) => /[a-z]/.test(v) && /[A-Z]/.test(v) && /\d/.test(v), "Root password needs upper case, lower case and a number");
+const passwordRules = (what: string) =>
+  z
+    .string()
+    .min(10, `${what} must be at least 10 characters`)
+    .max(64, `${what} can be at most 64 characters`)
+    .regex(/^[\x21-\x7e]+$/, `${what} can't contain spaces or non-ASCII characters`)
+    .refine((v) => !/['"`\\]/.test(v), `${what} can't contain quotes or backslashes`)
+    .refine((v) => /[a-z]/.test(v) && /[A-Z]/.test(v) && /\d/.test(v), `${what} needs upper case, lower case and a number`);
+export const rootPasswordSchema = passwordRules("Root password");
+export const hostingPasswordSchema = passwordRules("Password");
 
 export const cartItemSchema = z.object({
   productId: z.string(),

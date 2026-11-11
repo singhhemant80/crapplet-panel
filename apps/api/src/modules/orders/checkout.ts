@@ -44,6 +44,13 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
         if (isVps && !item.osTemplateId && p.osTemplates.length) throw badRequest(`Please choose an operating system for ${p.name}`);
         if (item.ipId && (!p.allowIpSelection || p.provisioner === "VIRTUALIZOR")) throw badRequest(`${p.name} does not support choosing an IP address — IPs are assigned by Virtualizor`);
         if (item.ipId && item.quantity > 1) throw badRequest("A selected IP can only be used for a single server");
+        if (p.provisioner === "CPANEL") {
+          const d = (item.hostname ?? "").trim().toLowerCase();
+          if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) throw badRequest(`Enter the domain name for ${p.name} (e.g. example.com)`);
+          if (item.quantity > 1) throw badRequest(`Order ${p.name} once per domain`);
+          const taken = await tx.service.findFirst({ where: { hostname: d, product: { provisioner: "CPANEL" }, status: { in: ["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED"] } }, select: { id: true } });
+          if (taken) throw conflict(`${d} already has a hosting account with us`);
+        }
 
         for (let q = 0; q < item.quantity; q++) {
           let serverId = item.serverId ?? null;

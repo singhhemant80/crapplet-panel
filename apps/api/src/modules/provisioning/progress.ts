@@ -32,8 +32,8 @@ export interface Progress {
   now: Date;
 }
 
-const PLACED = /^(Placing VPS|Cloned template|Created container)/;
-const CREATED = /^(Virtualizor VPS \S+ created|VPS \S+ running on|Created container)/;
+const PLACED = /(?:^(Placing VPS|Cloned template|Created container))|^cPanel server chosen/;
+const CREATED = /(?:^(Virtualizor VPS \S+ created|VPS \S+ running on|Created container))|^cPanel account \S+ created|^Found the existing cPanel account/;
 
 async function jobInfo(serviceId: string) {
   try {
@@ -58,6 +58,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   });
   const admin = audience === "admin";
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
+  const isHosting = s.product.provisioner === "CPANEL";
   const logs = s.logs;
   // only look at the latest attempt: everything after the last "Provisioning started"
   const lastStart = [...logs].reverse().find((l) => l.message?.startsWith("Provisioning started"));
@@ -81,9 +82,9 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
       at: inv?.paidAt ?? null,
     },
     { key: "queue", label: "Queued for setup", state: "pending" },
-    { key: "server", label: isVps ? "Server selected" : "Setting up", state: "pending" },
-    { key: "create", label: isVps ? "Creating your VPS" : "Activating", state: "pending" },
-    { key: "ready", label: isVps ? "Ready — login details emailed" : "Active", state: "pending" },
+    { key: "server", label: isVps || isHosting ? "Server selected" : "Setting up", state: "pending" },
+    { key: "create", label: isVps ? "Creating your VPS" : isHosting ? "Creating your cPanel account" : "Activating", state: "pending" },
+    { key: "ready", label: isVps || isHosting ? "Ready — login details emailed" : "Active", state: "pending" },
   ];
   const at = (k: Step["key"]) => steps.find((x) => x.key === k)!;
 
@@ -101,7 +102,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     for (const st of steps) if (st.state !== "done") st.state = "done";
     at("ready").at = created?.createdAt ?? null;
   }
-  if (!isVps && s.status === "ACTIVE") at("server").state = "done";
+  if (!isVps && !isHosting && s.status === "ACTIVE") at("server").state = "done";
 
   const failed = s.status === "FAILED";
   const error = failed || (job?.state === "delayed" && job.lastError) || job?.state === "failed" ? lastFail?.message ?? job?.lastError ?? null : null;

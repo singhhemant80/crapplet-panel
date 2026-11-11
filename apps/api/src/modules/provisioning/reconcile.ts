@@ -28,7 +28,7 @@ export async function clearStaleServiceLocks() {
 export async function reconcileProvisioning() {
   const quiet = new Date(Date.now() - 10 * 60_000);
   const stuck = await prisma.service.findMany({
-    where: { status: "PROVISIONING", updatedAt: { lt: quiet }, product: { provisioner: { in: ["PROXMOX", "VIRTUALIZOR"] } } },
+    where: { status: "PROVISIONING", updatedAt: { lt: quiet }, product: { provisioner: { in: ["PROXMOX", "VIRTUALIZOR", "CPANEL"] } } },
     select: { id: true, updatedAt: true, logs: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } } },
     take: 50,
   });

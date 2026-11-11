@@ -1,12 +1,6 @@
 import { SessionProvider } from "@/lib/session";
-import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 
+/** Sign-in pages get the website header/footer ((auth)/layout); the portal has its own app shell. */
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
-      <SiteHeader />
-      <div className="min-h-[60vh]">{children}</div>
-      <SiteFooter />
-    </SessionProvider>
-  );
+  return <SessionProvider>{children}</SessionProvider>;
 }

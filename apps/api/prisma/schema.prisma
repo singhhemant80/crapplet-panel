@@ -258,6 +258,7 @@ enum Provisioner {
   VIRTUALIZOR
   MANUAL
   NONE
+  CPANEL
 }
 
 enum VirtType {
@@ -494,6 +495,7 @@ enum ServerType {
   PROXMOX
   VIRTUALIZOR
   MANUAL
+  CPANEL
 }
 
 model Server {
@@ -516,6 +518,8 @@ model Server {
   maxRamPct     Int        @default(90)
   maxDiskPct    Int        @default(90)
   maxServices   Int        @default(0)
+  /// cPanel: nameservers shown to customers in the welcome email and client area
+  nameservers   String[]   @default([])
   enabled       Boolean    @default(true)
   lastCheckAt   DateTime?
   lastStatus    Json?

@@ -62,6 +62,7 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
     group: p.group ? { name: p.group.name, slug: p.group.slug } : undefined,
     specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4Count: p.ipv4Count, ipv6: p.ipv6Enabled, virtType: p.virtType },
     isVps: p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR",
+    isHosting: p.provisioner === "CPANEL",
     allowIpSelection: p.allowIpSelection && p.provisioner !== "VIRTUALIZOR",
     requireHostname: p.requireHostname,
     featured: p.featured,

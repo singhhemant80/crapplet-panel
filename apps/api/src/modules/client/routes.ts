@@ -2,6 +2,7 @@ import { provisioningProgress } from "../provisioning/progress";
 import { requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import { z } from "zod";
+import { hostingPasswordSchema } from "../orders/pricing";
 import { prisma, TicketPriority } from "../../db";
 import { ah, badRequest, conflict, forbidden, notFound, pageParams, parse } from "../../lib/http";
 import { decrypt, randomToken } from "../../lib/crypto";
@@ -22,32 +23,122 @@ clientRouter.get(
   "/dashboard",
   ah(async (req, res) => {
     const userId = req.user!.id;
-    const [active, pending, suspended, unpaid, profile, txns, tickets, announcements, renewals, domains] = await Promise.all([
-      prisma.service.count({ where: { userId, status: "ACTIVE" } }),
-      prisma.service.count({ where: { userId, status: { in: ["PENDING", "PROVISIONING"] } } }),
-      prisma.service.count({ where: { userId, status: "SUSPENDED" } }),
-      prisma.invoice.findMany({ where: { userId, status: "UNPAID" }, select: { total: true, amountPaid: true } }),
-      prisma.clientProfile.findUnique({ where: { userId } }),
-      prisma.transaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 5 }),
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const [user, services, unpaid, txns, tickets, openTickets, awaitingReply, announcements, domains, expiringDomains, payments, logins, affiliate, invoiceCount] = await Promise.all([
+      prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { profile: true } }),
+      prisma.service.findMany({
+        where: { userId, status: { notIn: ["CANCELLED", "TERMINATED"] } },
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        take: 30,
+        include: { product: { select: { name: true, type: true, provisioner: true, cpuCores: true, ramMb: true, diskGb: true } }, ips: { where: { isPrimary: true }, select: { address: true } }, osTemplate: { select: { id: true, name: true, family: true, distro: true, logoUrl: true } } },
+      }),
+      prisma.invoice.findMany({ where: { userId, status: "UNPAID" }, orderBy: { dueDate: "asc" }, select: { id: true, number: true, proformaNumber: true, total: true, amountPaid: true, dueDate: true, currency: true, issueDate: true } }),
+      prisma.transaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 6 }),
       prisma.ticket.findMany({ where: { userId }, orderBy: { lastReplyAt: "desc" }, take: 5, include: { department: true } }),
+      prisma.ticket.count({ where: { userId, status: { not: "CLOSED" } } }),
+      prisma.ticket.count({ where: { userId, status: "ANSWERED" } }),
       prisma.announcement.findMany({ where: { published: true }, orderBy: { publishedAt: "desc" }, take: 3 }),
-      prisma.service.findMany({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED"] }, nextDueDate: { not: null } }, orderBy: { nextDueDate: "asc" }, take: 5, include: { product: true, ips: { where: { isPrimary: true } } } }),
       prisma.domain.count({ where: { userId, status: "ACTIVE" } }),
+      prisma.domain.findMany({ where: { userId, status: "ACTIVE", expiryDate: { lte: new Date(Date.now() + 60 * 86400_000) } }, orderBy: { expiryDate: "asc" }, take: 5, select: { id: true, name: true, expiryDate: true, autoRenew: true } }),
+      prisma.transaction.findMany({ where: { userId, type: { in: ["PAYMENT", "WALLET_TOPUP"] }, createdAt: { gte: sixMonthsAgo } }, select: { amount: true, createdAt: true } }),
+      prisma.loginHistory.findMany({ where: { userId, success: true }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, ip: true, userAgent: true } }),
+      prisma.affiliate.findUnique({ where: { userId }, select: { code: true, balance: true, _count: { select: { referrals: true } } } }),
+      prisma.invoice.count({ where: { userId } }),
     ]);
+    const p = user.profile;
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString("en-IN", { month: "short" }), total: 0 };
+    });
+    for (const t of payments) {
+      const m = months.find((x) => x.key === `${t.createdAt.getFullYear()}-${t.createdAt.getMonth()}`);
+      if (m) m.total += t.amount;
+    }
+    const profileChecks = [
+      ["Phone number", !!user.phone],
+      ["Billing address", !!(p?.address1 && p?.city && p?.postcode)],
+      ["Email verified", !!user.emailVerifiedAt],
+      ["Two-factor sign-in", user.totpEnabled],
+    ] as const;
+    const live = services.filter((s) => s.status === "ACTIVE" || s.status === "SUSPENDED");
+    const nextRenewal = live.filter((s) => s.nextDueDate).sort((a, b) => a.nextDueDate!.getTime() - b.nextDueDate!.getTime())[0];
+    const outstanding = unpaid.reduce((s, i) => s + i.total - i.amountPaid, 0);
     res.json({
       stats: {
-        activeServices: active,
-        pendingServices: pending,
-        suspendedServices: suspended,
+        activeServices: services.filter((s) => s.status === "ACTIVE").length,
+        pendingServices: services.filter((s) => s.status === "PENDING" || s.status === "PROVISIONING").length,
+        suspendedServices: services.filter((s) => s.status === "SUSPENDED").length,
+        failedServices: services.filter((s) => s.status === "FAILED").length,
         unpaidInvoices: unpaid.length,
-        outstanding: unpaid.reduce((s, i) => s + i.total - i.amountPaid, 0),
-        creditBalance: profile?.creditBalance ?? 0,
+        overdueInvoices: unpaid.filter((i) => i.dueDate < now).length,
+        outstanding,
+        creditBalance: p?.creditBalance ?? 0,
         activeDomains: domains,
+        openTickets,
+        awaitingReply,
+        invoiceCount,
+        monthlySpend: live.reduce((sum, s) => sum + Math.round(s.recurringAmount / ({ MONTHLY: 1, QUARTERLY: 3, SEMIANNUAL: 6, ANNUAL: 12, BIENNIAL: 24, TRIENNIAL: 36 } as Record<string, number>)[s.billingCycle] || 0), 0),
       },
+      account: {
+        id: user.id,
+        clientNo: user.id.slice(-6).toUpperCase(),
+        since: user.createdAt,
+        currency: p?.currency ?? "INR",
+        company: p?.companyName ?? null,
+        gstin: p?.gstin ?? null,
+        emailVerified: !!user.emailVerifiedAt,
+        twoFactor: user.totpEnabled,
+        logins,
+        completeness: { done: profileChecks.filter(([, ok]) => ok).length, total: profileChecks.length, missing: profileChecks.filter(([, ok]) => !ok).map(([k]) => k) },
+        affiliate: affiliate ? { code: affiliate.code, balance: affiliate.balance, referrals: affiliate._count.referrals } : null,
+      },
+      services: services.map((s) => ({
+        id: s.id,
+        product: s.product.name,
+        type: s.product.type,
+        kind: s.product.provisioner === "CPANEL" ? "hosting" : s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR" ? "vps" : "other",
+        hostname: s.hostname,
+        ip: s.ips[0]?.address ?? null,
+        os: s.osTemplate,
+        specs: s.product.cpuCores ? { cpu: s.product.cpuCores, ramMb: s.product.ramMb, diskGb: s.product.diskGb } : null,
+        status: s.status,
+        nextDueDate: s.nextDueDate,
+        amount: s.recurringAmount,
+        cycle: s.billingCycle,
+        currency: s.currency,
+      })),
+      unpaid: unpaid.map((i) => ({ ...i, overdue: i.dueDate < now, balance: i.total - i.amountPaid })),
+      nextRenewal: nextRenewal ? { id: nextRenewal.id, product: nextRenewal.product.name, date: nextRenewal.nextDueDate, amount: nextRenewal.recurringAmount, currency: nextRenewal.currency } : null,
+      spend: months.map(({ label, total }) => ({ label, total })),
+      expiringDomains,
       transactions: txns,
       tickets: tickets.map((t) => ({ id: t.id, number: t.number, subject: t.subject, status: t.status, department: t.department.name, lastReplyAt: t.lastReplyAt })),
       announcements,
-      renewals: renewals.map((s) => ({ id: s.id, product: s.product.name, hostname: s.hostname, ip: s.ips[0]?.address ?? null, nextDueDate: s.nextDueDate, amount: s.recurringAmount, currency: s.currency, status: s.status })),
+    });
+  }),
+);
+
+/** Small counts for the client area's sidebar and top bar (every page). */
+clientRouter.get(
+  "/shell",
+  ah(async (req, res) => {
+    const userId = req.user!.id;
+    const [unpaid, answered, active, profile] = await Promise.all([
+      prisma.invoice.findMany({ where: { userId, status: "UNPAID" }, select: { total: true, amountPaid: true, dueDate: true } }),
+      prisma.ticket.count({ where: { userId, status: "ANSWERED" } }),
+      prisma.service.count({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED", "PROVISIONING", "PENDING"] } } }),
+      prisma.clientProfile.findUnique({ where: { userId }, select: { creditBalance: true, currency: true } }),
+    ]);
+    const now = Date.now();
+    res.json({
+      unpaidInvoices: unpaid.length,
+      overdueInvoices: unpaid.filter((i) => i.dueDate.getTime() < now).length,
+      outstanding: unpaid.reduce((s, i) => s + i.total - i.amountPaid, 0),
+      ticketsAwaitingReply: answered,
+      services: active,
+      creditBalance: profile?.creditBalance ?? 0,
+      currency: profile?.currency ?? "INR",
     });
   }),
 );
@@ -118,11 +209,44 @@ clientRouter.get(
     const logs = (
       await prisma.provisioningLog.findMany({ where: { serviceId: s.id, action: { in: ["create", "reinstall", "reboot", "start", "stop", "shutdown", "reset_password"] } }, orderBy: { createdAt: "desc" }, take: 60, select: { action: true, success: true, createdAt: true, message: true } })
     )
-      .filter((l) => l.action !== "create" || (l.success ? /^(Virtualizor VPS \S+ created|VPS \S+ running on)/.test(l.message ?? "") : !/— trying /.test(l.message ?? "")))
+      .filter((l) => l.action !== "create" || (l.success ? /^(Virtualizor VPS \S+ created|VPS \S+ running on|cPanel account \S+ created)/.test(l.message ?? "") : !/— trying /.test(l.message ?? "")))
       .slice(0, 10)
       .map(({ message: _m, ...l }) => l);
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });
     res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy });
+  }),
+);
+
+/** One-click login to cPanel / webmail / WHM (reseller) for the customer's hosting account. */
+clientRouter.post(
+  "/services/:id/cpanel-login",
+  ah(async (req, res) => {
+    const s = await ownService(req.user!.id, req.params.id);
+    if (s.product.provisioner !== "CPANEL") throw badRequest("Not a hosting account");
+    if (s.status !== "ACTIVE") throw badRequest(`Login isn't available while the account is ${s.status.toLowerCase()}`);
+    const { service } = parse(z.object({ service: z.enum(["cpaneld", "webmaild", "whostmgrd"]).default("cpaneld") }), req.body);
+    const { cpanelLoginUrl } = await import("../provisioning/cpanel-provisioner");
+    const url = await cpanelLoginUrl(await prisma.service.findUniqueOrThrow({ where: { id: s.id }, include: { server: true, user: true, product: { include: { servers: { include: { server: true } } } } } }), service).catch((e: Error) => {
+      throw badRequest(e.message);
+    });
+    await prisma.provisioningLog.create({ data: { serviceId: s.id, action: "login", success: true, message: `Customer opened ${service === "whostmgrd" ? "WHM" : service === "webmaild" ? "webmail" : "cPanel"}` } });
+    res.json({ url });
+  }),
+);
+
+/** Customer sets their own cPanel password (applied on the server right away). */
+clientRouter.post(
+  "/services/:id/hosting-password",
+  ah(async (req, res) => {
+    const s = await ownService(req.user!.id, req.params.id);
+    if (s.product.provisioner !== "CPANEL") throw badRequest("Not a hosting account");
+    if (s.status !== "ACTIVE") throw badRequest(`Can't change the password while the account is ${s.status.toLowerCase()}`);
+    const { password } = parse(z.object({ password: hostingPasswordSchema }), req.body);
+    const { runProvisionAction } = await import("../provisioning/provisioner");
+    await runProvisionAction(s.id, "reset_password", { password }).catch((e: Error) => {
+      throw badRequest(`cPanel didn't accept the password: ${e.message.replace(/^WHM passwd: /, "")}`);
+    });
+    res.json({ ok: true });
   }),
 );
 
@@ -192,7 +316,7 @@ clientRouter.post(
     const b = parse(actionSchema, req.body);
     const s = await ownService(req.user!.id, req.params.id);
     assertClientCan(s);
-    if (s.product.provisioner !== "PROXMOX" && s.product.provisioner !== "VIRTUALIZOR") throw badRequest("This service is managed manually — open a support ticket");
+    if (s.product.provisioner !== "PROXMOX" && s.product.provisioner !== "VIRTUALIZOR") throw badRequest(s.product.provisioner === "CPANEL" ? "Use the buttons for hosting accounts (cPanel login, change password)" : "This service is managed manually — open a support ticket");
     if (b.action === "reinstall") {
       if (b.confirm !== s.hostname && b.confirm !== "REINSTALL") throw badRequest("Type REINSTALL to confirm — all data will be erased");
       if (b.osTemplateId && !s.product.osTemplates.some((o) => o.osTemplateId === b.osTemplateId)) throw badRequest("OS not available for this plan");

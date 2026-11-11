@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma, Prisma, InvoiceStatus, ServiceStatus, BillingCycle, OrderStatus } from "../../db";
 import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
-import { cartSchema, rootPasswordSchema } from "../orders/pricing";
+import { cartSchema, rootPasswordSchema, hostingPasswordSchema } from "../orders/pricing";
 import { decrypt, encrypt, randomToken } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
 import { enqueueProvision, type ProvisionAction } from "../../jobs/queues";
@@ -230,7 +230,7 @@ adminCore.post(
   ah(async (req, res) => {
     const o = await prisma.order.findUniqueOrThrow({ where: { id: req.params.id }, include: { services: { include: { product: true } }, invoice: true } });
     for (const s of o.services.filter((x) => x.status === "PENDING" || x.status === "FAILED")) {
-      if (s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR") {
+      if (s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR" || s.product.provisioner === "CPANEL") {
         await prisma.service.update({ where: { id: s.id }, data: { status: "PROVISIONING" } });
         await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
       } else await prisma.service.update({ where: { id: s.id }, data: { status: "ACTIVE" } });
@@ -346,7 +346,7 @@ adminCore.get(
     const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, dueDate: true } });
     // node id → node name (Virtualizor serid / Proxmox node)
     const nodeRow = s.node && server ? await prisma.serverNode.findFirst({ where: { serverId: server.id, OR: [{ externalId: s.node }, { name: s.node }] }, select: { name: true } }) : null;
-    res.json({ service: { ...rest, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname } : null, hasPassword: !!passwordEnc }, invoices });
+    res.json({ service: { ...rest, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname, nameservers: server.nameservers } : null, hasPassword: !!passwordEnc }, invoices });
   }),
 );
 
@@ -542,8 +542,9 @@ adminCore.post(
   ah(async (req, res) => {
     const b = parse(
       z.object({
-        action: z.enum(["create", "suspend", "unsuspend", "terminate", "start", "stop", "shutdown", "reboot", "reinstall", "reset_password", "sync"]),
+        action: z.enum(["create", "suspend", "unsuspend", "terminate", "start", "stop", "shutdown", "reboot", "reinstall", "reset_password", "change_package", "sync"]),
         reason: z.string().max(200).optional(),
+        package: z.string().max(120).optional(),
         osTemplateId: z.string().optional(),
         notify: z.boolean().optional(),
       }),
@@ -563,9 +564,46 @@ adminCore.post(
       // remove a finished/failed create job so it can be queued again under the same id
       if (old && (state === "failed" || state === "completed")) await old.remove();
     }
-    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify, package: b.package }, actorId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: s.userId, action: `service.${b.action}`, entity: "service", entityId: s.id, details: b });
     res.status(202).json({ queued: true });
+  }),
+);
+
+// ───────────── Hosting (cPanel) ─────────────
+const loadHostingService = (id: string) => prisma.service.findUniqueOrThrow({ where: { id }, include: { server: true, user: true, product: { include: { servers: { include: { server: true } } } } } });
+
+/** One-click login to the customer's cPanel / webmail / WHM (reseller). */
+adminCore.post(
+  "/services/:id/cpanel-login",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const { service } = parse(z.object({ service: z.enum(["cpaneld", "webmaild", "whostmgrd"]).default("cpaneld") }), req.body);
+    const s = await loadHostingService(req.params.id);
+    if (s.product.provisioner !== "CPANEL") throw badRequest("Not a hosting account");
+    const { cpanelLoginUrl } = await import("../provisioning/cpanel-provisioner");
+    const url = await cpanelLoginUrl(s, service).catch((e: Error) => {
+      throw badRequest(e.message);
+    });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.cpanel_login", entity: "service", entityId: s.id, details: { service } });
+    res.json({ url });
+  }),
+);
+
+/** Set the cPanel password (applied on the server right away; the new one is stored for the credentials row). */
+adminCore.post(
+  "/services/:id/hosting-password",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const { password } = parse(z.object({ password: hostingPasswordSchema }), req.body);
+    const s = await loadHostingService(req.params.id);
+    if (s.product.provisioner !== "CPANEL") throw badRequest("Not a hosting account");
+    const { runProvisionAction } = await import("../provisioning/provisioner");
+    await runProvisionAction(s.id, "reset_password", { password }).catch((e: Error) => {
+      throw badRequest(`cPanel didn't accept the password: ${e.message.replace(/^WHM passwd: /, "")}`);
+    });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.password_changed", entity: "service", entityId: s.id });
+    res.json({ ok: true });
   }),
 );
 

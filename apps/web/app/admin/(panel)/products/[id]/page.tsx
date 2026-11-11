@@ -56,7 +56,7 @@ export default function ProductEditor() {
   // a VPS plan with no server ticked: pre-select the only matching server so orders can be built
   useEffect(() => {
     if (!p || !servers.data || p.serverIds.length) return;
-    const type = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : p.provisioner === "PROXMOX" ? "PROXMOX" : null;
+    const type = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : p.provisioner === "PROXMOX" ? "PROXMOX" : p.provisioner === "CPANEL" ? "CPANEL" : null;
     const match = type ? servers.data.servers.filter((s: any) => s.type === type && s.enabled) : [];
     if (match.length === 1) setP((cur: any) => ({ ...cur, serverIds: [match[0].id] }));
   }, [p?.provisioner, servers.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -80,7 +80,7 @@ export default function ProductEditor() {
       provisioner: p.provisioner, virtType: p.virtType, cpuCores: num(p.cpuCores), ramMb: num(p.ramMb), diskGb: num(p.diskGb), bandwidthGb: num(p.bandwidthGb),
       ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname, hsnSac: p.hsnSac, taxable: p.taxable,
       stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
-      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) } },
+      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) }, cpanel: { ...p.moduleConfig.cpanel, accountLimit: num(p.moduleConfig.cpanel?.accountLimit), diskMb: num(p.moduleConfig.cpanel?.diskMb), bandwidthMb: num(p.moduleConfig.cpanel?.bandwidthMb) } },
       pricing: [
         ...Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
         // USD rows only where staff typed a price; blank cycles fall back to auto-conversion
@@ -108,7 +108,9 @@ export default function ProductEditor() {
     }
   }
   const isVps = p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR";
-  const srvType = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : "PROXMOX";
+  const isHosting = p.provisioner === "CPANEL";
+  const srvType = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : isHosting ? "CPANEL" : "PROXMOX";
+  const typed = isVps || isHosting;
   return (
     <>
       {!isNew && readiness.data && <Readiness data={readiness.data} onRecheck={readiness.reload} loading={readiness.loading} />}
@@ -194,7 +196,7 @@ export default function ProductEditor() {
         </Card>
         <Card title="Provisioning">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Module"><Select value={p.provisioner} onChange={(e) => set({ provisioner: e.target.value })}><option value="PROXMOX">Proxmox VE</option><option value="VIRTUALIZOR">Virtualizor</option><option value="MANUAL">Manual provisioning</option><option value="NONE">None</option></Select></Field>
+            <Field label="Module"><Select value={p.provisioner} onChange={(e) => set({ provisioner: e.target.value })}><option value="PROXMOX">Proxmox VE</option><option value="VIRTUALIZOR">Virtualizor</option><option value="CPANEL">cPanel / WHM (shared & reseller hosting)</option><option value="MANUAL">Manual provisioning</option><option value="NONE">None</option></Select></Field>
             <Field label="Auto-setup"><Select value={p.autoSetup} onChange={(e) => set({ autoSetup: e.target.value })}><option value="ON_PAYMENT">After payment</option><option value="ON_ORDER">On order (trials)</option><option value="MANUAL">When staff accepts</option></Select></Field>
             {isVps && <>
               {p.provisioner === "PROXMOX" && <Field label="Virtualization"><Select value={p.virtType} onChange={(e) => set({ virtType: e.target.value })}><option value="KVM">KVM virtual machine</option><option value="LXC">LXC container</option></Select></Field>}
@@ -230,17 +232,31 @@ export default function ProductEditor() {
                 <VirtualizorPlacement serverIds={p.serverIds} value={p.moduleConfig.virtualizor ?? {}} onChange={(patch) => set({ moduleConfig: { ...p.moduleConfig, virtualizor: { ...p.moduleConfig.virtualizor, ...patch } } })} />
               </>}
             </>}
+            {isHosting && (
+              <CpanelSettings
+                serverIds={p.serverIds}
+                type={p.type}
+                value={p.moduleConfig.cpanel ?? {}}
+                onChange={(patch) => setP((cur: any) => ({ ...cur, moduleConfig: { ...cur.moduleConfig, cpanel: { ...(cur.moduleConfig.cpanel ?? {}), ...patch } } }))}
+                onSpecs={(sp) => setP((cur: any) => ({ ...cur, diskGb: sp.diskGb ?? cur.diskGb, bandwidthGb: sp.bandwidthGb ?? cur.bandwidthGb }))}
+                disk={p.diskGb}
+                bandwidth={p.bandwidthGb}
+                setDisk={(v) => set({ diskGb: v })}
+                setBandwidth={(v) => set({ bandwidthGb: v })}
+              />
+            )}
           </div>
         </Card>
         <Card title="Servers, operating systems & add-ons">
           {isVps && !p.serverIds.length && <Alert tone="warn" className="mb-3">Assign at least one {srvType === "PROXMOX" ? "Proxmox" : "Virtualizor"} server — its IP pool is what customers choose from.</Alert>}
+          {isHosting && !p.serverIds.length && <Alert tone="warn" className="mb-3">Tick the cPanel/WHM server(s) accounts are created on. New accounts go to the one with the fewest accounts.</Alert>}
           <div className="space-y-4">
             <div>
               <div className="mb-1.5 flex items-center justify-between text-[13px] font-bold text-slate-700">
                 <span>Servers {isVps && <span className="font-semibold text-mute">· VPS of this plan are built on the ticked server</span>}</span>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {(servers.data?.servers ?? []).filter((s: any) => !isVps || s.type === srvType).map((s: any) => {
+                {(servers.data?.servers ?? []).filter((s: any) => !typed || s.type === srvType).map((s: any) => {
                   const on = p.serverIds.includes(s.id);
                   return (
                     <button key={s.id} type="button" onClick={() => toggleIn("serverIds", s.id)}
@@ -248,14 +264,14 @@ export default function ProductEditor() {
                       <span className={cx("grid h-5 w-5 shrink-0 place-items-center rounded-md border-2", on ? "border-primary bg-primary text-white" : "border-slate-300")}>{on && <Icon name="check" className="text-[14px]" />}</span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-bold text-ink">{s.name}</span>
-                        <span className="block text-xs text-mute">{s.type === "VIRTUALIZOR" ? "Virtualizor" : "Proxmox"} · {s.freeIps} free IPs in panel{s.enabled ? "" : " · disabled"}</span>
+                        <span className="block text-xs text-mute">{s.type === "CPANEL" ? `cPanel/WHM · ${s._count?.services ?? 0} accounts` : `${s.type === "VIRTUALIZOR" ? "Virtualizor" : "Proxmox"} · ${s.freeIps} free IPs in panel`}{s.enabled ? "" : " · disabled"}</span>
                       </span>
                     </button>
                   );
                 })}
               </div>
               {isVps && !p.serverIds.length && <Alert tone="warn" className="mt-2">Tick the server new VPS should be built on.</Alert>}
-              {!(servers.data?.servers ?? []).some((s: any) => !isVps || s.type === srvType) && <span className="text-xs text-mute">None configured — add one under Infrastructure → Servers.</span>}
+              {!(servers.data?.servers ?? []).some((s: any) => !typed || s.type === srvType) && <span className="text-xs text-mute">None configured — add one under Infrastructure → Servers.</span>}
             </div>
             {isVps && (
               <OsPicker
@@ -559,6 +575,70 @@ function Chips({ label, items, selected, onToggle }: { label: string; items: { i
       <div className="flex flex-wrap gap-2">
         {items.map((i) => <button key={i.id} type="button" onClick={() => onToggle(i.id)} className={cx("rounded-lg px-3 py-1.5 text-xs font-bold", selected.includes(i.id) ? "bg-primary-dark text-white" : "bg-slate-100 text-slate-600 hover:bg-primary-soft")}>{i.label}</button>)}
         {!items.length && <span className="text-xs text-mute">None configured.</span>}
+      </div>
+    </div>
+  );
+}
+
+/** WHM package, reseller privileges and limits for a cPanel plan. */
+function CpanelSettings({ serverIds, type, value, onChange, onSpecs, disk, bandwidth, setDisk, setBandwidth }: { serverIds: string[]; type: string; value: any; onChange: (patch: any) => void; onSpecs: (s: { diskGb?: number | null; bandwidthGb?: number | null }) => void; disk: any; bandwidth: any; setDisk: (v: any) => void; setBandwidth: (v: any) => void }) {
+  const [list, setList] = useState<{ packages: any[]; acls: string[] } | null>(null);
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const sid = serverIds[0];
+  const load = () => {
+    if (!sid) return;
+    setLoading(true);
+    setErr("");
+    api(`/admin/servers/${sid}/cpanel-packages`).then(setList).catch((e) => setErr(e.message)).finally(() => setLoading(false));
+  };
+  useEffect(load, [sid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reseller = value.reseller ?? type === "RESELLER_HOSTING";
+  const pkgs = list?.packages ?? [];
+  const pick = (name: string) => {
+    onChange({ package: name });
+    const pk = pkgs.find((x) => x.name === name);
+    if (pk) onSpecs({ diskGb: pk.diskMb ? Math.max(1, Math.round(pk.diskMb / 1024)) : null, bandwidthGb: pk.bandwidthMb ? Math.round(pk.bandwidthMb / 1024) : null });
+  };
+  return (
+    <div className="space-y-4 sm:col-span-2">
+      {!sid ? <Alert tone="info">Tick a cPanel/WHM server below to load its packages.</Alert> : err ? <Alert tone="error">{err}</Alert> : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="WHM package" className="sm:col-span-2" hint="Create packages in WHM → Packages → Add a Package. Disk and bandwidth are filled from it for the order page.">
+          <div className="flex gap-2">
+            <Select value={value.package ?? ""} onChange={(e) => pick(e.target.value)} className="flex-1">
+              <option value="">{loading ? "Loading…" : "Choose a package…"}</option>
+              {value.package && !pkgs.some((x) => x.name === value.package) && <option value={value.package}>{value.package} (not found on server)</option>}
+              {pkgs.map((x) => <option key={x.name} value={x.name}>{x.name} — {x.diskMb ? `${Math.round(x.diskMb / 1024)} GB disk` : "unlimited disk"}, {x.bandwidthMb ? `${Math.round(x.bandwidthMb / 1024)} GB bandwidth` : "unmetered"}</option>)}
+            </Select>
+            <Button type="button" variant="outline" icon="refresh" onClick={load} disabled={!sid}>Reload</Button>
+          </div>
+        </Field>
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+          <Field label="Disk (GB, shown to buyers)"><Input type="number" value={disk ?? ""} onChange={(e) => setDisk(e.target.value)} placeholder="unlimited" /></Field>
+          <Field label="Bandwidth (GB)"><Input type="number" value={bandwidth ?? ""} onChange={(e) => setBandwidth(e.target.value)} placeholder="unmetered" /></Field>
+        </div>
+      </div>
+      <div className="rounded-xl border border-line p-4">
+        <Toggle checked={!!reseller} onChange={(v) => onChange({ reseller: v })} label={<span><b>Reseller account</b> <span className="text-mute">— the customer gets WHM to create their own cPanel accounts</span></span>} />
+        {reseller && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="Reseller privileges (ACL list)" hint="WHM → Edit Reseller Nameservers and Privileges → save a set as an ACL list">
+              <Select value={value.acllist ?? ""} onChange={(e) => onChange({ acllist: e.target.value })}>
+                <option value="">WHM defaults (very limited)</option>
+                {(list?.acls ?? []).map((a) => <option key={a} value={a}>{a}</option>)}
+                {value.acllist && !(list?.acls ?? []).includes(value.acllist) && <option value={value.acllist}>{value.acllist}</option>}
+              </Select>
+            </Field>
+            <Field label="Max cPanel accounts (empty = unlimited)"><Input type="number" min={1} value={value.accountLimit ?? ""} onChange={(e) => onChange({ accountLimit: e.target.value })} /></Field>
+            <Field label="Total disk for the reseller (MB)"><Input type="number" value={value.diskMb ?? ""} onChange={(e) => onChange({ diskMb: e.target.value })} placeholder="unlimited" /></Field>
+            <Field label="Total bandwidth (MB / month)"><Input type="number" value={value.bandwidthMb ?? ""} onChange={(e) => onChange({ bandwidthMb: e.target.value })} placeholder="unlimited" /></Field>
+            <div className="flex flex-col gap-3 sm:col-span-2">
+              <Toggle checked={!!value.overselling} onChange={(v) => onChange({ overselling: v })} label="Allow overselling disk and bandwidth" />
+              <Toggle checked={value.terminateSubAccounts !== false} onChange={(v) => onChange({ terminateSubAccounts: v })} label="When terminated, also remove the cPanel accounts the reseller created" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

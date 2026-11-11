@@ -142,7 +142,8 @@ function Configure() {
 
   function addToCart() {
     if (p.isVps && p.osTemplates.length && !os) return toast.error("Choose an operating system");
-    if (p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
+    if (p.isHosting && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter your domain name, like example.com");
+    if (!p.isHosting && p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
     const loc = locs.data?.locations.find((l: any) => l.serverId === serverId);
     const item: CartItem = {
       key: `${p.id}-${Date.now()}`,
@@ -252,7 +253,22 @@ function Configure() {
             </Card>
           )}
 
-          {(p.osTemplates.length > 0 || p.requireHostname) && (
+          {p.isHosting && (
+            <Card title="Your domain">
+              <Field label="Domain name" hint="The main website on this hosting account. You can add more domains later in cPanel.">
+                <div className="relative">
+                  <Icon name="language" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-mute" />
+                  <Input className="pl-10" value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, ""))} placeholder="yourbusiness.com" />
+                </div>
+              </Field>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
+                <span className="inline-flex items-center gap-1"><Icon name="check_circle" className="text-[15px] text-emerald-600" />Use a domain you already own — point it to our nameservers after setup</span>
+                <a href="/order/domain" className="font-bold text-primary-dark hover:underline">Need a domain? Register one →</a>
+              </div>
+            </Card>
+          )}
+
+          {!p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && (
             <Card title={`${p.allowIpSelection ? 4 : 3}. Server setup`}>
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.osTemplates.length > 0 && (

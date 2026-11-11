@@ -25,7 +25,7 @@ export async function onInvoicePaid(invoiceId: string) {
       if (!isRenewal) {
         if (svc.status !== "PENDING") continue;
         const due = svc.billingCycle === "ONETIME" ? null : addCycle(new Date(), svc.billingCycle);
-        const automated = svc.product.provisioner === "PROXMOX" || svc.product.provisioner === "VIRTUALIZOR";
+        const automated = svc.product.provisioner === "PROXMOX" || svc.product.provisioner === "VIRTUALIZOR" || svc.product.provisioner === "CPANEL";
         if (automated && svc.product.autoSetup !== "MANUAL") {
           await prisma.service.update({ where: { id: svc.id }, data: { status: "PROVISIONING", nextDueDate: due, nextInvoiceDate: due } });
           await enqueueProvision({ serviceId: svc.id, action: "create" });

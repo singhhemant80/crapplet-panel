@@ -26,6 +26,11 @@ export async function checkServer(serverId: string) {
     } else if (s.type === "VIRTUALIZOR") {
       const r = await syncVirtualizorNodes(s);
       status = { ok: true, nodes: r.nodes, online: r.online };
+    } else if (s.type === "CPANEL") {
+      const { whmFor } = await import("../modules/provisioning/cpanel-provisioner");
+      const w = whmFor(s);
+      const [version, load, accounts, hostname] = await Promise.all([w.version(), w.loadAvg(), w.accountCount().catch(() => null), w.hostname()]);
+      status = { ok: true, version, load: load?.one ?? null, accounts, hostname };
     } else status = { ok: true, manual: true };
     status.latencyMs = Date.now() - started;
     await prisma.server.update({ where: { id: s.id }, data: { lastCheckAt: new Date(), lastStatus: status as Prisma.InputJsonValue } });
@@ -38,7 +43,7 @@ export async function checkServer(serverId: string) {
 }
 
 export async function checkAllServers() {
-  const servers = await prisma.server.findMany({ where: { enabled: true, type: { in: ["PROXMOX", "VIRTUALIZOR"] } } });
+  const servers = await prisma.server.findMany({ where: { enabled: true, type: { in: ["PROXMOX", "VIRTUALIZOR", "CPANEL"] } } });
   const out: Record<string, unknown> = {};
   for (const s of servers) out[s.name] = await checkServer(s.id);
   return out;

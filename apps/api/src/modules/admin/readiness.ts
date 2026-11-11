@@ -20,6 +20,32 @@ export async function productReadiness(productId: string): Promise<{ ready: bool
   const inr = p.pricing.filter((x) => x.currency === "INR" && x.enabled);
   add(inr.length ? { key: "pricing", label: "Pricing", status: "ok", detail: `${inr.length} billing cycle${inr.length === 1 ? "" : "s"} priced` } : { key: "pricing", label: "Pricing", status: "error", detail: "No INR price", fix: "Add at least a monthly price", href: edit });
 
+  if (p.provisioner === "CPANEL") {
+    const mc = ((p.moduleConfig ?? {}) as { cpanel?: { package?: string; reseller?: boolean; acllist?: string } }).cpanel ?? {};
+    let servers = p.servers.map((s) => s.server).filter((s) => s.type === "CPANEL" && s.enabled);
+    const fallback = !servers.length;
+    if (fallback) servers = await prisma.server.findMany({ where: { type: "CPANEL", enabled: true } });
+    if (!servers.length) add({ key: "server", label: "cPanel/WHM server", status: "error", detail: "No enabled cPanel/WHM server", fix: "Add one under Infrastructure → Servers (type cPanel/WHM)", href: "/admin/servers" });
+    else add({ key: "server", label: "cPanel/WHM server", status: fallback ? "warn" : "ok", detail: `${servers.map((s) => s.name).join(", ")}${fallback ? " (none ticked on the plan — any enabled cPanel server is used)" : ""}`, fix: fallback ? "Tick the server under Servers" : undefined, href: edit });
+    for (const s of servers) {
+      const st = (s.lastStatus ?? {}) as { ok?: boolean; error?: string; version?: string };
+      if (st.ok === false) add({ key: `conn-${s.id}`, label: `Connection to ${s.name}`, status: "error", detail: st.error ?? "Last test failed", fix: "Fix the API token / firewall and click Test connection", href: "/admin/servers" });
+      else if (!s.lastCheckAt) add({ key: `conn-${s.id}`, label: `Connection to ${s.name}`, status: "warn", detail: "Never tested", fix: "Click Test connection", href: "/admin/servers" });
+      else add({ key: `conn-${s.id}`, label: `Connection to ${s.name}`, status: "ok", detail: `WHM ${st.version ?? ""} reachable` });
+      if (!s.nameservers?.length) add({ key: `ns-${s.id}`, label: `Nameservers on ${s.name}`, status: "warn", detail: "Not set — the welcome email uses whatever WHM returns", fix: "Add them in the server's settings", href: "/admin/servers" });
+    }
+    if (!mc.package) add({ key: "package", label: "WHM package", status: "error", detail: "No package chosen — accounts can't be created", fix: "Pick the package under Provisioning", href: edit });
+    else if (servers[0]) {
+      const { whmFor } = await import("../provisioning/cpanel-provisioner");
+      const names = await Promise.all(servers.map((s) => whmFor(s).packages().then((x) => x.map((y) => y.name)).catch(() => null)));
+      const missing = servers.filter((_, i) => names[i] && !names[i]!.includes(mc.package!));
+      if (missing.length) add({ key: "package", label: "WHM package", status: "error", detail: `"${mc.package}" doesn't exist on ${missing.map((s) => s.name).join(", ")}`, fix: "Create it in WHM → Add a Package, or pick another", href: edit });
+      else add({ key: "package", label: "WHM package", status: names.some(Boolean) ? "ok" : "warn", detail: names.some(Boolean) ? `"${mc.package}" found on the server` : `"${mc.package}" (couldn't check the server)` });
+    }
+    if (mc.reseller || p.type === "RESELLER_HOSTING") add({ key: "reseller", label: "Reseller privileges", status: mc.acllist ? "ok" : "warn", detail: mc.acllist ? `ACL list "${mc.acllist}"` : "No ACL list — the reseller gets WHM's defaults (very limited)", fix: mc.acllist ? undefined : "Choose an ACL list (WHM → Edit Reseller Nameservers and Privileges → save as ACL list)", href: edit });
+    return { ready: !checks.some((c) => c.status === "error"), checks };
+  }
+
   const vps = p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR";
   if (!vps) {
     add({ key: "module", label: "Provisioning", status: "ok", detail: p.provisioner === "MANUAL" ? "Manual — staff set these up by hand" : p.provisioner });

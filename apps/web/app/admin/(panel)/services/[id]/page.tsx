@@ -3,12 +3,12 @@ import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge } from "@/components/live-state";
-import { PasswordField, passwordProblem } from "@/components/password-field";
+import { PasswordField, generatePassword, passwordProblem } from "@/components/password-field";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, CYCLES, date, invNo, money } from "@/lib/api";
-import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, PageHeader, Select, Table, Td, Textarea, Toggle, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 export default function AdminService() {
   const { id } = useParams<{ id: string }>();
@@ -24,10 +24,11 @@ export default function AdminService() {
   const s = data.service;
   const act = (action: string, extra: Record<string, unknown> = {}) => api(`/admin/services/${id}/action`, { body: { action, ...extra } }).then(() => { toast.success(`${action} queued`); setTimeout(reload, 3000); }).catch((e) => toast.error(e.message));
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
+  const isHosting = s.product.provisioner === "CPANEL";
   return (
     <>
       <PageHeader back="/admin/services" title={<span className="flex items-center gap-3">{s.product.name} <Badge status={s.status} /></span>} subtitle={<span>{s.hostname} · <Link className="font-bold text-primary-dark" href={`/admin/clients/${s.user.id}`}>{s.user.email}</Link>{s.order && <> · order <Link className="font-bold text-primary-dark" href={`/admin/orders/${s.order.id}`}>{s.order.number}</Link></>}{s.reseller && ` · via reseller ${s.reseller.brandName}`}</span>} />
-      {isVps && s.status !== "TERMINATED" && s.status !== "CANCELLED" && (["PENDING", "PROVISIONING", "FAILED"].includes(s.status) || Date.now() - new Date(s.createdAt).getTime() < 86400_000) && (
+      {(isVps || isHosting) && s.status !== "TERMINATED" && s.status !== "CANCELLED" && (["PENDING", "PROVISIONING", "FAILED"].includes(s.status) || Date.now() - new Date(s.createdAt).getTime() < 86400_000) && (
         <ProvisioningTracker path={`/admin/services/${id}/provisioning`} audience="admin" onChange={() => reload()} onRetry={() => act("create")} />
       )}
       {s.status === "FAILED" && <FailurePanel s={s} />}
@@ -44,13 +45,14 @@ export default function AdminService() {
             <Button variant="outline" size="sm" icon="key" onClick={() => confirm("Reset password and reboot?") && act("reset_password")}>Reset password</Button>
             <Select className="h-9 w-56" defaultValue="" onChange={(e) => { if (e.target.value && confirm("Reinstall will ERASE the server. Continue?")) act("reinstall", { osTemplateId: e.target.value }); e.target.value = ""; }}><option value="">Reinstall with…</option>{s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => <option key={x.osTemplate.id} value={x.osTemplate.id}>{x.osTemplate.name}</option>)}</Select>
           </>}
+          {isHosting && s.remoteId && s.status === "ACTIVE" && <HostingActions s={s} onDone={reload} />}
           {s.status === "ACTIVE" && <Button variant="outline" size="sm" icon="pause" onClick={() => { const reason = prompt("Suspension reason", "Suspended by administrator"); if (reason) act("suspend", { reason }); }}>Suspend</Button>}
           {s.status === "SUSPENDED" && <Button variant="secondary" size="sm" icon="play_circle" onClick={() => act("unsuspend")}>Unsuspend</Button>}
-          {!["TERMINATED", "CANCELLED"].includes(s.status) && <Button variant="danger" size="sm" icon="delete_forever" onClick={() => confirm("TERMINATE this service? The VM will be destroyed and IPs released.") && act("terminate")}>Terminate</Button>}
+          {!["TERMINATED", "CANCELLED"].includes(s.status) && <Button variant="danger" size="sm" icon="delete_forever" onClick={() => confirm(isHosting ? `TERMINATE this hosting account? The cPanel account ${s.username ?? ""} and all its files, email and databases are deleted on the server.` : "TERMINATE this service? The VM will be destroyed and IPs released.") && act("terminate")}>Terminate</Button>}
         </div>
       </Card>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Server">
+        {isHosting ? <HostingCard s={s} live={live} id={id} /> : <Card title="Server">
           <dl className="grid grid-cols-[140px_1fr] gap-y-2.5 text-sm">
             <dt className="text-mute">Hypervisor</dt><dd className="font-semibold">{s.server ? `${s.server.name} (${s.server.type})` : "—"}</dd>
             <dt className="text-mute">Node / VPS id</dt><dd className="font-semibold">{s.nodeName ?? s.node ?? "—"}{s.nodeName && s.node && s.nodeName !== s.node && <span className="font-normal text-mute"> (#{s.node})</span>} / {s.remoteId ?? "—"} {s.virtType && <span className="text-mute">({s.virtType})</span>}</dd>
@@ -82,7 +84,7 @@ export default function AdminService() {
             )}
             <dt className="text-mute">Credentials</dt><dd>{s.hasPassword || s.username ? <Credentials id={id} username={s.username} hasPassword={s.hasPassword} /> : "—"}</dd>
           </dl>
-        </Card>
+        </Card>}
         <Card title="Billing & overrides">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Next due date"><Input type="date" value={edit.nextDueDate} onChange={(e) => setEdit({ ...edit, nextDueDate: e.target.value })} /></Field>
@@ -255,5 +257,83 @@ function Credentials({ id, username, hasPassword }: { id: string; username?: str
         )}
       </div>
     </div>
+  );
+}
+
+/** Opens a one-time cPanel / WHM / webmail login in a new tab (the tab is opened first so pop-up blockers allow it). */
+function openLogin(path: string, service: string) {
+  const w = window.open("about:blank", "_blank");
+  api<{ url: string }>(path, { body: { service } })
+    .then((r) => {
+      if (w) w.location.href = r.url;
+      else window.location.href = r.url;
+    })
+    .catch((e) => {
+      w?.close();
+      toast.error(e.message);
+    });
+}
+
+function HostingActions({ s, onDone }: { s: any; onDone: () => void }) {
+  const reseller = s.product.type === "RESELLER_HOSTING" || s.product.moduleConfig?.cpanel?.reseller;
+  const [pw, setPw] = useState<string | null>(null);
+  const [pkgs, setPkgs] = useState<string[] | null>(null);
+  const loadPkgs = () => s.server && api(`/admin/servers/${s.server.id}/cpanel-packages`).then((r) => setPkgs(r.packages.map((x: any) => x.name))).catch((e) => toast.error(e.message));
+  return (
+    <>
+      <Button size="sm" icon="open_in_new" onClick={() => openLogin(`/admin/services/${s.id}/cpanel-login`, "cpaneld")}>Login to cPanel</Button>
+      {reseller && <Button size="sm" variant="secondary" icon="admin_panel_settings" onClick={() => openLogin(`/admin/services/${s.id}/cpanel-login`, "whostmgrd")}>Login to WHM</Button>}
+      <Button variant="outline" size="sm" icon="mail" onClick={() => openLogin(`/admin/services/${s.id}/cpanel-login`, "webmaild")}>Webmail</Button>
+      <Button variant="outline" size="sm" icon="key" onClick={() => setPw(generatePassword())}>Change password</Button>
+      {pkgs ? (
+        <Select className="h-9 w-56" defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v && confirm(`Change the WHM package to ${v}?`)) api(`/admin/services/${s.id}/action`, { body: { action: "change_package", package: v } }).then(() => { toast.success("Package change queued"); setTimeout(onDone, 2500); }).catch((er) => toast.error(er.message)); }}>
+          <option value="">Change package to…</option>
+          {pkgs.map((x) => <option key={x}>{x}</option>)}
+        </Select>
+      ) : <Button variant="outline" size="sm" icon="swap_vert" onClick={loadPkgs}>Change package</Button>}
+      <Modal open={pw !== null} onClose={() => setPw(null)} title="Change cPanel password">
+        <p className="mb-3 text-sm text-mute">Changes the password for <b className="font-mono">{s.username}</b> on the server right away. The customer isn't emailed — share it with them if needed.</p>
+        <PasswordField value={pw ?? ""} onChange={setPw} optionalHint="" />
+        <Button className="mt-4" icon="save" disabled={!pw || !!passwordProblem(pw)} onClick={() => api(`/admin/services/${s.id}/hosting-password`, { body: { password: pw } }).then(() => { toast.success("Password changed"); setPw(null); onDone(); }).catch((e) => toast.error(e.message))}>Set password</Button>
+      </Modal>
+    </>
+  );
+}
+
+function Usage({ label, used, limit }: { label: string; used?: number | null; limit?: number | null }) {
+  const pct = limit ? Math.min(100, Math.round(((used ?? 0) / limit) * 100)) : null;
+  const fmt = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB` : `${mb} MB`);
+  return (
+    <div>
+      <div className="flex justify-between text-xs"><span className="font-semibold text-slate-700">{label}</span><span className="text-mute">{fmt(used ?? 0)} of {limit ? fmt(limit) : "unlimited"}{pct !== null ? ` · ${pct}%` : ""}</span></div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><div className={cx("h-full rounded-full", pct === null ? "bg-emerald-400" : pct > 90 ? "bg-rose-500" : pct > 75 ? "bg-amber-400" : "bg-primary")} style={{ width: `${pct ?? 8}%` }} /></div>
+    </div>
+  );
+}
+
+function HostingCard({ s, live, id }: { s: any; live: any; id: string }) {
+  const reseller = s.product.type === "RESELLER_HOSTING" || s.product.moduleConfig?.cpanel?.reseller;
+  return (
+    <Card title={reseller ? "Reseller hosting account" : "Hosting account"}>
+      <dl className="grid grid-cols-[140px_1fr] gap-y-2.5 text-sm">
+        <dt className="text-mute">Domain</dt><dd className="font-semibold">{s.hostname ? <a className="text-primary-dark hover:underline" href={`http://${s.hostname}`} target="_blank" rel="noreferrer">{s.hostname}</a> : "—"}</dd>
+        <dt className="text-mute">cPanel server</dt><dd className="font-semibold">{s.server ? `${s.server.name} (${s.server.hostname})` : "—"}</dd>
+        <dt className="text-mute">Package</dt><dd className="font-semibold">{live?.plan ?? s.product.moduleConfig?.cpanel?.package ?? "—"}{reseller && <span className="ml-2"><Badge>reseller</Badge></span>}</dd>
+        <dt className="text-mute">IP address</dt><dd className="font-mono text-[13px]">{live?.ip ?? "—"}</dd>
+        <dt className="text-mute">Status on server</dt>
+        <dd>{live ? (live.error ? <span className="text-rose-600">{live.error}</span> : <span className="flex flex-wrap items-center gap-2"><LiveBadge state={live.state === "running" ? "running" : live.state} reason={live.reason} />{live.reason && <span className="text-xs text-mute">{live.reason}</span>}</span>) : s.remoteId ? <LiveBadge loading /> : "—"}</dd>
+        {live && !live.error && live.disk && (
+          <>
+            <dt className="text-mute">Usage</dt>
+            <dd className="space-y-2.5">
+              <Usage label="Disk" used={live.disk.usedMb} limit={live.disk.limitMb} />
+              {live.bandwidth && <Usage label="Bandwidth (this month)" used={live.bandwidth.usedMb} limit={live.bandwidth.limitMb} />}
+            </dd>
+          </>
+        )}
+        <dt className="text-mute">Nameservers</dt><dd className="font-mono text-[13px]">{s.server?.nameservers?.length ? s.server.nameservers.join(", ") : <span className="font-sans text-mute">Not set on the server</span>}</dd>
+        <dt className="text-mute">Credentials</dt><dd>{s.hasPassword || s.username ? <Credentials id={id} username={s.username} hasPassword={s.hasPassword} /> : "—"}</dd>
+      </dl>
+    </Card>
   );
 }
