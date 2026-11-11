@@ -178,7 +178,7 @@ const PAGE_ICONS: [RegExp, string][] = [
   [/\/payment-reviews/, "fact_check"], [/\/services|\/vps/, "dns"], [/\/domains/, "public"], [/\/tickets/, "support_agent"], [/\/products|\/product-groups/, "inventory_2"],
   [/\/addons/, "extension"], [/\/promo/, "sell"], [/\/os-templates/, "album"], [/\/servers/, "storage"], [/\/proxmox/, "hub"], [/\/virtualizor/, "lan"],
   [/\/monitoring/, "monitor_heart"], [/\/ips/, "router"], [/\/locations/, "location_on"], [/\/provisioning/, "rocket_launch"], [/\/resellers|\/reseller/, "storefront"],
-  [/\/affiliates/, "handshake"], [/\/announcements/, "campaign"], [/\/knowledgebase/, "menu_book"], [/\/email/, "mail"], [/\/gateways/, "account_balance"],
+  [/\/affiliates/, "handshake"], [/\/announcements/, "campaign"], [/\/knowledgebase/, "menu_book"], [/\/whatsapp/, "chat"], [/\/email/, "mail"], [/\/gateways/, "account_balance"],
   [/\/currencies/, "currency_exchange"], [/\/reports/, "bar_chart"], [/\/activity/, "history"], [/\/staff|\/roles/, "badge"], [/\/security/, "shield_lock"],
   [/\/automation/, "schedule"], [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
   [/\/admin\/?$|\/client\/?$/, "space_dashboard"],

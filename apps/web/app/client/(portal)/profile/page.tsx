@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
-import { Button, Card, Loading, PageHeader, toast } from "@/components/ui";
+import { Button, Card, Icon, Loading, PageHeader, Toggle, toast, useApi } from "@/components/ui";
 import { emptyProfile, ProfileFields, type ProfileValues } from "@/components/profile-fields";
 
 export default function Profile() {
@@ -30,6 +30,25 @@ export default function Profile() {
           <Button type="submit" className="mt-6" loading={busy} icon="save">Save changes</Button>
         </form>
       </Card>
+      <WhatsAppPref />
     </>
+  );
+}
+
+/** Client's own switch for WhatsApp notifications (shown when the business has WhatsApp set up). */
+function WhatsAppPref() {
+  const { data, reload } = useApi<{ available: boolean; enabled: boolean }>("/client/whatsapp");
+  if (!data?.available) return null;
+  return (
+    <Card className="mt-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Icon name="chat" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold text-ink">WhatsApp notifications</div>
+          <div className="text-[13px] text-mute">Invoices, payment reminders and service updates on WhatsApp, to the mobile number above. Emails are always sent.</div>
+        </div>
+        <Toggle checked={data.enabled} onChange={(v) => api("/client/whatsapp", { method: "PUT", body: { enabled: v } }).then(() => { toast.success(v ? "WhatsApp notifications on" : "WhatsApp notifications off"); reload(); }).catch((e) => toast.error(e.message))} />
+      </div>
+    </Card>
   );
 }

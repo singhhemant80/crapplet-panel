@@ -230,6 +230,8 @@ export async function sendRaw(c: MailConfig, to: string, subject: string, bodyHt
 /** Queue an email; falls back to direct send if Redis is unavailable. */
 export async function queueEmail(template: string, to: string, vars: Record<string, unknown>, userId?: string, attachments?: EmailJob["attachments"]) {
   const job: EmailJob = { template, to, vars, userId, attachments };
+  // the WhatsApp version of client notifications (when switched on for this event)
+  if (userId) await import("../whatsapp/service").then((m) => m.notifyWhatsapp(template, userId, vars)).catch(() => undefined);
   try {
     await emailQueue().add(template, job, { attempts: 5, backoff: { type: "exponential", delay: 60_000 } });
   } catch (e) {

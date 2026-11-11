@@ -68,6 +68,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { href: "/admin/roles", label: "Roles & Permissions", icon: "admin_panel_settings", perm: "staff.manage" },
       { href: "/admin/email", label: "Email Delivery", icon: "forward_to_inbox", perm: "settings.manage" },
       { href: "/admin/email-templates", label: "Email Templates", icon: "mail", perm: "settings.manage" },
+      { href: "/admin/whatsapp", label: "WhatsApp", icon: "chat", perm: "settings.manage" },
       { href: "/admin/settings", label: "Settings", icon: "settings", perm: "settings.manage" },
       { href: "/admin/automation", label: "Automation", icon: "schedule", perm: "reports.view" },
       { href: "/admin/migration", label: "WHMCS Migration", icon: "move_up", perm: "settings.manage" },

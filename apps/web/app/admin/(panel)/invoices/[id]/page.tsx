@@ -31,6 +31,7 @@ export default function AdminInvoice() {
           {i.status === "UNPAID" && <>
             <Button size="sm" icon="add_card" onClick={() => setPay(true)}>Record payment</Button>
             <Button size="sm" variant="outline" icon="mail" onClick={() => api(`/admin/invoices/${id}/remind`, { body: {} }).then(() => toast.success("Reminder sent"))}>Send reminder</Button>
+            <Button size="sm" variant="outline" icon="chat" onClick={() => api(`/admin/invoices/${id}/whatsapp`, { body: {} }).then(() => toast.success("WhatsApp reminder queued")).catch((e) => toast.error(e.message))}>WhatsApp reminder</Button>
             <Button size="sm" variant="danger" onClick={() => confirm("Cancel invoice? Pending order services and IP holds will be released.") && api(`/admin/invoices/${id}/cancel`, { body: {} }).then(() => { toast.success("Cancelled"); reload(); }).catch((e) => toast.error(e.message))}>Cancel</Button>
           </>}
           {i.status === "PAID" && i.amountPaid > 0 && <Button size="sm" variant="danger" icon="currency_exchange" onClick={() => setRefund(true)}>Refund</Button>}

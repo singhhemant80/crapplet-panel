@@ -108,9 +108,14 @@ export default function ClientDetail() {
                 <dt className="text-[11.5px] font-bold uppercase tracking-wide text-mute">Account status</dt>
                 <dd className="mt-1"><Select className="h-8 w-32 text-sm" value={c.status} onChange={(e) => run(() => api(`/admin/clients/${id}`, { method: "PUT", body: { status: e.target.value } }), "Status updated")}><option>ACTIVE</option><option>INACTIVE</option><option>CLOSED</option></Select></dd>
               </div>
+              <div>
+                <dt className="text-[11.5px] font-bold uppercase tracking-wide text-mute">WhatsApp notifications</dt>
+                <dd className="mt-1"><Select className="h-8 w-28 text-sm" value={p.whatsappNotifications === false ? "off" : "on"} onChange={(e) => run(() => api(`/admin/clients/${id}/whatsapp-pref`, { method: "PUT", body: { enabled: e.target.value === "on" } }), e.target.value === "on" ? "WhatsApp notifications on" : "WhatsApp notifications off")}><option value="on">On</option><option value="off">Off</option></Select></dd>
+              </div>
               <Item k="Security" v={`${sum?.other.twoFactor ? "2FA on" : "2FA off"} · ${sum?.other.activeSessions ?? 0} signed-in session${sum?.other.activeSessions === 1 ? "" : "s"}`} />
             </dl>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+              <Button size="sm" variant="ghost" icon="password" onClick={() => setModal("setpw")}>Set new password</Button>
               <Button size="sm" variant="ghost" icon="lock_reset" onClick={() => confirm(`Email ${c.email} a password reset link?`) && run(() => api(`/admin/clients/${id}/password-reset`, { body: {} }), "Password reset email sent")}>Send password reset</Button>
               {c.totpEnabled && <Button size="sm" variant="ghost" icon="phonelink_lock" onClick={() => confirm("Turn off two-factor sign-in for this customer?") && run(() => api(`/admin/clients/${id}/reset-2fa`, { body: {} }), "2FA reset")}>Reset 2FA</Button>}
               {sum?.other.affiliate ? <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary-tint px-3 text-[13px] font-semibold text-primary-dark"><Icon name="handshake" className="text-[17px]" />Affiliate <span className="font-mono">{sum.other.affiliate.code}</span></span>
@@ -289,6 +294,7 @@ export default function ClientDetail() {
       <TicketModal open={modal === "ticket"} onClose={close} id={id} onDone={refresh} />
       <EmailModal open={modal === "email"} onClose={close} id={id} email={c.email} onDone={refresh} />
       <WhatsAppModal open={modal === "whatsapp"} onClose={close} client={c} />
+      <SetPasswordModal open={modal === "setpw"} onClose={close} client={c} onDone={refresh} />
       <MergeModal open={modal === "merge"} onClose={close} c={c} onDone={(into: string) => router.push(`/admin/clients/${into}`)} />
       <CloseModal open={modal === "close"} onClose={close} c={c} onDone={refresh} />
     </>
@@ -384,16 +390,119 @@ function EmailModal({ open, onClose, id, email, onDone }: { open: boolean; onClo
   );
 }
 
+const WA_QUICK: [string, string][] = [
+  ["Payment reminder", "Hi {name}, a friendly reminder that you have an unpaid invoice. You can pay online from your client area: {app}/client/invoices"],
+  ["Service ready", "Hi {name}, your service is ready. Login details are in your email and client area: {app}/client"],
+  ["Maintenance", "Hi {name}, we're doing scheduled maintenance today. Your service may be briefly unavailable. Thank you for your patience."],
+  ["Ticket update", "Hi {name}, we've replied to your support ticket: {app}/client/tickets"],
+];
+
 function WhatsAppModal({ open, onClose, client: c }: { open: boolean; onClose: () => void; client: any }) {
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const hist = useApi(open ? `/admin/whatsapp/messages?userId=${c.id}` : null, [open]);
   useEffect(() => { if (open) setMsg(`Hi ${c.firstName ?? ""}, `); }, [open, c.firstName]);
   const digits = String(c.phone ?? "").replace(/\D/g, "");
-  const phone = digits.length === 10 ? `91${digits}` : digits;
+  const phone = digits.length === 10 ? `91${digits}` : digits.replace(/^0+/, "");
+  const app = typeof window !== "undefined" ? window.location.origin : "";
+  async function send() {
+    setBusy(true);
+    try {
+      await api(`/admin/clients/${c.id}/whatsapp`, { body: { text: msg } });
+      toast.success("WhatsApp message queued");
+      hist.reload();
+      setMsg(`Hi ${c.firstName ?? ""}, `);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <Modal open={open} onClose={onClose} title="Send WhatsApp message">
-      <p className="mb-3 text-sm text-mute">Opens WhatsApp with this message to <b>+{phone}</b>.</p>
-      <Textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)} autoFocus />
-      <Button className="mt-4 !bg-emerald-600 !bg-none hover:!bg-emerald-700" icon="chat" disabled={!msg.trim() || phone.length < 10} onClick={() => { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener"); onClose(); }}>Open WhatsApp</Button>
+    <Modal open={open} onClose={onClose} title="Send WhatsApp message" wide>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="text-mute">To <b className="text-ink">+{phone}</b>{c.profile?.whatsappNotifications === false && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">notifications off</span>}</span>
+        <div className="flex flex-wrap gap-1.5">{WA_QUICK.map(([l, t]) => <button key={l} type="button" onClick={() => setMsg(t.replace("{name}", c.firstName ?? "").replaceAll("{app}", app))} className="rounded-full bg-[#f4effd] px-2.5 py-1 text-[11.5px] font-bold text-primary-dark hover:bg-primary-soft">{l}</button>)}</div>
+      </div>
+      <Textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)} autoFocus maxLength={1000} />
+      <div className="mt-1 text-right text-[11px] text-mute">{msg.length}/1000</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button className="!bg-emerald-600 !bg-none hover:!bg-emerald-700" icon="send" loading={busy} disabled={!msg.trim() || phone.length < 10} onClick={send}>Send via WhatsApp</Button>
+        <Button variant="outline" icon="open_in_new" disabled={!msg.trim() || phone.length < 10} onClick={() => window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener")}>Open in WhatsApp app</Button>
+      </div>
+      <p className="mt-2 text-xs text-mute">“Send” uses the WhatsApp provider set up in Admin → WhatsApp. With Meta&apos;s official API, free text only reaches clients who messaged you in the last 24 hours — use “Open in WhatsApp app” otherwise.</p>
+      {hist.data?.items?.length > 0 && (
+        <div className="mt-5 border-t border-line pt-4">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-mute">Recent WhatsApp messages</div>
+          <ul className="max-h-56 space-y-2 overflow-y-auto">
+            {hist.data.items.slice(0, 10).map((m: any) => (
+              <li key={m.id} className="rounded-xl bg-[#f0fdf4] p-3 text-[13px] ring-1 ring-emerald-100">
+                <div className="mb-1 flex items-center justify-between gap-2 text-[11px] font-semibold text-mute"><span>{m.event === "manual" ? "Message" : m.event} · {date(m.createdAt, true)}</span><Badge status={m.status === "SENT" ? "ACTIVE" : m.status === "FAILED" ? "FAILED" : "PENDING"}>{m.status.toLowerCase()}</Badge></div>
+                <div className="whitespace-pre-wrap break-words text-slate-700">{m.body}</div>
+                {m.error && <div className="mt-1 text-xs text-rose-600">{m.error}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function SetPasswordModal({ open, onClose, client: c, onDone }: { open: boolean; onClose: () => void; client: any; onDone: () => void }) {
+  const [mode, setMode] = useState<"generate" | "own">("generate");
+  const [pw, setPw] = useState("");
+  const [sendEmail, setSendEmail] = useState(true);
+  const [sendWa, setSendWa] = useState(false);
+  const [signOut, setSignOut] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ password: string; sent: string[] } | null>(null);
+  useEffect(() => { if (open) { setMode("generate"); setPw(""); setResult(null); setSendEmail(true); setSendWa(false); setSignOut(true); } }, [open]);
+  async function save() {
+    setBusy(true);
+    try {
+      const r = await api(`/admin/clients/${c.id}/set-password`, { body: { ...(mode === "own" ? { password: pw } : {}), sendEmail, sendWhatsapp: sendWa, signOut } });
+      setResult(r);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal open={open} onClose={onClose} title={`Set a new password for ${c.firstName ?? c.email}`}>
+      {result ? (
+        <div className="space-y-4">
+          <Alert tone="success">Password changed{result.sent.length ? ` · sent by ${result.sent.join(", ")}` : ""}.</Alert>
+          <div>
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-mute">New password — shown once</div>
+            <div className="flex items-center gap-2 rounded-xl border border-line bg-[#faf7ff] px-4 py-3 font-mono text-[15px] font-bold text-ink"><span className="min-w-0 flex-1 break-all">{result.password}</span><Copy text={result.password} /></div>
+            <p className="mt-2 text-xs text-mute">Share it with {c.email} securely. They can change it under Account → Security.</p>
+          </div>
+          <div className="flex justify-end"><Button onClick={onClose}>Done</Button></div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {([["generate", "casino", "Generate a strong one"], ["own", "edit", "Type a password"]] as const).map(([k, i, t]) => (
+              <button key={k} type="button" onClick={() => setMode(k)} className={cx("flex items-center gap-2 rounded-xl border p-3 text-left text-sm font-extrabold", mode === k ? "border-primary bg-primary-tint text-ink ring-2 ring-primary/20" : "border-line text-slate-600 hover:border-primary/40")}>
+                <span className={cx("grid h-8 w-8 place-items-center rounded-lg", mode === k ? "bg-primary-dark text-white" : "bg-primary-soft text-primary-dark")}><Icon name={i} className="text-[18px]" /></span>{t}
+              </button>
+            ))}
+          </div>
+          {mode === "own" && <Field label="New password" hint="At least 8 characters"><Input type="text" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus /></Field>}
+          <div className="space-y-2.5 rounded-xl bg-[#fbf9ff] p-4">
+            <Toggle checked={sendEmail} onChange={setSendEmail} label={`Email the new password to ${c.email}`} />
+            <Toggle checked={sendWa} onChange={setSendWa} label={c.phone ? `Send it on WhatsApp to ${c.phone}` : "Send it on WhatsApp (no mobile number)"} />
+            <Toggle checked={signOut} onChange={setSignOut} label="Sign the client out everywhere" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button icon="password" loading={busy} disabled={(mode === "own" && pw.length < 8) || (sendWa && !c.phone)} onClick={save}>Set password</Button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

@@ -14,6 +14,14 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
 <p><a href="{{link}}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Reset password</a></p>
 <p style="color:#64748b">This link expires in 60 minutes. If you didn't ask for this, you can ignore this email.</p>`,
   },
+  "auth.password_set": {
+    name: "Password set by staff",
+    subject: "Your {{company.brand}} password was reset",
+    body: `<p>Hi {{name}},</p><p>As requested, our team has set a new password for your account.</p>
+<p>Email: <b>{{email}}</b><br/>New password: <b style="font-family:monospace">{{password}}</b></p>
+<p><a href="{{appUrl}}/client/login" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Sign in</a></p>
+<p style="color:#64748b">Please change it after signing in (Account → Security). If you didn't ask for this, contact us right away.</p>`,
+  },
   "auth.welcome": {
     name: "Welcome",
     subject: "Welcome to {{company.brand}}",

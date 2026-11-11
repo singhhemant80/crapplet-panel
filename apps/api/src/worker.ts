@@ -8,6 +8,7 @@ import { runProvisionAction, markCreateFailed } from "./modules/provisioning/pro
 import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
 import { maybeRunScheduled } from "./jobs/billing";
+import { deliverWhatsapp } from "./modules/whatsapp/service";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
 import { syncVirtualizorOs } from "./modules/provisioning/virtualizor-os";
@@ -38,6 +39,8 @@ provisioning.on("failed", async (job, err) => {
 provisioning.on("completed", (job) => console.log(`[provisioning] ${job.name} ${job.data.serviceId} done`));
 
 const email = new Worker<EmailJob>("email", async (job) => sendTemplatedEmail(job.data), { connection, concurrency: 5 });
+const whatsapp = new Worker<{ messageId: string; vars: Record<string, unknown> }>("whatsapp", async (job) => deliverWhatsapp(job.data.messageId, job.data.vars), { connection, concurrency: 3 });
+whatsapp.on("failed", (job, err) => console.error(`[whatsapp] ${job?.name} failed:`, err.message));
 email.on("failed", (job, err) => console.error(`[email] ${job?.data.template} → ${job?.data.to} failed:`, err.message));
 
 const maintenance = new Worker(
@@ -123,7 +126,7 @@ schedule().catch((e) => {
 
 async function shutdown() {
   console.log("[worker] shutting down");
-  await Promise.all([provisioning.close(), email.close(), maintenance.close(), migration.close()]);
+  await Promise.all([provisioning.close(), email.close(), whatsapp.close(), maintenance.close(), migration.close()]);
   await closeQueues();
   await prisma.$disconnect();
   process.exit(0);

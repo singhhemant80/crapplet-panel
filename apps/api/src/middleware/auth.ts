@@ -49,8 +49,13 @@ export function signAccessToken(u: { id: string; type: string; sid: string }) {
 }
 
 async function loadUser(userId: string, sessionId?: string): Promise<AuthUser | null> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, include: { role: true, reseller: true } });
+  const [user, session] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, include: { role: true, reseller: true } }),
+    sessionId ? prisma.session.findUnique({ where: { id: sessionId }, select: { revokedAt: true, expiresAt: true } }) : null,
+  ]);
   if (!user || user.status !== "ACTIVE") return null;
+  // signed out (logout, password reset, "sign out everywhere") takes effect at once, not when the token expires
+  if (sessionId && (!session || session.revokedAt || session.expiresAt < new Date())) return null;
   return {
     id: user.id,
     type: user.type,

@@ -13,7 +13,7 @@ import { prisma } from "../../db";
 import { config } from "../../config";
 import { ah, badRequest, conflict, notFound, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
-import { encrypt, randomToken, sha256 } from "../../lib/crypto";
+import { encrypt, generatePassword, randomToken, sha256 } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
 import { adjustCredit, createInvoice, invoiceEmailVars } from "../billing/invoices";
 import { queueEmail } from "../email/mailer";
@@ -293,6 +293,48 @@ adminClients.get(
 );
 
 // ───── Account actions ─────
+/** Staff sets a new password for a client who can't log in (typed or generated), optionally sending it. */
+adminClients.post(
+  "/clients/:id/set-password",
+  requireStaff("clients.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      z.object({
+        password: z.string().min(8, "Password must be at least 8 characters").max(128).optional(),
+        sendEmail: z.boolean().default(false),
+        sendWhatsapp: z.boolean().default(false),
+        signOut: z.boolean().default(true),
+      }),
+      req.body,
+    );
+    const u = await client(req.params.id);
+    const password = b.password ?? generatePassword(14);
+    const bcrypt = (await import("bcryptjs")).default;
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(password, 12) } }),
+      ...(b.signOut ? [prisma.session.updateMany({ where: { userId: u.id, revokedAt: null }, data: { revokedAt: new Date() } })] : []),
+    ]);
+    const sent: string[] = [];
+    if (b.sendEmail) {
+      await queueEmail("auth.password_set", u.email, { name: u.firstName, email: u.email, password }, u.id);
+      sent.push("email");
+    }
+    if (b.sendWhatsapp) {
+      const { sendManualWhatsapp } = await import("../whatsapp/service");
+      try {
+        const s = await getSettings();
+        await sendManualWhatsapp({ userId: u.id, actorId: req.user!.id, event: "manual", text: `Hi ${u.firstName}, your ${s.company.brand} password has been reset.\nEmail: ${u.email}\nNew password: ${password}\nSign in: ${config.appUrl}/client/login — please change it after signing in.` });
+        sent.push("whatsapp");
+      } catch (e) {
+        sent.push(`whatsapp failed: ${(e as Error).message}`);
+      }
+    }
+    await audit({ actorId: req.user!.id, userId: u.id, action: "client.password_set", details: { generated: !b.password, signedOut: b.signOut, sent } });
+    // the password is returned once so staff can copy it; it's never stored in plain text or logged
+    res.json({ ok: true, password, generated: !b.password, sent });
+  }),
+);
+
 adminClients.post(
   "/clients/:id/password-reset",
   requireStaff("clients.manage"),

@@ -145,6 +145,8 @@ model ClientProfile {
   creditBalance Int     @default(0)
   notes         String?
   affiliateRef  String?
+  /// client accepts WhatsApp notifications (they can switch it off in their profile)
+  whatsappNotifications Boolean @default(true)
 }
 
 model Role {
@@ -1288,4 +1290,22 @@ model AutomationEvent {
   @@index([createdAt])
   @@index([action, createdAt])
   @@index([runId])
+}
+
+/// WhatsApp messages sent (or attempted) to clients — automatic notifications and staff messages.
+model WhatsappMessage {
+  id         String   @id @default(cuid())
+  userId     String?
+  to         String
+  event      String   // notification key (invoice.created, …) or "manual"
+  body       String
+  status     String   @default("QUEUED") // QUEUED | SENT | FAILED | SKIPPED
+  providerId String?
+  error      String?
+  sentById   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }

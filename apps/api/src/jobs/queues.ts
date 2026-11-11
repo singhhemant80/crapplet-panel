@@ -56,6 +56,7 @@ function q<T>(name: string): Queue<T> {
 
 export const provisioningQueue = () => q<ProvisionJob>("provisioning");
 export const emailQueue = () => q<EmailJob>("email");
+export const whatsappQueue = () => q<{ messageId: string; vars: Record<string, unknown> }>("whatsapp");
 export const paymentQueue = () => q<PaymentJob>("payments");
 export const migrationQueue = () => q<{ runId: string }>("migration");
 export const maintenanceQueue = () => q<Record<string, unknown>>("maintenance");
