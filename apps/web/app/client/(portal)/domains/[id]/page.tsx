@@ -17,7 +17,14 @@ export default function DomainPage() {
   const save = (p: string, body: unknown, msg: string) => api(`/client/domains/${id}${p}`, { method: "PUT", body }).then(() => { toast.success(msg); reload(); }).catch((e) => toast.error(e.message));
   return (
     <>
-      <PageHeader back="/client/domains" title={<span className="flex items-center gap-3">{d.name} <Badge status={d.status} /></span>} subtitle={`Expires ${date(d.expiryDate)}`} />
+      <PageHeader icon="public"
+        stats={[
+          ["Status", <Badge key="s" status={d.status} />],
+          ["Registered", d.registrationDate ? date(d.registrationDate) : "—"],
+          ["Expires", d.expiryDate ? date(d.expiryDate) : "—", d.expiryDate ? (() => { const n = Math.ceil((new Date(d.expiryDate).getTime() - Date.now()) / 86400_000); return n < 0 ? `${-n} days ago` : `in ${n} days`; })() : undefined],
+          ["Auto-renew", d.autoRenew ? "On" : "Off"],
+        ]}
+        back="/client/domains" title={<span className="flex items-center gap-3">{d.name} <Badge status={d.status} /></span>} subtitle={`Expires ${date(d.expiryDate)}`} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Nameservers">
           <div className="space-y-3">

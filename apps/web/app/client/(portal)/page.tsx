@@ -66,7 +66,7 @@ export default function Dashboard() {
       )}
 
       {/* ── KPIs ── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
         <Kpi href="/client/services?status=ACTIVE" icon="dns" tone="violet" label="Active services" value={s.activeServices} hint={s.pendingServices ? `${s.pendingServices} being set up` : `${services.length} in total`} />
         <Kpi href="/client/invoices?status=UNPAID" icon="receipt_long" tone={s.outstanding ? "rose" : "emerald"} label="Amount due" value={money(s.outstanding, cur)} hint={s.unpaidInvoices ? `${s.unpaidInvoices} unpaid invoice${s.unpaidInvoices > 1 ? "s" : ""}` : "Nothing to pay"} />
         <Kpi href="/client/wallet" icon="account_balance_wallet" tone="indigo" label="Account credit" value={money(s.creditBalance, cur)} hint="Used automatically on invoices" />
@@ -302,7 +302,7 @@ function Kpi({ href, icon, tone, label, value, hint }: { href: string; icon: str
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[12.5px] font-semibold text-mute">{label}</div>
-          <div className="mt-1 truncate text-[22px] font-extrabold tracking-tight text-ink">{value}</div>
+          <div className="mt-1 truncate text-lg font-extrabold tracking-tight text-ink sm:text-[22px]">{value}</div>
         </div>
         <span className={cx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-md", TONES[tone])}><Icon name={icon} className="text-[20px]" /></span>
       </div>

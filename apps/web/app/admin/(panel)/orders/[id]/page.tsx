@@ -24,6 +24,15 @@ export default function AdminOrder() {
   return (
     <>
       <PageHeader
+        icon="shopping_bag"
+        stats={[
+          ["Customer", <Link key="c" href={`/admin/clients/${u.id}`} className="hover:underline">{[u.firstName, u.lastName].filter(Boolean).join(" ") || u.email}</Link>, u.email],
+          ["Order total", money(o.total, o.currency), o.currency === "INR" ? "incl. GST" : undefined],
+          ["Items", `${o.services.length} service${o.services.length === 1 ? "" : "s"}${o.domains?.length ? ` · ${o.domains.length} domain${o.domains.length === 1 ? "" : "s"}` : ""}`],
+          ["Invoice", inv ? <Badge key="i" status={inv.status} /> : "—", inv?.dueDate ? `due ${date(inv.dueDate)}` : undefined],
+          ["Promo code", o.promoCode ?? "—"],
+          ["Placed", date(o.createdAt), o.ip ?? undefined],
+        ]}
         back="/admin/orders"
         title={<span className="flex flex-wrap items-center gap-3">Order {o.number} <Badge status={o.status} /></span>}
         subtitle={<span>Placed {date(o.createdAt, true)}{o.ip && <> · from IP <span className="font-mono">{o.ip}</span></>}{o.reseller && <> · via reseller {o.reseller.brandName}</>}</span>}
@@ -40,21 +49,6 @@ export default function AdminOrder() {
       />
 
       <OrderStatusPanel o={o} onDone={reload} />
-
-      {/* at-a-glance strip */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          ["Order total", money(o.total, o.currency), "payments"],
-          ["Invoice", inv ? <Badge key="b" status={inv.status} /> : "—", "receipt_long"],
-          ["Items", `${o.services.length} service${o.services.length === 1 ? "" : "s"}${o.domains.length ? ` · ${o.domains.length} domain${o.domains.length === 1 ? "" : "s"}` : ""}`, "inventory_2"],
-          ["Promo code", o.promoCode ?? "—", "sell"],
-        ].map(([l, v, i]: any) => (
-          <div key={l} className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-mute"><Icon name={i} className="text-[18px] text-primary-dark" />{l}</div>
-            <div className="mt-1.5 text-lg font-extrabold text-ink">{v}</div>
-          </div>
-        ))}
-      </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">

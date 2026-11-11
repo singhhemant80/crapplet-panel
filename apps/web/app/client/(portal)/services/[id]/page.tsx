@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, CYCLES, date, gb, invNo, money } from "@/lib/api";
-import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, Select, Textarea, cx, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, cx, toast, useApi } from "@/components/ui";
 import { PasswordField, passwordProblem } from "@/components/password-field";
 import { Sparkline } from "@/components/sparkline";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
@@ -58,49 +58,34 @@ export default function ServicePage() {
   const days = svc.nextDueDate ? Math.ceil((new Date(svc.nextDueDate).getTime() - Date.now()) / 86400_000) : null;
   return (
     <>
-      <Link href="/client/services" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline"><Icon name="arrow_back" className="text-[18px]" />My services</Link>
-
-      {/* ── header ── */}
-      <section className="mb-6 overflow-hidden rounded-3xl border border-[#ece7f7] bg-white shadow-card">
-        <div className="relative bg-[radial-gradient(120%_160%_at_0%_0%,#f3ecff_0%,#ffffff_55%)] p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              {isVps && svc.osTemplate ? <OsLogo os={svc.osTemplate} size={56} className="rounded-2xl shadow-sm" /> : (
-                <span className={cx("grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-white shadow-md", isHosting ? "bg-gradient-to-br from-sky-500 to-indigo-600" : "bg-gradient-to-br from-primary to-primary-dark")}>
-                  <Icon name={isHosting ? "language" : isVps ? "terminal" : "widgets"} className="text-[28px]" />
-                </span>
-              )}
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-xl font-extrabold tracking-tight text-ink sm:text-2xl">{svc.product.name}</h1>
-                  <Badge status={svc.status} />
-                  {svc.status === "ACTIVE" && (isVps || isHosting) && <LiveBadge state={live?.state} reason={live?.reason} loading={!live} />}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-600">
-                  {svc.hostname && <span className="inline-flex items-center gap-1"><Icon name={isHosting ? "language" : "dns"} className="text-[16px] text-mute" />{isHosting ? <a href={`http://${svc.hostname}`} target="_blank" rel="noreferrer" className="font-semibold hover:text-primary-dark">{svc.hostname}</a> : svc.hostname}</span>}
-                  {(ip || live?.ip) && <span className="inline-flex items-center gap-1 font-mono text-[12.5px]"><Icon name="lan" className="text-[16px] text-mute" />{ip ?? live?.ip}<Copy text={ip ?? live?.ip} /></span>}
-                  <span className="inline-flex items-center gap-1"><Icon name="category" className="text-[16px] text-mute" />{isHosting ? (reseller ? "Reseller hosting (cPanel + WHM)" : "cPanel web hosting") : isVps ? `${svc.product.virtType ?? "KVM"} VPS · ${svc.product.cpuCores} vCPU · ${gb(svc.product.ramMb)}` : "Service"}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {isHosting && svc.status === "ACTIVE" && <>
-                <Button icon="open_in_new" onClick={() => openLogin(id, "cpaneld")}>Login to cPanel</Button>
-                {reseller && <Button variant="secondary" icon="admin_panel_settings" onClick={() => openLogin(id, "whostmgrd")}>Login to WHM</Button>}
-                <Button variant="outline" icon="mail" onClick={() => openLogin(id, "webmaild")}>Webmail</Button>
-              </>}
-              {isVps && svc.status === "ACTIVE" && svc.product?.provisioner === "VIRTUALIZOR" && <Button icon="terminal" href={`/client/services/${id}/console`}>Open console</Button>}
-              {svc.status === "SUSPENDED" && <Button icon="bolt" href="/client/invoices?status=UNPAID">Pay to restore</Button>}
-            </div>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[#efe9fb] pt-4 sm:grid-cols-4">
-            <HeadStat label="Recurring" value={`${money(svc.recurringAmount, svc.currency)}`} sub={`${CYCLES[svc.billingCycle] ?? ""}${svc.currency === "INR" ? " + GST" : ""}`} />
-            <HeadStat label="Next due" value={date(svc.nextDueDate)} sub={days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`} warn={days !== null && days <= 7} />
-            <HeadStat label="Registered" value={date(svc.registrationDate)} sub={`Service #${String(svc.id).slice(-6).toUpperCase()}`} />
-            <HeadStat label={isHosting ? "Server" : isVps ? "Operating system" : "Status"} value={isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status} sub={isHosting ? live?.plan ? `Package ${live.plan}` : "" : isVps ? `${svc.product.diskGb} GB NVMe` : ""} />
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        back="/client/services"
+        icon={isVps && svc.osTemplate ? <OsLogo os={svc.osTemplate} size={34} /> : <Icon name={isHosting ? "language" : isVps ? "terminal" : "widgets"} className="text-[26px]" />}
+        title={svc.hostname || svc.product.name}
+        badge={<Badge status={svc.status} />}
+        subtitle={isHosting ? `${svc.product.name} · ${reseller ? "Reseller hosting (cPanel + WHM)" : "cPanel web hosting"}` : isVps ? `${svc.product.name} · ${svc.product.virtType ?? "KVM"} VPS · ${svc.product.cpuCores} vCPU · ${gb(svc.product.ramMb)} · ${svc.product.diskGb} GB NVMe` : svc.product.name}
+        meta={<>
+          {svc.status === "ACTIVE" && (isVps || isHosting) && <span className="rounded-lg bg-white/95 px-1.5 py-1"><LiveBadge state={live?.state} reason={live?.reason} loading={!live} /></span>}
+          {(ip || live?.ip) && <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 font-mono text-[12.5px] font-semibold ring-1 ring-white/15"><Icon name="lan" className="text-[16px] text-white/70" />{ip ?? live?.ip}<span className="[&_button]:text-white/80"><Copy text={ip ?? live?.ip} /></span></span>}
+          {isHosting && svc.hostname && <a href={`http://${svc.hostname}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold"><Icon name="open_in_new" className="text-[16px] text-white/70" />Visit website</a>}
+        </>}
+        actions={<>
+          {isHosting && svc.status === "ACTIVE" && <>
+            <Button size="sm" icon="open_in_new" onClick={() => openLogin(id, "cpaneld")}>Login to cPanel</Button>
+            {reseller && <Button size="sm" variant="secondary" icon="admin_panel_settings" onClick={() => openLogin(id, "whostmgrd")}>Login to WHM</Button>}
+            <Button size="sm" variant="outline" icon="mail" onClick={() => openLogin(id, "webmaild")}>Webmail</Button>
+          </>}
+          {isVps && svc.status === "ACTIVE" && svc.product?.provisioner === "VIRTUALIZOR" && <Button size="sm" icon="terminal" href={`/client/services/${id}/console`}>Open console</Button>}
+          {svc.status === "SUSPENDED" && <Button size="sm" icon="bolt" href="/client/invoices?status=UNPAID">Pay to restore</Button>}
+        </>}
+        stats={[
+          ["Registered", date(svc.registrationDate), `Service #${String(svc.id).slice(-6).toUpperCase()}`],
+          ["Next due", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
+          ["Billing cycle", CYCLES[svc.billingCycle] ?? svc.billingCycle],
+          ["Recurring", money(svc.recurringAmount, svc.currency), svc.currency === "INR" ? "+ GST" : undefined],
+          [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
+        ]}
+      />
 
       {(isVps || isHosting) && (["PENDING", "PROVISIONING", "FAILED"].includes(svc.status) || (svc.status === "ACTIVE" && Date.now() - new Date(svc.createdAt).getTime() < 3 * 3600_000)) && (
         <ProvisioningTracker path={`/client/services/${id}/provisioning`} audience="client" onChange={() => reload()} />
@@ -135,9 +120,9 @@ export default function ServicePage() {
             </div>
           </div>
           {live?.error && <Alert tone="warn" className="mt-4">Live figures aren't available right now: {live.error}</Alert>}
-          {!live && <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-[118px] animate-pulse rounded-xl bg-[#f6f3fd]" />)}</div>}
+          {!live && <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-[118px] animate-pulse rounded-xl bg-[#f6f3fd]" />)}</div>}
           {live && !live.error && (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">
               <Meter label="CPU" value={`${fmtNum(live.cpuPct ?? 0)}%`} sub={`${live.cpus ?? svc.product.cpuCores} vCPU${live.cpuLimitMhz ? ` · ${live.cpuLimitMhz} MHz` : ""}`} pct={live.cpuPct ?? 0} icon="memory" />
               <Meter label="Memory" value={live.memUsedMb != null ? mbStr(live.memUsedMb) : "—"} sub={`of ${mbStr(live.memTotalMb ?? svc.product.ramMb)}`} pct={live.memTotalMb && live.memUsedMb != null ? (live.memUsedMb / live.memTotalMb) * 100 : undefined} icon="memory_alt" />
               <Meter label="Disk" value={live.diskUsedGb != null ? `${fmtNum(live.diskUsedGb)} GB` : `${live.diskTotalGb ?? svc.product.diskGb} GB`} sub={live.diskUsedGb != null ? `of ${live.diskTotalGb ?? svc.product.diskGb} GB` : "allocated"} pct={live.diskUsedGb != null && live.diskTotalGb ? (live.diskUsedGb / live.diskTotalGb) * 100 : undefined} icon="hard_drive" />
@@ -303,15 +288,6 @@ function speedStr(bps?: number) {
   return `${Math.round(b)} bps`;
 }
 
-function HeadStat({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11.5px] font-bold uppercase tracking-wide text-mute">{label}</div>
-      <div className="mt-0.5 truncate text-[15px] font-extrabold text-ink">{value}</div>
-      {sub && <div className={cx("truncate text-xs", warn ? "font-semibold text-rose-600" : "text-mute")}>{sub}</div>}
-    </div>
-  );
-}
 
 function Meter({ label, value, sub, pct, icon }: { label: string; value: string; sub: string; pct?: number; icon: string }) {
   return (

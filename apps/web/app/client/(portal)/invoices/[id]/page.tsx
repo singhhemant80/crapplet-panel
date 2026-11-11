@@ -139,6 +139,14 @@ function InvoiceView() {
   return (
     <>
       <PageHeader
+        icon="receipt_long"
+        stats={[
+          ["Total", money(inv.total, inv.currency)],
+          ["Paid", money(inv.amountPaid ?? 0, inv.currency)],
+          ["Balance due", money(Math.max(0, inv.total - (inv.amountPaid ?? 0)), inv.currency)],
+          ["Issued", date(inv.createdAt)],
+          ["Due date", inv.dueDate ? date(inv.dueDate) : "—"],
+        ]}
         back="/client/invoices"
         title={
           <span className="flex flex-wrap items-center gap-3">

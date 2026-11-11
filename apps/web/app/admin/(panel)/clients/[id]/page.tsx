@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, date, invNo, money } from "@/lib/api";
-import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, PageHeader, Modal, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", SG: "Singapore", CA: "Canada", AU: "Australia", DE: "Germany" };
 const fullName = (x: any) => [x?.firstName, x?.lastName].filter(Boolean).join(" ") || x?.email || "—";
@@ -57,41 +57,28 @@ export default function ClientDetail() {
 
   return (
     <>
-      <Link href="/admin/clients" className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline"><Icon name="arrow_back" className="text-[18px]" />Customers</Link>
-
-      {/* ── profile header ── */}
-      <section className="mb-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-        <div className="h-1.5 bg-gradient-to-r from-primary via-primary-dark to-primary-deep" />
-        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
-          <div className="flex min-w-0 items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-lg font-extrabold text-white shadow-glow">{initials}</span>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-2xl font-extrabold tracking-tight text-ink">{fullName(c)}</h1>
-                <Badge status={c.status} />
-                {!c.emailVerified && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">Email not verified</span>}
-                {c.reseller && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700 ring-1 ring-sky-200">Reseller</span>}
-              </div>
-              <div className="mt-0.5 text-sm text-mute">{p.companyName ? <b className="font-semibold text-slate-700">{p.companyName} · </b> : null}Client #{c.id.slice(-6).toUpperCase()} · since {date(c.createdAt)}{sum ? ` (${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"})` : ""}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-600">
-                <span className="inline-flex items-center gap-1"><Icon name="mail" className="text-[16px] text-mute" />{c.email}<Copy text={c.email} /></span>
-                {c.phone && <span className="inline-flex items-center gap-1"><Icon name="call" className="text-[16px] text-mute" />{c.phone}</span>}
-                {place && <span className="inline-flex items-center gap-1"><Icon name="location_on" className="text-[16px] text-mute" />{place}</span>}
-                {sum?.other.lastLogin && <span className="inline-flex items-center gap-1"><Icon name="schedule" className="text-[16px] text-mute" />Last login {date(sum.other.lastLogin.at, true)} · <span className="font-mono text-[12px]">{sum.other.lastLogin.ip}</span></span>}
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
-            <Button size="sm" variant="outline" icon="login" disabled={c.status !== "ACTIVE"} onClick={loginAs}>Login as client</Button>
-            <Button size="sm" variant="outline" icon="mail" onClick={() => setModal("email")}>Email</Button>
-            <Button size="sm" variant="outline" icon="chat" disabled={!c.phone} onClick={() => setModal("whatsapp")}>WhatsApp</Button>
-          </div>
-        </div>
-      </section>
+      <PageHeader
+        back="/admin/clients"
+        icon={<span className="text-lg font-extrabold">{initials}</span>}
+        title={fullName(c)}
+        badge={<Badge status={c.status} />}
+        subtitle={<>{p.companyName ? <b className="font-semibold text-white">{p.companyName} · </b> : null}Client #{c.id.slice(-6).toUpperCase()} · since {date(c.createdAt)}{sum ? ` (${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"})` : ""}{!c.emailVerified && <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40">Email not verified</span>}{c.reseller && <span className="ml-2 rounded-full bg-sky-400/20 px-2 py-0.5 text-[11px] font-bold text-sky-100 ring-1 ring-sky-300/40">Reseller</span>}</>}
+        meta={<>
+          <span className="inline-flex items-center gap-1.5 break-all"><Icon name="mail" className="text-[16px] text-white/60" />{c.email}<span className="[&_button]:text-white/80"><Copy text={c.email} /></span></span>
+          {c.phone && <span className="inline-flex items-center gap-1.5"><Icon name="call" className="text-[16px] text-white/60" />{c.phone}</span>}
+          {place && <span className="inline-flex items-center gap-1.5"><Icon name="location_on" className="text-[16px] text-white/60" />{place}</span>}
+          {sum?.other.lastLogin && <span className="inline-flex items-center gap-1.5"><Icon name="schedule" className="text-[16px] text-white/60" />Last login {date(sum.other.lastLogin.at, true)} · <span className="font-mono text-[12px]">{sum.other.lastLogin.ip}</span></span>}
+        </>}
+        actions={<>
+          <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
+          <Button size="sm" variant="outline" icon="login" disabled={c.status !== "ACTIVE"} onClick={loginAs}>Login as client</Button>
+          <Button size="sm" variant="outline" icon="mail" onClick={() => setModal("email")}>Email</Button>
+          <Button size="sm" variant="outline" icon="chat" disabled={!c.phone} onClick={() => setModal("whatsapp")}>WhatsApp</Button>
+        </>}
+      />
 
       {/* ── KPIs ── */}
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         <Kpi icon="account_balance_wallet" tone="purple" label="Credit balance" value={sum ? money(sum.income.credit, cur) : "…"} onClick={() => setModal("credit")} hint="Manage credits" />
         <Kpi icon="pending_actions" tone={due > 0 ? "rose" : "green"} label="Due now" value={sum ? money(due, cur) : "…"} hint={inv ? `${inv.UNPAID.count + inv.COLLECTIONS.count} unpaid invoice${inv.UNPAID.count + inv.COLLECTIONS.count === 1 ? "" : "s"}` : ""} onClick={() => goTab("invoices")} />
         <Kpi icon="payments" tone="green" label="Lifetime revenue" value={sum ? money(sum.income.gross, cur) : "…"} hint={sum ? `Net ${money(sum.income.net, cur)} after fees` : ""} onClick={() => goTab("statement")} />
@@ -340,7 +327,7 @@ function Item({ k, v, mono, wide }: { k: string; v?: ReactNode; mono?: boolean; 
 function Kpi({ icon, label, value, hint, tone, onClick }: { icon: string; label: string; value: ReactNode; hint?: string; tone: "purple" | "green" | "amber" | "rose" | "sky" | "slate"; onClick?: () => void }) {
   const tones = { purple: "bg-primary-soft text-primary-dark", green: "bg-emerald-50 text-emerald-600", amber: "bg-amber-50 text-amber-600", rose: "bg-rose-50 text-rose-600", sky: "bg-sky-50 text-sky-600", slate: "bg-slate-100 text-slate-500" };
   return (
-    <button type="button" onClick={onClick} className="flex items-center gap-3.5 rounded-2xl border border-line bg-white p-4 text-left shadow-card transition hover:-translate-y-px hover:border-[#dccafb]">
+    <button type="button" onClick={onClick} className="flex flex-col items-start gap-2.5 rounded-2xl border border-line bg-white p-3.5 text-left shadow-card sm:flex-row sm:items-center sm:gap-3.5 sm:p-4 transition hover:-translate-y-px hover:border-[#dccafb]">
       <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-xl", tones[tone])}><Icon name={icon} className="text-[22px]" /></span>
       <div className="min-w-0">
         <div className="truncate text-[12.5px] font-semibold text-mute">{label}</div>

@@ -33,7 +33,7 @@ export default function AdminDashboard() {
           {s.failedProvisioning > 0 && <Alert tone="error"><Link href="/admin/services?status=FAILED" className="font-bold underline">{s.failedProvisioning} services</Link> failed to provision and need attention.</Alert>}
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Stat label="Monthly recurring revenue" value={rupees(s.mrr)} icon="trending_up" tone="green" hint={`ARR ${rupees(s.arr)}`} />
         <Stat label="Collected this month" value={rupees(s.monthRevenue)} icon="payments" hint={`${s.paidThisMonth} invoices paid`} />
         <Stat label="Outstanding" value={rupees(s.outstanding)} icon="pending_actions" tone="amber" href="/admin/invoices?status=UNPAID" hint={`${s.unpaidInvoices} unpaid invoices`} />

@@ -34,9 +34,9 @@ export function Button({ variant = "primary", size = "md", loading, icon, href, 
       {children}
     </>
   );
-  if (href) return <Link href={href} className={cls}>{inner}</Link>;
+  if (href) return <Link href={href} className={cls} data-variant={variant}>{inner}</Link>;
   return (
-    <button className={cls} disabled={disabled || loading} {...rest}>
+    <button className={cls} data-variant={variant} disabled={disabled || loading} {...rest}>
       {inner}
     </button>
   );
@@ -48,14 +48,14 @@ export function Spinner({ className = "h-5 w-5" }: { className?: string }) {
 
 export function Card({ children, className, title, action, pad = true }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode; pad?: boolean }) {
   return (
-    <section className={cx("rounded-2xl border border-line bg-white shadow-card", className)}>
+    <section className={cx("min-w-0 rounded-2xl border border-line bg-white shadow-card", className)}>
       {title && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-4 sm:px-5">
           <h3 className="text-[15px] font-extrabold text-ink">{title}</h3>
           {action}
         </header>
       )}
-      <div className={pad ? "p-5" : ""}>{children}</div>
+      <div className={pad ? "p-4 sm:p-5" : ""}>{children}</div>
     </section>
   );
 }
@@ -63,14 +63,14 @@ export function Card({ children, className, title, action, pad = true }: { child
 export function Stat({ label, value, icon, tone = "purple", href, hint }: { label: string; value: ReactNode; icon: string; tone?: "purple" | "green" | "amber" | "rose" | "sky" | "slate"; href?: string; hint?: string }) {
   const tones = { purple: "bg-primary-soft text-primary-dark", green: "bg-emerald-50 text-emerald-600", amber: "bg-amber-50 text-amber-600", rose: "bg-rose-50 text-rose-600", sky: "bg-sky-50 text-sky-600", slate: "bg-slate-100 text-slate-600" };
   const body = (
-    <div className="flex items-center gap-4 rounded-2xl border border-line bg-white p-5 shadow-card transition hover:border-[#dccafb]">
-      <span className={cx("grid h-12 w-12 shrink-0 place-items-center rounded-xl", tones[tone])}>
+    <div className="flex h-full flex-col items-start gap-2.5 rounded-2xl border border-line bg-white p-3.5 shadow-card transition hover:border-[#dccafb] sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+      <span className={cx("grid h-10 w-10 shrink-0 place-items-center rounded-xl sm:h-12 sm:w-12", tones[tone])}>
         <Icon name={icon} className="text-[24px]" />
       </span>
       <div className="min-w-0">
         <div className="truncate text-[13px] font-semibold text-mute">{label}</div>
-        <div className="mt-0.5 text-2xl font-extrabold tracking-tight text-ink">{value}</div>
-        {hint && <div className="text-xs text-mute">{hint}</div>}
+        <div className="mt-0.5 truncate text-xl font-extrabold tracking-tight text-ink sm:text-2xl">{value}</div>
+        {hint && <div className="line-clamp-2 text-xs text-mute">{hint}</div>}
       </div>
     </div>
   );
@@ -172,19 +172,66 @@ export function Empty({ icon = "inbox", title, children }: { icon?: string; titl
   );
 }
 
-export function PageHeader({ title, subtitle, actions, back }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; back?: string }) {
+/** Icon for a page, from its address — used by PageHeader when none is given. */
+const PAGE_ICONS: [RegExp, string][] = [
+  [/\/search/, "search"], [/\/clients|\/customers/, "groups"], [/\/orders/, "shopping_bag"], [/\/invoices/, "receipt_long"], [/\/transactions|\/payments/, "payments"],
+  [/\/payment-reviews/, "fact_check"], [/\/services|\/vps/, "dns"], [/\/domains/, "public"], [/\/tickets/, "support_agent"], [/\/products|\/product-groups/, "inventory_2"],
+  [/\/addons/, "extension"], [/\/promo/, "sell"], [/\/os-templates/, "album"], [/\/servers/, "storage"], [/\/proxmox/, "hub"], [/\/virtualizor/, "lan"],
+  [/\/monitoring/, "monitor_heart"], [/\/ips/, "router"], [/\/locations/, "location_on"], [/\/provisioning/, "rocket_launch"], [/\/resellers|\/reseller/, "storefront"],
+  [/\/affiliates/, "handshake"], [/\/announcements/, "campaign"], [/\/knowledgebase/, "menu_book"], [/\/email/, "mail"], [/\/gateways/, "account_balance"],
+  [/\/currencies/, "currency_exchange"], [/\/reports/, "bar_chart"], [/\/activity/, "history"], [/\/staff|\/roles/, "badge"], [/\/security/, "shield_lock"],
+  [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
+  [/\/admin\/?$|\/client\/?$/, "space_dashboard"],
+];
+
+export type HeaderStat = [label: string, value: ReactNode, sub?: ReactNode];
+
+/**
+ * Page header: gradient band with icon, title, optional badge / meta line / actions, and an optional
+ * strip of key facts underneath. Buttons passed as `actions` are restyled for the dark band.
+ */
+export function PageHeader({ title, subtitle, actions, back, icon, badge, meta, stats, children }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; back?: string; icon?: string | ReactNode; badge?: ReactNode; meta?: ReactNode; stats?: HeaderStat[]; children?: ReactNode }) {
+  const [path, setPath] = useState("");
+  useEffect(() => setPath(window.location.pathname), []);
+  const ic = icon ?? PAGE_ICONS.find(([re]) => re.test(path))?.[1] ?? "dashboard";
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        {back && (
-          <Link href={back} className="mb-2 inline-flex items-center gap-1 text-[13px] font-bold text-primary-dark hover:underline">
-            <Icon name="arrow_back" className="text-[17px]" /> Back
-          </Link>
+    <div className="mb-6">
+      {back && (
+        <Link href={back} className="mb-3 inline-flex items-center gap-1 text-[13px] font-bold text-primary-dark hover:underline">
+          <Icon name="arrow_back" className="text-[17px]" /> Back
+        </Link>
+      )}
+      <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+        <div className="relative bg-gradient-to-br from-[#1e0b4b] via-[#3b0f7a] to-[#6d28d9] px-4 py-5 text-white sm:px-6">
+          <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
+          <div className="relative flex flex-wrap items-start gap-3 sm:items-center sm:gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-primary-dark shadow-lg sm:h-12 sm:w-12">
+              {typeof ic === "string" ? <Icon name={ic} className="text-[26px]" /> : ic}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="min-w-0 break-words text-xl font-extrabold tracking-tight sm:text-2xl [&_.text-mute]:!text-white/60">{title}</h1>
+                {badge && <span className="rounded-lg bg-white/95 px-1 py-0.5 text-ink">{badge}</span>}
+              </div>
+              {subtitle && <div className="mt-0.5 text-[13.5px] text-white/75 [&_.font-mono]:text-white/90 [&_a]:!text-white [&_a]:underline-offset-2 [&_a:hover]:underline">{subtitle}</div>}
+              {meta && <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/90 [&_a:hover]:underline">{meta}</div>}
+            </div>
+            {actions && <div className="hero-actions flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
+          </div>
+          {children && <div className="relative mt-4">{children}</div>}
+        </div>
+        {stats && stats.length > 0 && (
+          <dl className={cx("grid grid-cols-2 sm:grid-cols-3", stats.length >= 6 ? "xl:grid-cols-6" : stats.length === 5 ? "xl:grid-cols-5" : stats.length === 4 ? "lg:grid-cols-4" : "")}>
+            {stats.map(([l, v, sub], i) => (
+              <div key={i} className="min-w-0 border-b border-r border-line px-4 py-3.5 sm:px-5 sm:py-4">
+                <dt className="truncate text-[11px] font-bold uppercase tracking-wider text-mute">{l}</dt>
+                <dd className="mt-1 truncate text-[15px] font-extrabold text-ink">{v}</dd>
+                {sub && <dd className="truncate text-xs text-mute">{sub}</dd>}
+              </div>
+            ))}
+          </dl>
         )}
-        <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-[28px]">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-mute">{subtitle}</p>}
-      </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </section>
     </div>
   );
 }

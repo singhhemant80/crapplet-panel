@@ -13,3 +13,13 @@ body { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; col
 .prose-kb { line-height: 1.7; white-space: pre-wrap; }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
 .fade-up { animation: fadeInUp .45s cubic-bezier(.22,1,.36,1) backwards; }
+
+/* Buttons inside the gradient page header */
+.hero-actions [data-variant="primary"] { background: #fff !important; color: #6d28d9 !important; box-shadow: 0 8px 20px rgba(0,0,0,.18) !important; }
+.hero-actions [data-variant="outline"], .hero-actions [data-variant="secondary"], .hero-actions [data-variant="ghost"] { background: rgba(255,255,255,.1) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.28) !important; }
+.hero-actions [data-variant="outline"]:hover, .hero-actions [data-variant="secondary"]:hover, .hero-actions [data-variant="ghost"]:hover { background: rgba(255,255,255,.2) !important; }
+.hero-actions select, .hero-actions input { background-color: #fff; color: #0f172a; }
+/* last row / column of the facts strip: no stray borders */
+
+/* grid/flex children may shrink below their content (tables scroll inside their card instead of widening the page) */
+main .grid > * { min-width: 0; }

@@ -16,7 +16,16 @@ export default function AdminInvoice() {
   const i = data.invoice;
   return (
     <>
-      <PageHeader back="/admin/invoices" title={<span className="flex items-center gap-3">{data.label} <Badge status={i.status} /></span>} subtitle={<span><Link className="font-bold text-primary-dark" href={`/admin/clients/${i.user.id}`}>{i.user.firstName} {i.user.lastName}</Link> · proforma {i.proformaNumber} · place of supply {i.placeOfSupply ?? "—"}</span>}
+      <PageHeader icon="receipt_long"
+        stats={[
+          ["Total", money(i.total, i.currency)],
+          ["Paid", money(i.amountPaid ?? 0, i.currency)],
+          ["Balance due", money(Math.max(0, i.total - (i.amountPaid ?? 0)), i.currency)],
+          ["Issued", date(i.createdAt)],
+          ["Due date", i.dueDate ? date(i.dueDate) : "—"],
+          ["Customer", `${i.user.firstName ?? ""} ${i.user.lastName ?? ""}`.trim() || i.user.email, i.user.email],
+        ]}
+        back="/admin/invoices" title={<span className="flex items-center gap-3">{data.label} <Badge status={i.status} /></span>} subtitle={<span><Link className="font-bold text-primary-dark" href={`/admin/clients/${i.user.id}`}>{i.user.firstName} {i.user.lastName}</Link> · proforma {i.proformaNumber} · place of supply {i.placeOfSupply ?? "—"}</span>}
         actions={<>
           <Button variant="outline" size="sm" icon="picture_as_pdf" onClick={() => window.open(`/api/admin/invoices/${id}/pdf`, "_blank")}>PDF</Button>
           {i.status === "UNPAID" && <>

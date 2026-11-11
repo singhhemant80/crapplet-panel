@@ -21,7 +21,15 @@ export default function AdminTicket() {
   const upd = (body: any) => api(`/admin/tickets/${id}`, { method: "PUT", body }).then(() => { toast.success("Updated"); reload(); });
   return (
     <>
-      <PageHeader back="/admin/tickets" title={t.subject} subtitle={<span className="flex flex-wrap items-center gap-2">#{t.number} · opened {date(t.createdAt, true)} {t.slaDueAt && !t.firstResponseAt && <span className={new Date(t.slaDueAt) < new Date() ? "font-bold text-rose-600" : ""}>· first response due {date(t.slaDueAt, true)}</span>}</span>} />
+      <PageHeader icon="support_agent" badge={<Badge status={t.status} />}
+        stats={[
+          ["Status", <Badge key="s" status={t.status} />],
+          ["Priority", <Badge key="p" status={t.priority} />],
+          ["Department", t.department?.name ?? "—"],
+          ["Customer", t.user ? `${t.user.firstName ?? ""} ${t.user.lastName ?? ""}`.trim() || t.user.email : t.fromEmail ?? "—", t.user?.email],
+          ["Replies", `${t.messages.length}`, t.messages.length ? `last ${date(t.messages[t.messages.length - 1].createdAt, true)}` : undefined],
+        ]}
+        back="/admin/tickets" title={t.subject} subtitle={<span className="flex flex-wrap items-center gap-2">#{t.number} · opened {date(t.createdAt, true)} {t.slaDueAt && !t.firstResponseAt && <span className={new Date(t.slaDueAt) < new Date() ? "font-bold text-rose-600" : ""}>· first response due {date(t.slaDueAt, true)}</span>}</span>} />
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           {t.messages.map((m: any) => (

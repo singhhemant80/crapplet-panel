@@ -132,7 +132,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             <button onClick={async () => { await logout(); router.replace("/admin/login"); }} className="grid h-10 w-10 place-items-center rounded-xl border border-line text-slate-500 hover:text-rose-600" title="Sign out"><Icon name="logout" /></button>
           </div>
         </header>
-        <main className="mx-auto max-w-[1440px] p-4 sm:p-6 lg:p-8 fade-up">{children}</main>
+        <main className="mx-auto max-w-[1440px] overflow-x-clip p-4 sm:p-6 lg:p-8 fade-up">{children}</main>
       </div>
     </div>
   );

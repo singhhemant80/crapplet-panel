@@ -13,7 +13,15 @@ export default function TicketView() {
   const t = data.ticket;
   return (
     <>
-      <PageHeader back="/client/tickets" title={t.subject} subtitle={<span className="flex flex-wrap items-center gap-2">#{t.number} · {t.department.name} · <Badge status={t.status} /> <Badge status={t.priority} /></span>}
+      <PageHeader icon="support_agent"
+        stats={[
+          ["Status", <Badge key="s" status={t.status} />],
+          ["Priority", <Badge key="p" status={t.priority} />],
+          ["Department", t.department?.name ?? "—"],
+          ["Opened", date(t.createdAt)],
+          ["Replies", `${t.messages.length}`],
+        ]}
+        back="/client/tickets" title={t.subject} subtitle={<span className="flex flex-wrap items-center gap-2">#{t.number} · {t.department.name} · <Badge status={t.status} /> <Badge status={t.priority} /></span>}
         actions={t.status !== "CLOSED" && <Button variant="outline" size="sm" onClick={() => api(`/client/tickets/${id}/close`, { body: {} }).then(reload)}>Close ticket</Button>} />
       <div className="space-y-4">
         {t.messages.map((m: any) => (
