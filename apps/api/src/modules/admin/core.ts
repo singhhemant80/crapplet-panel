@@ -443,11 +443,11 @@ adminCore.get(
   ah(async (req, res) => {
     const s = await prisma.service.findUnique({
       where: { id: req.params.id },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, product: { include: { osTemplates: { include: { osTemplate: true } } } }, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true, status: true, profile: { select: { companyName: true, gstin: true, city: true, state: true, country: true, creditBalance: true, currency: true } } } }, product: { include: { osTemplates: { include: { osTemplate: true } }, group: { select: { name: true } } } }, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true, tickets: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, subject: true, status: true, createdAt: true } } },
     });
     if (!s) throw notFound();
     const { passwordEnc, server, ...rest } = s;
-    const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, dueDate: true } });
+    const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, amountPaid: true, currency: true, dueDate: true, paidAt: true, createdAt: true } });
     // node id → node name (Virtualizor serid / Proxmox node)
     const nodeRow = s.node && server ? await prisma.serverNode.findFirst({ where: { serverId: server.id, OR: [{ externalId: s.node }, { name: s.node }] }, select: { name: true } }) : null;
     res.json({ service: { ...rest, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname, nameservers: server.nameservers } : null, hasPassword: !!passwordEnc }, invoices });
