@@ -83,6 +83,8 @@ const STATUS: Record<string, string> = {
   APPROVED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   AVAILABLE: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   ANSWERED: "bg-sky-50 text-sky-700 ring-sky-200",
+  COMPLETED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  RUNNING: "bg-sky-50 text-sky-700 ring-sky-200",
   running: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   PENDING: "bg-amber-50 text-amber-700 ring-amber-200",
   PROVISIONING: "bg-violet-50 text-violet-700 ring-violet-200",
@@ -180,7 +182,7 @@ const PAGE_ICONS: [RegExp, string][] = [
   [/\/monitoring/, "monitor_heart"], [/\/ips/, "router"], [/\/locations/, "location_on"], [/\/provisioning/, "rocket_launch"], [/\/resellers|\/reseller/, "storefront"],
   [/\/affiliates/, "handshake"], [/\/announcements/, "campaign"], [/\/knowledgebase/, "menu_book"], [/\/whatsapp/, "chat"], [/\/email/, "mail"], [/\/gateways/, "account_balance"],
   [/\/currencies/, "currency_exchange"], [/\/reports/, "bar_chart"], [/\/activity/, "history"], [/\/staff|\/roles/, "badge"], [/\/security/, "shield_lock"],
-  [/\/automation/, "schedule"], [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
+  [/\/automation/, "schedule"], [/\/backups/, "backup"], [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
   [/\/admin\/?$|\/client\/?$/, "space_dashboard"],
 ];
 

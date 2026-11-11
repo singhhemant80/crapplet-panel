@@ -127,9 +127,10 @@ fi
 log "Firewall"
 ufw allow OpenSSH >/dev/null; ufw allow 'Nginx Full' >/dev/null; ufw --force enable >/dev/null
 
-log "Nightly database backups (02:30 IST, 14 days kept)"
-install -m 750 "$ROOT/deploy/backup.sh" /usr/local/bin/crapplet-backup
-echo "30 21 * * * root /usr/local/bin/crapplet-backup >> /var/log/crapplet-backup.log 2>&1" > /etc/cron.d/crapplet-backup
+log "Database backups are scheduled in the panel (Admin → Setup → Database Backups)"
+# the old nightly cron is replaced by the panel's own backups (same folder, with schedule, retention and offsite copy)
+rm -f /etc/cron.d/crapplet-backup
+install -m 750 "$ROOT/deploy/backup.sh" /usr/local/bin/crapplet-backup   # still there for a manual command-line backup
 
 log "Done"
 echo "Website:      https://${DOMAIN}/"

@@ -3,12 +3,13 @@
  * Queues: provisioning, email, maintenance (IP reservation expiry, server health, daily billing).
  */
 import { Worker, type Job } from "bullmq";
-import { bullConnection, maintenanceQueue, closeQueues, type EmailJob, type ProvisionJob } from "./jobs/queues";
+import { bullConnection, maintenanceQueue, backupQueue, closeQueues, type EmailJob, type ProvisionJob } from "./jobs/queues";
 import { runProvisionAction, markCreateFailed } from "./modules/provisioning/provisioner";
 import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
 import { maybeRunScheduled } from "./jobs/billing";
 import { deliverWhatsapp } from "./modules/whatsapp/service";
+import { createBackup, maybeBackup } from "./modules/backup/service";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
 import { syncVirtualizorOs } from "./modules/provisioning/virtualizor-os";
@@ -85,6 +86,14 @@ const maintenance = new Worker(
 );
 maintenance.on("failed", (job, err) => console.error(`[maintenance] ${job?.name} failed:`, err.message));
 
+// database backups on their own queue so a long dump never holds up IP expiry / health checks
+const backup = new Worker<{ runId?: string }>(
+  "backup",
+  async (job) => (job.name === "backup-now" && job.data.runId ? createBackup({ trigger: "manual", runId: job.data.runId }).then((r) => ({ id: r.id, file: r.fileName })) : maybeBackup()),
+  { connection, concurrency: 1, lockDuration: 60 * 60_000 },
+);
+backup.on("failed", (job, err) => console.error(`[backup] ${job?.name} failed:`, err.message));
+
 // one import at a time; a large WHMCS can take a while
 const migration = new Worker<{ runId: string }>("migration", async (job) => executeMigrationRun(job.data.runId), { connection, concurrency: 1, lockDuration: 2 * 60 * 60_000 });
 migration.on("failed", (job, err) => console.error(`[migration] ${job?.data.runId} failed:`, err.message));
@@ -103,6 +112,8 @@ async function schedule() {
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("sync-ips", { every: 10 * 60_000 }, { name: "sync-ips" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
+  // automatic database backups: checked every 5 minutes against Settings → Backups
+  await backupQueue().upsertJobScheduler("backup-tick", { every: 5 * 60_000 }, { name: "backup-tick" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), automation (daily, checked every 5m)");
 }
 
@@ -126,7 +137,7 @@ schedule().catch((e) => {
 
 async function shutdown() {
   console.log("[worker] shutting down");
-  await Promise.all([provisioning.close(), email.close(), whatsapp.close(), maintenance.close(), migration.close()]);
+  await Promise.all([provisioning.close(), email.close(), whatsapp.close(), backup.close(), maintenance.close(), migration.close()]);
   await closeQueues();
   await prisma.$disconnect();
   process.exit(0);

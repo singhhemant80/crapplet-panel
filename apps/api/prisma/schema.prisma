@@ -1309,3 +1309,21 @@ model WhatsappMessage {
   @@index([createdAt])
   @@index([userId, createdAt])
 }
+
+/// A database backup (automatic or "Back up now") and where copies were sent.
+model BackupRun {
+  id           String    @id @default(cuid())
+  trigger      String    // schedule | manual
+  triggeredBy  String?
+  status       String    @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  fileName     String?
+  sizeBytes    BigInt?
+  includesUploads Boolean @default(false)
+  destinations Json      @default("[]") // [{ type, ok, location?, error? }]
+  error        String?
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  deletedAt    DateTime? // local file removed by retention
+
+  @@index([startedAt])
+}

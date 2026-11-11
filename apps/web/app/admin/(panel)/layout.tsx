@@ -71,6 +71,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { href: "/admin/whatsapp", label: "WhatsApp", icon: "chat", perm: "settings.manage" },
       { href: "/admin/settings", label: "Settings", icon: "settings", perm: "settings.manage" },
       { href: "/admin/automation", label: "Automation", icon: "schedule", perm: "reports.view" },
+      { href: "/admin/backups", label: "Database Backups", icon: "backup", perm: "settings.manage" },
       { href: "/admin/migration", label: "WHMCS Migration", icon: "move_up", perm: "settings.manage" },
       { href: "/admin/activity", label: "Activity Log", icon: "history", perm: "reports.view" },
       { href: "/admin/security", label: "My Security", icon: "shield_lock" },
