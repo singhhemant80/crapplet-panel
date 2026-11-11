@@ -35,6 +35,31 @@ export interface MysqlConn {
   ssl?: boolean;
 }
 
+/**
+ * Turn MySQL connection failures into steps the admin can act on. The usual cause is that the
+ * WHMCS database only accepts connections from its own server (cPanel's default).
+ */
+export function explainMysqlError(e: any, c: Pick<MysqlConn, "host" | "port" | "user" | "database">): string {
+  const msg = String(e?.message ?? e);
+  const code = e?.code as string | undefined;
+  const seenAs = /Host '([^']+)' is not allowed/.exec(msg)?.[1];
+  if (code === "ER_HOST_NOT_PRIVILEGED" || seenAs)
+    return `The WHMCS MySQL server refused this panel${seenAs ? ` (it sees it as '${seenAs}')` : ""} — its database user is only allowed to connect from the WHMCS server itself. ` +
+      `Fix on the WHMCS server: in cPanel open "Remote MySQL" (Databases section) and add this panel's public IP${seenAs ? ` and ${seenAs}` : ""} as an access host; ` +
+      `then allow TCP port ${c.port} from that IP in its firewall (CSF: add the IP to csf.allow). ` +
+      `Without cPanel: GRANT SELECT ON \`${c.database}\`.* TO '${c.user}'@'<panel IP>' IDENTIFIED BY '…'; ` +
+      `Or use an SSH tunnel from this server and set the host to 127.0.0.1.`;
+  if (code === "ER_ACCESS_DENIED_ERROR")
+    return `MySQL rejected the user '${c.user}' or its password. Check the password, and that the user is allowed from this panel's IP (cPanel → Remote MySQL). (${msg})`;
+  if (code === "ER_DBACCESS_DENIED_ERROR" || code === "ER_BAD_DB_ERROR")
+    return `The user '${c.user}' can't open the database '${c.database}'. Check the database name, and in cPanel → MySQL Databases add the user to that database. (${msg})`;
+  if (code === "ETIMEDOUT" || code === "ECONNREFUSED" || /timed? ?out|ECONNREFUSED/i.test(msg))
+    return `Couldn't reach ${c.host}:${c.port} — the port is closed or blocked. On the WHMCS server allow port ${c.port} from this panel's IP in the firewall (CSF: csf.allow), and make sure MySQL listens on the public address (bind-address). (${msg})`;
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN")
+    return `The host '${c.host}' doesn't resolve — use the WHMCS server's IP address instead. (${msg})`;
+  return msg;
+}
+
 export async function mysqlSource(c: MysqlConn): Promise<SourceDb> {
   const conn = await mysql.createConnection({
     host: c.host,
@@ -48,6 +73,8 @@ export async function mysqlSource(c: MysqlConn): Promise<SourceDb> {
     bigNumberStrings: true,
     connectTimeout: 15000,
     charset: "utf8mb4",
+  }).catch((e) => {
+    throw new Error(explainMysqlError(e, c));
   });
   const existing = new Set(((await conn.query("SHOW TABLES"))[0] as Row[]).map((r) => String(Object.values(r)[0]).toLowerCase()));
   return {

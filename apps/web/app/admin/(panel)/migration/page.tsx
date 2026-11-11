@@ -17,6 +17,7 @@ export default function Migration() {
   const [overwritePricing, setOverwritePricing] = useState(false);
   const [since, setSince] = useState("");
   const [info, setInfo] = useState<any>(null);
+  const [connErr, setConnErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export default function Migration() {
 
   async function test() {
     setBusy("test");
-    try { setInfo(await api("/admin/migration/whmcs/test", { body: { connection: conn } })); } catch (e: any) { toast.error(e.message); setInfo(null); } finally { setBusy(null); }
+    setConnErr(null); try { setInfo(await api("/admin/migration/whmcs/test", { body: { connection: conn } })); } catch (e: any) { toast.error("Couldn't connect to the WHMCS database — see the details below"); setConnErr(e.message); setInfo(null); } finally { setBusy(null); }
   }
   async function start(dryRun: boolean) {
     if (!dryRun && !confirm("Import into the live database now? Re-running later only adds/updates records — nothing is duplicated.")) return;
@@ -62,6 +63,7 @@ export default function Migration() {
               </Field>
             </div>
             <Button className="mt-4" variant="outline" icon="cable" loading={busy === "test"} disabled={!conn.host || !conn.database || !conn.user} onClick={test}>Test connection</Button>
+            {connErr && <Alert tone="error" className="mt-4"><div className="text-sm leading-relaxed">{connErr.replace(/^Could not read the WHMCS database: /, "")}</div></Alert>}
             {info && (
               <div className="mt-4 rounded-xl bg-[#fbf9ff] p-4 text-sm">
                 <div className="font-bold text-ink">Connected — WHMCS {info.version} {info.company && `· ${info.company}`}</div>
