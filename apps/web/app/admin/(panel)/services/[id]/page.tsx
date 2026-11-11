@@ -52,29 +52,30 @@ export default function AdminService() {
 
       {/* ── header ── */}
       <section className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-        <div className="relative bg-gradient-to-br from-[#1e0b4b] via-[#3b0f7a] to-[#6d28d9] px-6 py-6 text-white">
+        <div className="relative bg-gradient-to-br from-[#1e0b4b] via-[#3b0f7a] to-[#6d28d9] px-4 py-5 text-white sm:px-6 sm:py-6">
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
-          <div className="relative flex flex-wrap items-start gap-5">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white shadow-lg">
+          <div className="relative flex flex-wrap items-start gap-4 sm:gap-5">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white shadow-lg sm:h-16 sm:w-16 sm:rounded-2xl [&_img]:max-h-8 sm:[&_img]:max-h-10">
               {s.osTemplate ? <OsLogo os={s.osTemplate} size={40} /> : <Icon name={isHosting ? "language" : "dns"} className="text-[32px] text-primary-dark" />}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl font-extrabold tracking-tight">{s.hostname || P.name}</h1>
+                <h1 className="min-w-0 break-all text-xl font-extrabold tracking-tight sm:text-2xl">{s.hostname || P.name}</h1>
                 <span className="rounded-lg bg-white/95 px-1 py-0.5"><Badge status={s.status} /></span>
                 {s.overrideAutoSuspend && <span className="rounded-md bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40">Auto-suspend off</span>}
               </div>
               <div className="mt-1 text-sm text-white/75">{P.name}{P.group?.name ? ` · ${P.group.name}` : ""}{s.reseller ? ` · via reseller ${s.reseller.brandName}` : ""}</div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] [&>*]:whitespace-nowrap">
                 {primary && <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 font-mono font-semibold ring-1 ring-white/15"><Icon name="lan" className="text-[16px] text-white/70" />{primary.address}<span className="[&_button]:text-white/80"><Copy text={primary.address} /></span></span>}
                 <Link href={`/admin/clients/${s.user.id}`} className="inline-flex items-center gap-1.5 font-semibold hover:underline"><Icon name="person" className="text-[16px] text-white/70" />{custName}</Link>
                 {s.order && <Link href={`/admin/orders/${s.order.id}`} className="inline-flex items-center gap-1.5 font-semibold hover:underline"><Icon name="shopping_bag" className="text-[16px] text-white/70" />{s.order.number}</Link>}
                 {s.server && <span className="inline-flex items-center gap-1.5 text-white/80"><Icon name="dns" className="text-[16px] text-white/60" />{s.server.name}{s.nodeName || s.node ? ` · ${s.nodeName ?? s.node}` : ""}{s.remoteId ? ` · #${s.remoteId}` : ""}</span>}
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 border-t border-white/10 pt-3 sm:w-auto sm:flex-col sm:items-end sm:border-0 sm:pt-0">
               {s.remoteId && !ended && (live ? (live.error ? <span className="rounded-lg bg-rose-500/20 px-2.5 py-1 text-xs font-bold text-rose-100 ring-1 ring-rose-300/40">{live.error}</span> : <span className="rounded-lg bg-white/95 px-1.5 py-1"><LiveBadge state={live.state} reason={live.reason} /></span>) : <span className="rounded-lg bg-white/95 px-1.5 py-1"><LiveBadge loading /></span>)}
               {ok && live.uptimeSec > 0 && <span className="text-xs text-white/70">Up {uptime(live.uptimeSec)}</span>}
+              <span className="flex-1 sm:hidden" />
               {s.product.provisioner === "VIRTUALIZOR" && s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) && <Link href={`/admin/services/${id}/console`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3.5 text-[13px] font-extrabold text-primary-dark shadow-lg transition hover:bg-primary-soft"><Icon name="terminal" className="text-[18px]" />Open console</Link>}
             </div>
           </div>
@@ -122,7 +123,7 @@ export default function AdminService() {
               </>
             )}
             {isHosting && s.remoteId && s.status === "ACTIVE" && <Group label="Hosting"><HostingActions s={s} onDone={reload} /></Group>}
-            <div className="ml-auto">
+            <div className="w-full sm:ml-auto sm:w-auto">
               <Group label="Account">
                 {s.status === "ACTIVE" && <Button variant="outline" size="sm" icon="pause" onClick={() => { const reason = prompt("Suspension reason", "Suspended by administrator"); if (reason) act("suspend", { reason }); }}>Suspend</Button>}
                 {s.status === "SUSPENDED" && <Button variant="secondary" size="sm" icon="play_circle" onClick={() => act("unsuspend")}>Unsuspend</Button>}
@@ -140,12 +141,12 @@ export default function AdminService() {
             <div><h3 className="text-[15px] font-extrabold text-ink">Resource usage</h3><p className="text-xs text-mute">Live from the hypervisor</p></div>
             <Button size="sm" variant="ghost" icon="refresh" onClick={() => { setLive(null); refreshLive(); }}>Refresh</Button>
           </header>
-          {!live ? <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div> : live.error ? <div className="p-5"><Alert tone="error">{live.error}</Alert></div> : (
-            <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-4">
+          {!live ? <div className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />)}</div> : live.error ? <div className="p-5"><Alert tone="error">{live.error}</Alert></div> : (
+            <div className="grid grid-cols-2 gap-3 p-4 sm:gap-4 sm:p-5 xl:grid-cols-4">
               <Meter icon="developer_board" label="CPU" value={`${fmt(live.cpuPct ?? 0)}%`} sub={`${P.cpuCores ?? live.cpus ?? "?"} vCPU${live.cpuLimitMhz ? ` · ${fmt(live.cpuLimitMhz)} MHz` : ""}`} pct={live.cpuPct} />
               <Meter icon="memory" label="Memory" value={live.memUsedMb != null ? mb(live.memUsedMb) : "—"} sub={`of ${live.memTotalMb ? mb(live.memTotalMb) : P.ramMb ? mb(P.ramMb) : "?"}`} pct={live.memTotalMb ? (live.memUsedMb / live.memTotalMb) * 100 : null} />
               <Meter icon="database" label="Disk" value={live.diskUsedGb != null ? `${fmt(live.diskUsedGb)} GB` : `${live.diskTotalGb ?? P.diskGb ?? "?"} GB`} sub={live.diskUsedGb != null ? `of ${live.diskTotalGb ?? P.diskGb} GB` : "allocated"} pct={live.diskUsedGb != null && live.diskTotalGb ? (live.diskUsedGb / live.diskTotalGb) * 100 : null} />
-              <Meter icon="data_usage" label="Bandwidth this month" value={`${fmt(live.bandwidthUsedGb ?? 0)} GB`} sub={live.bandwidthGb ? `of ${fmt(live.bandwidthGb)} GB` : "unmetered"} pct={live.bandwidthGb ? ((live.bandwidthUsedGb ?? 0) / live.bandwidthGb) * 100 : null} />
+              <Meter icon="data_usage" label="Bandwidth" value={`${fmt(live.bandwidthUsedGb ?? 0)} GB`} sub={live.bandwidthGb ? `of ${fmt(live.bandwidthGb)} GB this month` : "unmetered, this month"} pct={live.bandwidthGb ? ((live.bandwidthUsedGb ?? 0) / live.bandwidthGb) * 100 : null} />
               <Meter icon="download" label="Download" value={live.netInBps != null ? speed(live.netInBps) : live.netInMb != null ? mb(live.netInMb) : "—"} sub={live.netInBps != null ? "current speed" : "since boot"} />
               <Meter icon="upload" label="Upload" value={live.netOutBps != null ? speed(live.netOutBps) : live.netOutMb != null ? mb(live.netOutMb) : "—"} sub={live.netOutBps != null ? "current speed" : "since boot"} />
               <Meter icon="schedule" label="Uptime" value={live.uptimeSec ? uptime(live.uptimeSec) : running ? "—" : "Stopped"} sub={running ? "since last boot" : live.state ?? ""} />
@@ -346,9 +347,9 @@ function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
 function Meter({ icon, label, value, sub, pct }: { icon: string; label: string; value: string; sub?: string; pct?: number | null }) {
   const p = pct == null || isNaN(pct) ? null : Math.max(0, Math.min(100, pct));
   return (
-    <div className="rounded-xl border border-line p-4">
-      <div className="flex items-center justify-between text-[12px] font-bold text-mute">{label}<Icon name={icon} className="text-[19px] text-primary" /></div>
-      <div className="mt-1.5 text-xl font-extrabold tracking-tight text-ink">{value}</div>
+    <div className="min-w-0 rounded-xl border border-line p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-2 text-[12px] font-bold text-mute"><span className="truncate">{label}</span><Icon name={icon} className="shrink-0 text-[19px] text-primary" /></div>
+      <div className="mt-1.5 truncate text-lg font-extrabold tracking-tight text-ink sm:text-xl">{value}</div>
       <div className="text-xs text-mute">{sub}</div>
       {p != null && <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={cx("h-full rounded-full", p > 90 ? "bg-rose-500" : p > 70 ? "bg-amber-500" : "bg-gradient-to-r from-primary to-primary-dark")} style={{ width: `${Math.max(2, p)}%` }} /></div>}
     </div>
