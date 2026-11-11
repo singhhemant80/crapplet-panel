@@ -4,10 +4,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, CYCLES, CYCLE_MONTHS, gb, money } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { readCart, writeCart, type CartItem } from "@/lib/cart";
-import { Alert, Button, Card, Field, Icon, Input, Loading, Select, Spinner, cx, toast, useApi } from "@/components/ui";
+import { Alert, Button, Field, Icon, Input, Loading, Select, Spinner, cx, toast, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
 import { OsChooser } from "@/components/os-chooser";
-import { CurrencySwitch, pick, priceRow, rowsIn, taxNote, useCurrency } from "@/lib/currency";
+import { CurrencySwitch, pick, priceRow, rowsIn, useCurrency } from "@/lib/currency";
+
+/** A numbered configuration step. */
+function Step({ n, title, sub, action, children }: { n?: number; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-line bg-white shadow-card">
+      <header className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-4">
+        {n != null && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary-dark text-sm font-extrabold text-white shadow-glow">{n}</span>}
+        <div className="min-w-0 flex-1"><h2 className="text-[15.5px] font-extrabold text-ink">{title}</h2>{sub && <p className="text-[12.5px] text-mute">{sub}</p>}</div>
+        {action}
+      </header>
+      <div className="p-6">{children}</div>
+    </section>
+  );
+}
 
 function useCountdown(until?: string | null) {
   const [now, setNow] = useState(Date.now());
@@ -169,14 +183,20 @@ function Configure() {
   }
 
   const filtered = ips;
+  // number the steps that are shown
+  const order = ["cycle", p.isVps && "location", p.allowIpSelection && serverId && "ip", p.isHosting && "domain", !p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && "setup", (p.configOptions.length > 0 || p.addons.length > 0) && "extras"].filter(Boolean) as string[];
+  const num = (k: string) => order.indexOf(k) + 1;
+  const loc = locs.data?.locations.find((l: any) => l.serverId === serverId);
+  const osName = p.osTemplates.find((o: any) => o.id === os)?.name;
+  const gst = currency === "INR" ? Math.round(total * 0.18) : 0;
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6">
       <OrderSteps step={2} />
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
-          <div>
-            <div className="text-sm font-bold text-primary-dark">{p.group?.name}</div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-2xl border border-line bg-white p-6 shadow-card">
+            <a href={`/order${p.group?.slug ? `?group=${p.group.slug}` : ""}`} className="inline-flex items-center gap-1 text-[13px] font-bold text-primary-dark hover:underline"><Icon name="arrow_back" className="text-[16px]" />{p.group?.name ?? "All plans"}</a>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
               <h1 className="text-3xl font-extrabold tracking-tight text-ink">{p.name}</h1>
               <CurrencySwitch />
             </div>
@@ -184,13 +204,13 @@ function Configure() {
             {p.isVps && (
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
                 {[["developer_board", `${p.specs.cpuCores} vCPU`], ["memory", gb(p.specs.ramMb)], ["database", `${p.specs.diskGb} GB SSD`], ["public", `${p.specs.ipv4Count} × IPv4`]].map(([i, t]) => (
-                  <span key={t} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 ring-1 ring-line"><Icon name={i} className="text-[18px] text-primary-dark" />{t}</span>
+                  <span key={t} className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf7ff] px-3 py-1.5 ring-1 ring-[#ede4ff]"><Icon name={i} className="text-[18px] text-primary-dark" />{t}</span>
                 ))}
               </div>
             )}
           </div>
 
-          <Card title="1. Billing cycle">
+          <Step n={num("cycle")} title="Billing cycle" sub="Pay for longer and save — you can change it at renewal.">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {rowsIn(p.pricing, currency).map((x: any) => {
                 const monthlyBase = priceRow(p.pricing, "MONTHLY", currency)?.price;
@@ -205,10 +225,10 @@ function Configure() {
                 );
               })}
             </div>
-          </Card>
+          </Step>
 
           {p.isVps && (
-            <Card title="2. Location">
+            <Step n={num("location")} title="Location" sub="Where your server will run.">
               {!locs.data ? <Loading /> : !locs.data.locations.length ? <Alert tone="warn">No locations available for this plan right now.</Alert> : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {locs.data.locations.map((l: any) => (
@@ -219,11 +239,11 @@ function Configure() {
                   ))}
                 </div>
               )}
-            </Card>
+            </Step>
           )}
 
           {p.allowIpSelection && serverId && (
-            <Card title="3. Choose your IPv4 address" action={reservation && countdown && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-700 ring-1 ring-amber-200"><Icon name="timer" className="text-[16px]" />held {countdown.label}</span>}>
+            <Step n={num("ip")} title="Choose your IPv4 address" sub="Optional — skip it and we'll assign one." action={reservation && countdown && <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-700 ring-1 ring-amber-200"><Icon name="timer" className="text-[16px]" />held {countdown.label}</span>}>
               {reservation ? (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-primary-soft to-white p-4 ring-1 ring-[#e9d5ff]">
                   <div className="flex items-center gap-3">
@@ -237,11 +257,11 @@ function Configure() {
               )}
               <Input value={search} onChange={(e) => setSearch(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Search e.g. 203.0.113.4" className="mb-4" />
               {ipsLoading ? <div className="flex justify-center py-8"><Spinner className="h-6 w-6 text-primary-dark" /></div> : !filtered.length ? <p className="py-6 text-center text-sm text-mute">No free addresses match.</p> : (
-                <div className="grid max-h-[340px] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid max-h-[300px] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
                   {filtered.map((ip: any) => {
                     const mine = reservation?.ipId === ip.id;
                     return (
-                      <button key={ip.id} disabled={!!reserving} onClick={() => !mine && pickIp(ip)} className={cx("flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 font-mono text-[13px] font-bold transition", mine ? "border-primary-dark bg-primary-dark text-white" : "border-line bg-white text-slate-700 hover:border-primary hover:text-primary-dark")}>
+                      <button key={ip.id} disabled={!!reserving} onClick={() => !mine && pickIp(ip)} className={cx("flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 font-mono text-[12.5px] font-semibold transition", mine ? "border-primary-dark bg-primary-dark text-white" : "border-line bg-white text-slate-700 hover:border-primary hover:text-primary-dark")}>
                         {reserving === ip.id ? <Spinner className="h-3.5 w-3.5" /> : mine ? <Icon name="check" className="text-[16px]" /> : null}
                         {ip.address}
                       </button>
@@ -250,11 +270,11 @@ function Configure() {
                 </div>
               )}
               {!me && <p className="mt-3 text-xs text-mute">You'll be asked to sign in or create an account to hold an IP.</p>}
-            </Card>
+            </Step>
           )}
 
           {p.isHosting && (
-            <Card title="Your domain">
+            <Step n={num("domain")} title="Your domain" sub="The main website on this hosting account.">
               <Field label="Domain name" hint="The main website on this hosting account. You can add more domains later in cPanel.">
                 <div className="relative">
                   <Icon name="language" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-mute" />
@@ -265,11 +285,11 @@ function Configure() {
                 <span className="inline-flex items-center gap-1"><Icon name="check_circle" className="text-[15px] text-emerald-600" />Use a domain you already own — point it to our nameservers after setup</span>
                 <a href="/order/domain" className="font-bold text-primary-dark hover:underline">Need a domain? Register one →</a>
               </div>
-            </Card>
+            </Step>
           )}
 
           {!p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && (
-            <Card title={`${p.allowIpSelection ? 4 : 3}. Server setup`}>
+            <Step n={num("setup")} title="Server setup" sub="Operating system and hostname — you can reinstall another OS later.">
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.osTemplates.length > 0 && (
                   <Field label="Operating system" className="sm:col-span-2">
@@ -280,11 +300,11 @@ function Configure() {
                   <Input value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim())} placeholder="server1.example.com" />
                 </Field>
               </div>
-            </Card>
+            </Step>
           )}
 
           {(p.configOptions.length > 0 || p.addons.length > 0) && (
-            <Card title="Extras">
+            <Step n={num("extras")} title="Extras" sub="Optional upgrades, billed with your plan.">
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.configOptions.map((o: any) => (
                   <Field key={o.key} label={o.label}>
@@ -307,27 +327,46 @@ function Configure() {
                   </label>
                 ))}
               </div>
-            </Card>
+            </Step>
           )}
         </div>
 
         <aside>
-          <div className="sticky top-[150px] rounded-2xl border border-line bg-white p-5 shadow-card">
-            <h3 className="font-extrabold text-ink">Order summary</h3>
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-mute">{p.name}</dt><dd className="font-semibold">{cm(price?.price)}</dd></div>
-              {optionsMonthly > 0 && <div className="flex justify-between"><dt className="text-mute">Extras × {months} mo</dt><dd className="font-semibold">{cm(optionsMonthly * months)}</dd></div>}
-              {price?.setupFee + addonSetup > 0 && <div className="flex justify-between"><dt className="text-mute">Setup fee</dt><dd className="font-semibold">{cm((price?.setupFee ?? 0) + addonSetup)}</dd></div>}
-              {reservation && <div className="flex justify-between"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold">{reservation.address}</dd></div>}
-              <div className="flex justify-between border-t border-line pt-3 text-base"><dt className="font-extrabold text-ink">Due today</dt><dd className="font-extrabold text-ink">{cm(total)}</dd></div>
-              <div className="text-right text-xs text-mute">{taxNote(currency)} · {CYCLES[cycle]}</div>
-            </dl>
-            <Button size="lg" className="mt-5 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue</Button>
-            <ul className="mt-5 space-y-2 text-xs font-semibold text-slate-600">
-              <li className="flex items-center gap-2"><Icon name="bolt" className="text-primary" /> Deployed automatically after payment</li>
-              <li className="flex items-center gap-2"><Icon name="shield" className="text-primary" /> DDoS protected network</li>
-              <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-primary" /> {currency === "INR" ? "GST invoice with your GSTIN" : `Invoice in ${currency} · cards & PayPal`}</li>
-            </ul>
+          <div className="sticky top-[150px] overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+            <div className="bg-gradient-to-br from-[#2e1065] via-[#4c1d95] to-[#6d28d9] px-5 py-4 text-white">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Order summary</div>
+              <div className="mt-0.5 text-lg font-extrabold">{p.name}</div>
+              <div className="text-xs text-white/70">{p.group?.name} · {CYCLES[cycle]}</div>
+            </div>
+            <div className="p-5">
+              <dl className="space-y-2.5 text-[13px]">
+                {p.isVps && <div className="flex justify-between gap-3"><dt className="text-mute">Resources</dt><dd className="text-right font-semibold text-ink">{p.specs.cpuCores} vCPU · {gb(p.specs.ramMb)} · {p.specs.diskGb} GB</dd></div>}
+                {loc && <div className="flex justify-between gap-3"><dt className="text-mute">Location</dt><dd className="font-semibold text-ink">{loc.name}</dd></div>}
+                {osName && <div className="flex justify-between gap-3"><dt className="text-mute">OS</dt><dd className="truncate font-semibold text-ink">{osName}</dd></div>}
+                {hostname && <div className="flex justify-between gap-3"><dt className="text-mute">{p.isHosting ? "Domain" : "Hostname"}</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
+                <div className="flex justify-between gap-3"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold text-ink">{reservation?.address ?? (p.isVps ? "Auto-assigned" : "Shared")}</dd></div>
+              </dl>
+              <div className="my-4 border-t border-dashed border-line" />
+              <dl className="space-y-2 text-[13px]">
+                <div className="flex justify-between"><dt className="text-mute">Plan ({CYCLES[cycle].toLowerCase()})</dt><dd className="font-semibold text-ink">{cm(price?.price)}</dd></div>
+                {optionsMonthly > 0 && <div className="flex justify-between"><dt className="text-mute">Extras × {months} mo</dt><dd className="font-semibold text-ink">{cm(optionsMonthly * months)}</dd></div>}
+                {(price?.setupFee ?? 0) + addonSetup > 0 && <div className="flex justify-between"><dt className="text-mute">Setup fee</dt><dd className="font-semibold text-ink">{cm((price?.setupFee ?? 0) + addonSetup)}</dd></div>}
+                <div className="flex justify-between"><dt className="text-mute">Subtotal</dt><dd className="font-semibold text-ink">{cm(total)}</dd></div>
+                {currency === "INR" && <div className="flex justify-between"><dt className="text-mute">GST 18% <span className="text-[11px]">(estimate)</span></dt><dd className="font-semibold text-ink">{cm(gst)}</dd></div>}
+              </dl>
+              <div className="mt-4 flex items-end justify-between rounded-xl bg-[#faf7ff] px-4 py-3 ring-1 ring-[#ede4ff]">
+                <div><div className="text-[11px] font-bold uppercase tracking-wider text-mute">Due today</div><div className="text-[11px] text-mute">{currency === "INR" ? "incl. GST" : "no Indian GST"}</div></div>
+                <div className="text-2xl font-extrabold tracking-tight text-primary-dark">{cm(total + gst)}</div>
+              </div>
+              {reservation && countdown && <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><Icon name="timer" className="text-[16px]" />{reservation.address} held for {countdown.label}</div>}
+              <Button size="lg" className="mt-4 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue to checkout</Button>
+              <p className="mt-2 text-center text-[11.5px] text-mute">Review your cart and apply a promo code next.</p>
+              <ul className="mt-4 space-y-2 border-t border-line pt-4 text-xs font-semibold text-slate-600">
+                <li className="flex items-center gap-2"><Icon name="bolt" className="text-[18px] text-primary" /> Deployed automatically after payment</li>
+                <li className="flex items-center gap-2"><Icon name="shield" className="text-[18px] text-primary" /> DDoS protected network</li>
+                <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-[18px] text-primary" /> {currency === "INR" ? "GST invoice with your GSTIN" : `Invoice in ${currency} · cards & PayPal`}</li>
+              </ul>
+            </div>
           </div>
         </aside>
       </div>

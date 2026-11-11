@@ -1,4 +1,5 @@
 "use client";
+import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsChooser } from "@/components/os-chooser";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
@@ -17,7 +18,7 @@ export default function ServicePage() {
   const [live, setLive] = useState<any>(null);
   const [usage, setUsage] = useState<any[]>([]);
   const [cred, setCred] = useState<{ username: string; password: string } | null>(null);
-  const [modal, setModal] = useState<null | "reinstall" | "cancel" | "rdns" | "password">(null);
+  const [modal, setModal] = useState<null | "reinstall" | "cancel" | "rdns" | "password" | "resetpw">(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const svc = data?.service;
@@ -95,7 +96,7 @@ export default function ServicePage() {
             <HeadStat label="Recurring" value={`${money(svc.recurringAmount, svc.currency)}`} sub={`${CYCLES[svc.billingCycle] ?? ""}${svc.currency === "INR" ? " + GST" : ""}`} />
             <HeadStat label="Next due" value={date(svc.nextDueDate)} sub={days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`} warn={days !== null && days <= 7} />
             <HeadStat label="Registered" value={date(svc.registrationDate)} sub={`Service #${String(svc.id).slice(-6).toUpperCase()}`} />
-            <HeadStat label={isHosting ? "Server" : isVps ? "Location" : "Status"} value={isHosting ? live?.server?.name ?? "—" : isVps ? svc.location ?? svc.osTemplate?.name ?? "—" : svc.status} sub={isHosting ? live?.plan ? `Package ${live.plan}` : "" : isVps ? `${svc.product.diskGb} GB NVMe` : ""} />
+            <HeadStat label={isHosting ? "Server" : isVps ? "Operating system" : "Status"} value={isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status} sub={isHosting ? live?.plan ? `Package ${live.plan}` : "" : isVps ? `${svc.product.diskGb} GB NVMe` : ""} />
           </div>
         </div>
       </section>
@@ -121,22 +122,36 @@ export default function ServicePage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-[15px] font-extrabold text-ink">Power & performance</div>
-              <div className="text-xs text-mute">{live?.uptimeSec ? `Up ${Math.floor(live.uptimeSec / 86400) ? `${Math.floor(live.uptimeSec / 86400)}d ` : ""}${Math.floor((live.uptimeSec % 86400) / 3600)}h ${Math.floor((live.uptimeSec % 3600) / 60)}m` : live?.state === "locked" ? "A task is running on this server — try again in a minute" : "Live from the hypervisor"}</div>
+              <div className="text-xs text-mute">{live?.state && live.state !== "running" ? "The server is not running — start it to see live figures" : live?.uptimeSec ? `Up ${Math.floor(live.uptimeSec / 86400) ? `${Math.floor(live.uptimeSec / 86400)}d ` : ""}${Math.floor((live.uptimeSec % 86400) / 3600)}h ${Math.floor((live.uptimeSec % 3600) / 60)}m` : live?.state === "locked" ? "A task is running on this server — try again in a minute" : "Live from the hypervisor"}</div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" icon="play_arrow" disabled={running} loading={busy === "start"} onClick={() => act("start")}>Start</Button>
               <Button size="sm" variant="outline" icon="restart_alt" disabled={!running} loading={busy === "reboot"} onClick={() => act("reboot")}>Reboot</Button>
               <Button size="sm" variant="outline" icon="power_settings_new" disabled={!running} loading={busy === "shutdown"} onClick={() => confirm("Shut down the server gracefully?") && act("shutdown")}>Shutdown</Button>
               <Button size="sm" variant="outline" icon="stop" disabled={!running} loading={busy === "stop"} onClick={() => confirm("Force power-off? Unsaved data may be lost.") && act("stop")}>Power off</Button>
+              <Button size="sm" variant="outline" icon="bolt" disabled={!running} loading={busy === "hard_reset"} onClick={() => confirm("Hard reset cuts the power and starts the server again — like pressing the reset button. Use it only if the server is frozen; unsaved data is lost. Continue?") && act("hard_reset")}>Hard reset</Button>
               <Button size="sm" variant="secondary" icon="install_desktop" onClick={() => setModal("reinstall")}>Reinstall</Button>
             </div>
           </div>
+          {live?.error && <Alert tone="warn" className="mt-4">Live figures aren't available right now: {live.error}</Alert>}
+          {!live && <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-[118px] animate-pulse rounded-xl bg-[#f6f3fd]" />)}</div>}
           {live && !live.error && (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Meter label="CPU" value={`${live.cpuPct ?? 0}%`} sub={`${live.cpus ?? svc.product.cpuCores} vCPU`} pct={live.cpuPct ?? 0} icon="memory" />
-              <Meter label="Memory" value={`${live.memUsedMb ?? 0} MB`} sub={`of ${live.memTotalMb ?? svc.product.ramMb} MB`} pct={live.memTotalMb ? ((live.memUsedMb ?? 0) / live.memTotalMb) * 100 : 0} icon="memory_alt" />
-              <Meter label="Network in" value={`${live.netInMb ?? 0} MB`} sub="since boot" icon="download" />
-              <Meter label="Network out" value={`${live.netOutMb ?? 0} MB`} sub="since boot" icon="upload" />
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Meter label="CPU" value={`${fmtNum(live.cpuPct ?? 0)}%`} sub={`${live.cpus ?? svc.product.cpuCores} vCPU${live.cpuLimitMhz ? ` · ${live.cpuLimitMhz} MHz` : ""}`} pct={live.cpuPct ?? 0} icon="memory" />
+              <Meter label="Memory" value={live.memUsedMb != null ? mbStr(live.memUsedMb) : "—"} sub={`of ${mbStr(live.memTotalMb ?? svc.product.ramMb)}`} pct={live.memTotalMb && live.memUsedMb != null ? (live.memUsedMb / live.memTotalMb) * 100 : undefined} icon="memory_alt" />
+              <Meter label="Disk" value={live.diskUsedGb != null ? `${fmtNum(live.diskUsedGb)} GB` : `${live.diskTotalGb ?? svc.product.diskGb} GB`} sub={live.diskUsedGb != null ? `of ${live.diskTotalGb ?? svc.product.diskGb} GB` : "allocated"} pct={live.diskUsedGb != null && live.diskTotalGb ? (live.diskUsedGb / live.diskTotalGb) * 100 : undefined} icon="hard_drive" />
+              {live.netInBps !== undefined ? (
+                <>
+                  <Meter label="Download" value={speedStr(live.netInBps)} sub="right now" icon="download" />
+                  <Meter label="Upload" value={speedStr(live.netOutBps)} sub="right now" icon="upload" />
+                </>
+              ) : (
+                <>
+                  <Meter label="Network in" value={mbStr(live.netInMb ?? 0)} sub="since boot" icon="download" />
+                  <Meter label="Network out" value={mbStr(live.netOutMb ?? 0)} sub="since boot" icon="upload" />
+                </>
+              )}
+              <Meter label="Bandwidth this month" value={live.bandwidthUsedGb != null ? `${fmtNum(live.bandwidthUsedGb)} GB` : "—"} sub={live.bandwidthGb ? `of ${live.bandwidthGb} GB` : "unmetered"} pct={live.bandwidthGb && live.bandwidthUsedGb != null ? (live.bandwidthUsedGb / live.bandwidthGb) * 100 : undefined} icon="swap_vert" />
             </div>
           )}
           {usage.length > 1 && (
@@ -202,7 +217,7 @@ export default function ServicePage() {
           </dl>
           {isVps && svc.status === "ACTIVE" && (
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
-              <Button size="sm" variant="ghost" icon="key" onClick={() => confirm("Generate a new root/Administrator password? The server will reboot.") && act("reset_password")}>Reset password</Button>
+              <Button size="sm" variant="ghost" icon="key" onClick={() => setModal("resetpw")}>Reset password</Button>
               <Button size="sm" variant="ghost" icon="dns" onClick={() => setModal("rdns")}>Reverse DNS</Button>
             </div>
           )}
@@ -256,6 +271,7 @@ export default function ServicePage() {
 
       <ReinstallModal open={modal === "reinstall"} onClose={() => setModal(null)} svc={svc} onSubmit={(os, confirmText) => act("reinstall", { osTemplateId: os, confirm: confirmText })} busy={busy === "reinstall"} />
       <CancelModal open={modal === "cancel"} onClose={() => setModal(null)} id={id} />
+      <ResetPasswordModal open={modal === "resetpw"} onClose={() => setModal(null)} busy={busy === "reset_password"} windows={/windows/i.test(svc.osTemplate?.family ?? svc.osTemplate?.name ?? "")} onSubmit={(password) => { setCred(null); act("reset_password", password ? { password } : {}); }} />
       <RdnsModal open={modal === "rdns"} onClose={() => setModal(null)} id={id} ips={svc.ips} />
       <HostingPasswordModal open={modal === "password"} onClose={() => setModal(null)} id={id} username={svc.username} onDone={() => setCred(null)} />
     </>
@@ -274,6 +290,16 @@ function openLogin(id: string, service: string) {
       w?.close();
       toast.error(e.message);
     });
+}
+
+const fmtNum = (n: number) => (Math.round(n * 10) / 10).toLocaleString("en-IN");
+const mbStr = (mb: number) => (mb >= 1024 ? `${fmtNum(mb / 1024)} GB` : `${Math.round(mb)} MB`);
+function speedStr(bps?: number) {
+  const b = (bps ?? 0) * 8;
+  if (b >= 1e9) return `${fmtNum(b / 1e9)} Gbps`;
+  if (b >= 1e6) return `${fmtNum(b / 1e6)} Mbps`;
+  if (b >= 1e3) return `${fmtNum(b / 1e3)} Kbps`;
+  return `${Math.round(b)} bps`;
 }
 
 function HeadStat({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {

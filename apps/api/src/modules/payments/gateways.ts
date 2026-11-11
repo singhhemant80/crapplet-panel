@@ -55,7 +55,8 @@ export interface Gateway {
   createPayment(intent: IntentLike, payer: Payer, cfg: GatewayConfig, pub: PublicGatewayConfig, testMode: boolean, label: string): Promise<{ gatewayOrderId?: string; client: Record<string, unknown> }>;
   verifyReturn?(body: Record<string, unknown>, cfg: GatewayConfig, testMode: boolean, intent: IntentLike): Promise<Verified>;
   parseWebhook?(raw: Buffer, headers: Record<string, string | string[] | undefined>, cfg: GatewayConfig, testMode: boolean): Promise<WebhookResult>;
-  refund?(gatewayTxnId: string, amount: number, cfg: GatewayConfig, testMode: boolean): Promise<{ refundId: string }>;
+  /** Refund (part of) a captured payment through the gateway's API. ctx.ref is our idempotency / refund id. */
+  refund?(gatewayTxnId: string, amount: number, cfg: GatewayConfig, testMode: boolean, ctx?: RefundCtx): Promise<{ refundId: string; status?: string }>;
 }
 
 const h = (headers: Record<string, string | string[] | undefined>, k: string) => {
@@ -117,12 +118,18 @@ const razorpay: Gateway = {
     }
     return { eventId, type: evt.event, payments };
   },
-  async refund(txnId, amount, cfg) {
+  async refund(txnId, amount, cfg, _test, ctx) {
     const auth = "Basic " + Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
-    const r = await httpJson<{ id: string }>(`https://api.razorpay.com/v1/payments/${txnId}/refund`, { method: "POST", headers: { Authorization: auth, "Content-Type": "application/json" }, body: JSON.stringify({ amount }) });
-    return { refundId: r.id };
+    const r = await httpJson<{ id: string; status?: string }>(`https://api.razorpay.com/v1/payments/${txnId}/refund`, {
+      method: "POST",
+      headers: { Authorization: auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, speed: "normal", receipt: ctx?.ref?.slice(0, 40), notes: ctx?.reason ? { reason: ctx.reason.slice(0, 250) } : undefined }),
+    });
+    return { refundId: r.id, status: r.status };
   },
 };
+
+export type RefundCtx = { ref: string; orderId?: string | null; reason?: string };
 
 // ───────────────────────── Stripe ─────────────────────────
 const stripe: Gateway = {
@@ -176,13 +183,13 @@ const stripe: Gateway = {
     }
     return { eventId: evt.id, type: evt.type, payments };
   },
-  async refund(txnId, amount, cfg) {
-    const r = await httpJson<{ id: string }>("https://api.stripe.com/v1/refunds", {
+  async refund(txnId, amount, cfg, _test, ctx) {
+    const r = await httpJson<{ id: string; status?: string }>("https://api.stripe.com/v1/refunds", {
       method: "POST",
-      headers: { Authorization: `Bearer ${cfg.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ payment_intent: txnId, amount: String(amount) }).toString(),
+      headers: { Authorization: `Bearer ${cfg.secretKey}`, "Content-Type": "application/x-www-form-urlencoded", ...(ctx?.ref ? { "Idempotency-Key": ctx.ref } : {}) },
+      body: new URLSearchParams({ payment_intent: txnId, amount: String(amount), reason: "requested_by_customer" }).toString(),
     });
-    return { refundId: r.id };
+    return { refundId: r.id, status: r.status };
   },
 };
 
@@ -230,12 +237,15 @@ const cashfree: Gateway = {
     }
     return { eventId: `${evt.type}:${p?.cf_payment_id ?? ts}`, type: evt.type, payments };
   },
-  async refund(txnId, amount, cfg, test) {
-    void txnId;
-    void amount;
-    void cfg;
-    void test;
-    throw new HttpError(501, "Cashfree refunds must be initiated from the Cashfree dashboard (order-level refunds need the order id)");
+  /** Cashfree refunds are made against the order: POST /orders/{order_id}/refunds */
+  async refund(txnId, amount, cfg, test, ctx) {
+    if (!ctx?.orderId) throw new HttpError(400, `Couldn't find the Cashfree order for payment ${txnId} — refund it from the Cashfree dashboard`);
+    const r = await httpJson<{ cf_refund_id?: string | number; refund_id?: string; refund_status?: string }>(`${cfBase(test)}/orders/${encodeURIComponent(ctx.orderId)}/refunds`, {
+      method: "POST",
+      headers: cfHeaders(cfg),
+      body: JSON.stringify({ refund_amount: Number((amount / 100).toFixed(2)), refund_id: ctx.ref.slice(0, 40), refund_note: (ctx.reason ?? "Refund").slice(0, 100), refund_speed: "STANDARD" }),
+    });
+    return { refundId: String(r.cf_refund_id ?? r.refund_id ?? ctx.ref), status: r.refund_status };
   },
 };
 
@@ -268,6 +278,18 @@ const payu: Gateway = {
     const withCharges = f("additionalCharges") ? `${f("additionalCharges")}|${reverse}` : reverse;
     if (!safeEqual(payuHash(withCharges), f("hash"))) throw new HttpError(400, "PayU hash mismatch");
     return { intentId: f("txnid"), gatewayOrderId: f("txnid"), gatewayTxnId: f("mihpayid"), amount: Math.round(Number(f("amount")) * 100), paid: f("status") === "success", raw: body };
+  },
+  /** PayU "cancel_refund_transaction": var1 = mihpayid, var2 = our unique refund token, var3 = amount. */
+  async refund(txnId, amount, cfg, test, ctx) {
+    const command = "cancel_refund_transaction";
+    const form = new URLSearchParams({ key: cfg.key, command, var1: txnId, var2: (ctx?.ref ?? `rf${Date.now()}`).slice(0, 23), var3: (amount / 100).toFixed(2), hash: payuHash(`${cfg.key}|${command}|${txnId}|${cfg.salt}`) });
+    const r = await httpJson<{ status: number | string; msg?: string; request_id?: string; error_code?: string }>(`${test ? "https://test.payu.in" : "https://info.payu.in"}/merchant/postservice.php?form=2`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (String(r.status) !== "1") throw new HttpError(502, `PayU refused the refund: ${r.msg ?? r.error_code ?? "unknown error"}`);
+    return { refundId: String(r.request_id ?? ctx?.ref), status: r.msg };
   },
 };
 
@@ -443,12 +465,12 @@ const paypal: Gateway = {
     }
     return { eventId: String(evt.id), type: String(evt.event_type), payments };
   },
-  async refund(txnId, amount, cfg, test) {
+  async refund(txnId, amount, cfg, test, ctx) {
     const token = await ppToken(cfg, test);
     const cap = await httpJson<PpCapture>(`${ppBase(test)}/v2/payments/captures/${txnId}`, { method: "GET", headers: { Authorization: `Bearer ${token}` } });
     const r = await httpJson<{ id: string }>(`${ppBase(test)}/v2/payments/captures/${txnId}/refund`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": `refund-${txnId}-${amount}` },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "PayPal-Request-Id": ctx?.ref ?? `refund-${txnId}-${amount}-${Date.now()}` },
       body: JSON.stringify({ amount: { value: (amount / 100).toFixed(2), currency_code: cap.amount.currency_code } }),
     });
     return { refundId: r.id };

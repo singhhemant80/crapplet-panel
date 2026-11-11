@@ -853,10 +853,13 @@ model Transaction {
   currency     String          @default("INR")
   description  String?
   raw          Json?
+  /// for REFUND rows: the payment (PAYMENT / CREDIT_APPLIED transaction) this refund reverses
+  refundOfId   String?
   createdAt    DateTime        @default(now())
 
   @@unique([gateway, gatewayTxnId, type])
   @@index([userId])
+  @@index([refundOfId])
 }
 
 enum IntentStatus {

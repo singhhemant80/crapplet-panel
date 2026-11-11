@@ -1,4 +1,5 @@
 "use client";
+import { GlobalSearch } from "@/components/admin/global-search";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -120,11 +121,8 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       <div className="min-w-0">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-white/85 px-4 backdrop-blur sm:px-6">
           <button className="grid h-10 w-10 place-items-center rounded-xl border border-line lg:hidden" onClick={() => setOpen(true)} aria-label="Menu"><Icon name="menu" /></button>
-          <form className="hidden max-w-md flex-1 sm:block" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.currentTarget).get("q"); if (q) router.push(`/admin/clients?q=${encodeURIComponent(String(q))}`); }}>
-            <label className="flex h-10 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm focus-within:border-primary">
-              <Icon name="search" className="text-mute" /><input name="q" className="flex-1 bg-transparent outline-none" placeholder="Search customers by name, email, GSTIN…" />
-            </label>
-          </form>
+          <GlobalSearch />
+          <Link href="/admin/search" className="grid h-10 w-10 place-items-center rounded-xl border border-line text-slate-500 sm:hidden" aria-label="Search"><Icon name="search" /></Link>
           <div className="ml-auto flex items-center gap-3">
             <a href="/" target="_blank" className="hidden text-sm font-bold text-mute hover:text-primary-dark md:inline">View website ↗</a>
             <div className="text-right">

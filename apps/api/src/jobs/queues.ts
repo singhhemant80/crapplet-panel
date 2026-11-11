@@ -21,6 +21,7 @@ export type ProvisionAction =
   | "reinstall"
   | "reset_password"
   | "change_package"
+  | "hard_reset"
   | "sync";
 
 export interface ProvisionJob {

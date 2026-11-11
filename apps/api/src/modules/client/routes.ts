@@ -2,10 +2,10 @@ import { provisioningProgress } from "../provisioning/progress";
 import { requireCurrency } from "../../lib/currency";
 import { Router } from "express";
 import { z } from "zod";
-import { hostingPasswordSchema } from "../orders/pricing";
+import { hostingPasswordSchema, rootPasswordSchema } from "../orders/pricing";
 import { prisma, TicketPriority } from "../../db";
 import { ah, badRequest, conflict, forbidden, notFound, pageParams, parse } from "../../lib/http";
-import { decrypt, randomToken } from "../../lib/crypto";
+import { decrypt, encrypt, randomToken } from "../../lib/crypto";
 import { requireClient } from "../../middleware/auth";
 import { enqueueProvision } from "../../jobs/queues";
 import { profileSchema, resolveStateCode } from "../auth/routes";
@@ -305,9 +305,11 @@ clientRouter.get(
 );
 
 const actionSchema = z.object({
-  action: z.enum(["start", "stop", "shutdown", "reboot", "reinstall", "reset_password"]),
+  action: z.enum(["start", "stop", "shutdown", "reboot", "hard_reset", "reinstall", "reset_password"]),
   osTemplateId: z.string().optional(),
   confirm: z.string().optional(),
+  /** reset_password: the customer's own password (otherwise one is generated) */
+  password: rootPasswordSchema.optional(),
 });
 
 clientRouter.post(
@@ -323,7 +325,7 @@ clientRouter.post(
     }
     const recent = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 10_000) } } });
     if (recent) throw conflict("Another action is in progress, please wait a few seconds");
-    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, ...(b.action === "reset_password" && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     await prisma.provisioningLog.create({ data: { serviceId: s.id, action: `${b.action}_requested`, success: true, message: "Queued by customer" } });
     res.status(202).json({ queued: true });
   }),

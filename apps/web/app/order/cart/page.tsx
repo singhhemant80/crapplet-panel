@@ -13,7 +13,7 @@ import { CurrencySwitch, readCurrency, useCurrency } from "@/lib/currency";
 export default function CartPage() {
   const router = useRouter();
   const { me, loading: sessionLoading } = useSession();
-  const { currency, locked } = useCurrency();
+  const { currency, locked } = useCurrency({ billing: true });
   const [cart, setCart] = useState<Cart | null>(null);
   const [quote, setQuote] = useState<any>(null);
   const [qErr, setQErr] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function CartPage() {
       <OrderSteps step={3} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight text-ink">Review your order</h1>
-        <CurrencySwitch />
+        <CurrencySwitch billing />
       </div>
       {locked && readCurrency() !== qc && (
         <Alert className="mb-5">Your account is billed in <b>{qc}</b>, so this order is priced in {qc}.</Alert>
@@ -86,7 +86,7 @@ export default function CartPage() {
                 <Card key={i.key}>
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex gap-3">
-                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary-dark"><Icon name="dns" /></span>
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-white shadow-glow"><Icon name={i.osTemplateId ? "dns" : "language"} /></span>
                       <div>
                         <div className="font-extrabold text-ink">{i.productName}</div>
                         <div className="text-sm text-mute">{CYCLES[i.cycle]}{i.location ? ` · ${i.location}` : ""}{i.osName ? ` · ${i.osName}` : ""}</div>
@@ -122,7 +122,12 @@ export default function CartPage() {
           </div>
 
           <aside className="space-y-4">
-            <Card title="Summary">
+            <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+              <div className="bg-gradient-to-br from-[#2e1065] via-[#4c1d95] to-[#6d28d9] px-5 py-4 text-white">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Order summary</div>
+                <div className="mt-0.5 text-lg font-extrabold">{cart.items.length + cart.domains.length} item{cart.items.length + cart.domains.length === 1 ? "" : "s"} · {qc}</div>
+              </div>
+              <div className="p-5">
               {qErr && <Alert tone="error" className="mb-3">{qErr}</Alert>}
               {!quote ? <Loading /> : (
                 <dl className="space-y-2 text-sm">
@@ -132,7 +137,7 @@ export default function CartPage() {
                   {quote.totals.cgst > 0 && <div className="flex justify-between"><dt className="text-mute">CGST 9%</dt><dd className="font-semibold">{cm(quote.totals.cgst)}</dd></div>}
                   {quote.totals.sgst > 0 && <div className="flex justify-between"><dt className="text-mute">SGST 9%</dt><dd className="font-semibold">{cm(quote.totals.sgst)}</dd></div>}
                   {quote.totals.igst > 0 && <div className="flex justify-between"><dt className="text-mute">IGST 18%</dt><dd className="font-semibold">{cm(quote.totals.igst)}</dd></div>}
-                  <div className="flex justify-between border-t border-line pt-3 text-lg"><dt className="font-extrabold text-ink">Total</dt><dd className="font-extrabold text-ink">{cm(quote.totals.total)}</dd></div>
+                  <div className="!mt-4 flex items-end justify-between rounded-xl bg-[#faf7ff] px-4 py-3 ring-1 ring-[#ede4ff]"><dt className="text-[11px] font-bold uppercase tracking-wider text-mute">Total due</dt><dd className="text-2xl font-extrabold tracking-tight text-primary-dark">{cm(quote.totals.total)}</dd></div>
                   {!me && qc === "INR" && <p className="text-xs text-mute">GST shown for Madhya Pradesh; it is recalculated for your billing state after sign-in.</p>}
                   {qc !== "INR" && !quote.totals.taxTotal && <p className="text-xs text-mute">No Indian GST — export of services to customers outside India.</p>}
                 </dl>
@@ -142,7 +147,8 @@ export default function CartPage() {
                 <Button size="sm" variant="secondary" type="submit" className="h-10">Apply</Button>
               </form>
               {quote?.promo && <p className="mt-2 text-xs font-bold text-emerald-600">{quote.promo.code} applied — you save {cm(quote.promo.discount)}</p>}
-            </Card>
+              </div>
+            </div>
             {!sessionLoading && (!me || me.type !== "CLIENT") ? (
               <Card>
                 <p className="mb-3 text-sm text-mute">Sign in or create an account to place your order.</p>
@@ -159,6 +165,10 @@ export default function CartPage() {
                 </label>
                 <Button size="lg" className="mt-4 w-full" icon="lock" disabled={!tos || !quote} loading={busy} onClick={checkout}>Place order</Button>
                 <p className="mt-2 text-center text-xs text-mute">Wallet credit is applied first. Pay the rest by UPI, card or netbanking.</p>
+                <div className="mt-3 flex items-center justify-center gap-4 border-t border-line pt-3 text-[11.5px] font-semibold text-slate-500">
+                  <span className="flex items-center gap-1"><Icon name="lock" className="text-[15px] text-emerald-600" />Secure checkout</span>
+                  <span className="flex items-center gap-1"><Icon name="bolt" className="text-[15px] text-primary" />Instant setup</span>
+                </div>
               </Card>
             )}
           </aside>

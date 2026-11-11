@@ -5,8 +5,10 @@ import { cx } from "@/components/ui";
 
 /**
  * Storefront currency.
- * - Signed-in clients always see (and pay in) their account currency.
- * - Guests pick INR / USD; the first visit guesses from the browser time zone.
+ * - Anyone can browse prices in INR or USD (header toggle / switch on the order pages).
+ * - The cart and checkout bill in the account's currency for signed-in clients ("billing" mode),
+ *   and the order pages say so when the two differ.
+ * - First visit: the account currency when signed in, otherwise a guess from the time zone.
  */
 // same key as the public website's currency.js, so the site header toggle and the order pages always agree
 const KEY = "crapplet_currency";
@@ -20,11 +22,11 @@ function guess(): string {
     return "INR";
   }
 }
-export function readCurrency(): string {
+export function readCurrency(fallback?: string): string {
   try {
-    return localStorage.getItem(KEY) || guess();
+    return localStorage.getItem(KEY) || fallback || guess();
   } catch {
-    return "INR";
+    return fallback || "INR";
   }
 }
 export function writeCurrency(c: string) {
@@ -55,17 +57,17 @@ function bindHeader() {
   });
 }
 
-export function useCurrency() {
+export function useCurrency(opts: { billing?: boolean } = {}) {
   const { me } = useSession();
   const accountCurrency: string | undefined = me?.type === "CLIENT" ? me?.profile?.currency : undefined;
-  const [picked, setPicked] = useState("INR");
+  const [picked, setPicked] = useState(accountCurrency ?? "INR");
   useEffect(() => {
-    const sync = () => setPicked(readCurrency());
+    const sync = () => setPicked(readCurrency(accountCurrency));
     sync();
     window.addEventListener("cc-currency", sync);
     return () => window.removeEventListener("cc-currency", sync);
-  }, []);
-  const currency = accountCurrency ?? picked;
+  }, [accountCurrency]);
+  const currency = opts.billing && accountCurrency ? accountCurrency : picked;
   useEffect(() => {
     bindHeader();
     syncHeaderButtons(currency);
@@ -73,7 +75,7 @@ export function useCurrency() {
     const t = setTimeout(() => syncHeaderButtons(currency), 300);
     return () => clearTimeout(t);
   }, [currency]);
-  return { currency, locked: !!accountCurrency, setCurrency: writeCurrency, isInr: currency === "INR" };
+  return { currency, accountCurrency, locked: !!(opts.billing && accountCurrency), differs: !!accountCurrency && picked !== accountCurrency, setCurrency: writeCurrency, isInr: currency === "INR" };
 }
 
 /** Price row for a cycle in a currency from the catalogue's `pricing` list. */
@@ -86,16 +88,17 @@ export const pick = (map: Record<string, number> | undefined, currency: string, 
 /** One-line tax note under prices. */
 export const taxNote = (currency: string) => (currency === "INR" ? "+ 18% GST" : "no Indian GST outside India");
 
-export function CurrencySwitch({ className }: { className?: string }) {
-  const { currency, locked, setCurrency } = useCurrency();
+export function CurrencySwitch({ className, billing }: { className?: string; billing?: boolean }) {
+  const { currency, locked, setCurrency, accountCurrency, differs } = useCurrency({ billing });
   if (locked)
     return (
-      <span className={cx("inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-primary-dark ring-1 ring-line", className)} title="Prices follow your account's billing currency">
-        Billing in {currency}
+      <span className={cx("inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-primary-dark ring-1 ring-line", className)} title="Your account is billed in this currency">
+        Billed in {currency}
       </span>
     );
   return (
-    <div className={cx("inline-flex rounded-full bg-white p-1 ring-1 ring-line", className)} role="group" aria-label="Currency">
+    <div className={cx("inline-flex flex-col items-end gap-1", className)}>
+    <div className="inline-flex rounded-full bg-white p-1 ring-1 ring-line" role="group" aria-label="Currency">
       {CURRENCIES.map((c) => (
         <button
           key={c}
@@ -107,6 +110,8 @@ export function CurrencySwitch({ className }: { className?: string }) {
           {c === "INR" ? "₹ INR" : "$ USD"}
         </button>
       ))}
+    </div>
+    {differs && <span className="text-[11px] font-semibold text-mute">Prices shown in {currency} · your account is billed in {accountCurrency}</span>}
     </div>
   );
 }

@@ -258,7 +258,12 @@ export async function cancelInvoice(invoiceId: string, reason = "Cancelled") {
 
 /** Issue a credit note and optionally refund to the customer's credit balance. */
 export async function issueCreditNote(args: { invoiceId: string; amount: number; reason: string; toCredit: boolean; actorId: string }) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction((tx) => issueCreditNoteTx(tx, args));
+}
+
+/** Same as issueCreditNote, inside a caller's transaction (refunds write the refund and its credit note together). */
+export async function issueCreditNoteTx(tx: Prisma.TransactionClient, args: { invoiceId: string; amount: number; reason: string; toCredit: boolean; actorId: string }) {
+  {
     const inv = await tx.invoice.findUniqueOrThrow({ where: { id: args.invoiceId }, include: { creditNotes: true } });
     if (inv.status !== "PAID") throw conflict("Credit notes can only be issued against paid invoices");
     const already = inv.creditNotes.reduce((s, c) => s + c.amount, 0);
@@ -273,7 +278,7 @@ export async function issueCreditNote(args: { invoiceId: string; amount: number;
     if (args.toCredit) await adjustCredit(tx, { userId: inv.userId, amount: args.amount, description: `Credit note ${cn.number}`, refType: "creditNote", refId: cn.id });
     if (args.amount + already >= inv.total) await tx.invoice.update({ where: { id: inv.id }, data: { status: "REFUNDED" } });
     return cn;
-  });
+  }
 }
 
 export function invoiceEmailVars(inv: { id: string; number: string | null; proformaNumber: string; total: number; currency: string; dueDate: Date }, name: string) {

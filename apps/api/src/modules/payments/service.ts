@@ -123,24 +123,8 @@ export async function reviewOfflinePayment(args: { intentId: string; approve: bo
   return { ok: true, ...r };
 }
 
-export async function refundTransaction(args: { transactionId: string; amount: number; toCredit: boolean; actorId: string; reason: string }) {
-  const t = await prisma.transaction.findUniqueOrThrow({ where: { id: args.transactionId } });
-  if (t.type !== "PAYMENT") throw badRequest("Only payments can be refunded");
-  const refunded = await prisma.transaction.aggregate({ where: { gateway: t.gateway, type: "REFUND", description: { contains: t.gatewayTxnId } }, _sum: { amount: true } });
-  if (args.amount <= 0 || args.amount + (refunded._sum.amount ?? 0) > t.amount) throw badRequest("Refund exceeds the original payment");
-  let refundId = `credit-${Date.now()}`;
-  if (!args.toCredit) {
-    const impl = GATEWAYS[t.gateway];
-    if (!impl?.refund) throw new HttpError(400, `Automatic refunds are not supported for ${t.gateway}. Refund to credit or refund manually.`);
-    const { secrets, row } = await gatewayConfig(t.gateway);
-    refundId = (await impl.refund(t.gatewayTxnId, args.amount, secrets, row.testMode)).refundId;
-  }
-  await prisma.transaction.create({
-    data: { userId: t.userId, invoiceId: t.invoiceId, gateway: args.toCredit ? "credit" : t.gateway, gatewayTxnId: refundId, type: "REFUND", amount: args.amount, currency: t.currency, description: `Refund of ${t.gatewayTxnId}: ${args.reason}` },
-  });
-  if (t.invoiceId) {
-    const { issueCreditNote } = await import("../billing/invoices");
-    await issueCreditNote({ invoiceId: t.invoiceId, amount: args.amount, reason: args.reason, toCredit: args.toCredit, actorId: args.actorId }).catch((e) => console.warn("[refund] credit note", e));
-  }
-  return { ok: true, refundId };
+export async function refundTransaction(args: { transactionId: string; amount: number; toCredit?: boolean; method?: "gateway" | "wallet" | "manual"; actorId: string; reason: string }) {
+  const { refundOne } = await import("./refunds");
+  const r = await refundOne({ paymentId: args.transactionId, amount: args.amount, method: args.method ?? (args.toCredit ? "wallet" : "gateway"), reason: args.reason, actorId: args.actorId });
+  return { ok: true, refundId: r.refundId, gateway: r.gateway };
 }

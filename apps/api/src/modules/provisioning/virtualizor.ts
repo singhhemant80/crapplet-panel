@@ -407,6 +407,46 @@ export class VirtualizorClient {
   terminate(vpsid: string) {
     return this.call("vs", { delete: vpsid });
   }
+  /**
+   * Live usage the way the WHMCS module's client area reads it, from the end-user API on 4083:
+   *   act=vpsmanage&stats=1 → info.cpu.percent, info.disk{used_gb,limit_gb,percent}, info.netspeed{download,upload}
+   *   act=monitor           → cpu{percent,limit}, ram{used,limit,percent}, disk{disk{…},inodes{…}}
+   *   act=bandwidth         → bandwidth{used_gb,limit_gb,percent} for this month
+   * Each part is optional — whatever answers is used.
+   */
+  async liveUsage(vpsid: string) {
+    const n = (x: unknown) => (x === undefined || x === null || x === "" || Number.isNaN(Number(x)) ? undefined : Number(x));
+    const [man, mon, bw] = await Promise.all([
+      this.call<{ info?: Record<string, any> }>("vpsmanage", { stats: 1, svs: vpsid }, undefined, { port: 4083 }).catch(() => null),
+      this.call<Record<string, any>>("monitor", { svs: vpsid }, undefined, { port: 4083 }).catch(() => null),
+      this.call<Record<string, any>>("bandwidth", { svs: vpsid }, undefined, { port: 4083 }).catch(() => null),
+    ]);
+    const info = man?.info ?? {};
+    const cpu = info.cpu ?? mon?.cpu?.cpu ?? mon?.cpu ?? {};
+    const ram = mon?.ram ?? info.ram ?? {};
+    const disk = info.disk ?? mon?.disk?.disk ?? mon?.disk ?? {};
+    const band = bw?.bandwidth ?? info.bandwidth ?? {};
+    const speed = info.netspeed ?? {};
+    return {
+      reachable: !!(man || mon),
+      status: n(info.status),
+      cpuPct: n(cpu.percent),
+      cpuLimitMhz: n(cpu.limit),
+      memUsedMb: n(ram.used),
+      memTotalMb: n(ram.limit),
+      memPct: n(ram.percent),
+      diskUsedGb: n(disk.used_gb),
+      diskTotalGb: n(disk.limit_gb),
+      diskPct: n(disk.percent),
+      netInBps: n(speed.download),
+      netOutBps: n(speed.upload),
+      bandwidthUsedGb: n(band.used_gb),
+      bandwidthGb: n(band.limit_gb),
+      bandwidthPct: n(band.percent),
+      uptimeSec: n(info.uptime ?? info.vps?.uptime),
+    };
+  }
+
   power(vpsid: string, action: "start" | "stop" | "restart" | "poweroff") {
     return this.call("vs", { action, vpsid });
   }

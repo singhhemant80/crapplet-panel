@@ -48,8 +48,9 @@
 .chdr-empty{padding:14px;font-size:14px;color:var(--mute);text-align:center}
 
 .chdr-actions{display:flex;align-items:center;gap:18px;flex-shrink:0}
-.chdr .cur-toggle{height:44px;padding:4px;background:#fff;border:1px solid #e6dcf8;border-radius:12px;font-size:13px}
-.chdr .cur-toggle .cur-btn{padding:0 14px;border-radius:9px;color:#334155;font-weight:700}
+.chdr .cur-toggle{display:inline-flex;align-items:stretch;gap:2px;height:44px;padding:4px;background:#fff;border:1px solid #e6dcf8;border-radius:12px;font-size:13px;line-height:1;box-sizing:border-box}
+.chdr .cur-toggle .cur-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 14px;border:0;margin:0;background:transparent;border-radius:9px;color:#334155;font:inherit;font-weight:700;line-height:1;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}
+.chdr .cur-toggle .cur-btn:hover:not(.is-active){background:#f5f0ff;color:#6d28d9}
 .chdr .cur-toggle .cur-btn.is-active{background:var(--p);color:#fff;box-shadow:0 4px 12px rgba(163,101,254,.35)}
 .chdr-support{display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:var(--ink)!important;transition:color .2s}
 .chdr-support .ms{font-size:21px}

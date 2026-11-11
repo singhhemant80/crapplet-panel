@@ -43,7 +43,7 @@ export function InvoiceSheet({ data, admin, footer }: { data: any; admin?: boole
   const overdue = inv.status === "UNPAID" && new Date(inv.dueDate) < new Date();
   const st = STATUS[overdue ? "OVERDUE" : inv.status] ?? STATUS.UNPAID;
   const due = inv.total - inv.amountPaid;
-  const kind = inv.isWalletTopup ? "Wallet top-up" : inv.number ? "Tax invoice" : "Proforma invoice";
+  const kind = inv.isWalletTopup ? "Receipt voucher" : inv.number ? "Tax invoice" : "Proforma invoice";
   const exportInv = cur !== "INR" && !inv.taxTotal && inv.placeOfSupplyCode === "96";
   const payments = (inv.transactions ?? []).filter((t: any) => t.type === "PAYMENT" || t.type === "CREDIT_APPLIED" || t.type === "REFUND");
 

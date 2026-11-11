@@ -1,4 +1,5 @@
 "use client";
+import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
@@ -15,6 +16,7 @@ export default function AdminService() {
   const { data, loading, reload } = useApi(`/admin/services/${id}`);
   const os = useApi("/admin/os-templates");
   const [live, setLive] = useState<any>(null);
+  const [resetPw, setResetPw] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   useEffect(() => {
     if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
@@ -42,7 +44,9 @@ export default function AdminService() {
             <Button variant="outline" size="sm" icon="restart_alt" onClick={() => act("reboot")}>Reboot</Button>
             <Button variant="outline" size="sm" icon="power_settings_new" onClick={() => act("shutdown")}>Shutdown</Button>
             <Button variant="outline" size="sm" icon="stop" onClick={() => act("stop")}>Power off</Button>
-            <Button variant="outline" size="sm" icon="key" onClick={() => confirm("Reset password and reboot?") && act("reset_password")}>Reset password</Button>
+            <Button variant="outline" size="sm" icon="bolt" onClick={() => confirm("Hard reset: cut the power and start the server again? Unsaved data is lost.") && act("hard_reset")}>Hard reset</Button>
+            <Button variant="outline" size="sm" icon="key" onClick={() => setResetPw(true)}>Reset password</Button>
+            <ResetPasswordModal open={resetPw} onClose={() => setResetPw(false)} windows={/windows/i.test(s.osTemplate?.family ?? s.osTemplate?.name ?? "")} onSubmit={(password) => { setResetPw(false); act("reset_password", password ? { password } : {}); }} />
             <Select className="h-9 w-56" defaultValue="" onChange={(e) => { if (e.target.value && confirm("Reinstall will ERASE the server. Continue?")) act("reinstall", { osTemplateId: e.target.value }); e.target.value = ""; }}><option value="">Reinstall with…</option>{s.product.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => <option key={x.osTemplate.id} value={x.osTemplate.id}>{x.osTemplate.name}</option>)}</Select>
           </>}
           {isHosting && s.remoteId && s.status === "ACTIVE" && <HostingActions s={s} onDone={reload} />}

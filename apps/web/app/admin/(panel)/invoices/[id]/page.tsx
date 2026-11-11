@@ -2,15 +2,16 @@
 import { InvoiceSheet } from "@/components/invoice-sheet";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, date, money } from "@/lib/api";
-import { Badge, Button, Card, Field, Input, Loading, Modal, PageHeader, Select, Table, Td, Toggle, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, Modal, PageHeader, Select, Table, Td, Toggle, toast, useApi } from "@/components/ui";
 
 export default function AdminInvoice() {
   const { id } = useParams<{ id: string }>();
   const { data, loading, reload } = useApi(`/admin/invoices/${id}`);
   const [pay, setPay] = useState(false);
   const [cn, setCn] = useState(false);
+  const [refund, setRefund] = useState(false);
   if (loading || !data) return <Loading />;
   const i = data.invoice;
   return (
@@ -23,6 +24,7 @@ export default function AdminInvoice() {
             <Button size="sm" variant="outline" icon="mail" onClick={() => api(`/admin/invoices/${id}/remind`, { body: {} }).then(() => toast.success("Reminder sent"))}>Send reminder</Button>
             <Button size="sm" variant="danger" onClick={() => confirm("Cancel invoice? Pending order services and IP holds will be released.") && api(`/admin/invoices/${id}/cancel`, { body: {} }).then(() => { toast.success("Cancelled"); reload(); }).catch((e) => toast.error(e.message))}>Cancel</Button>
           </>}
+          {i.status === "PAID" && i.amountPaid > 0 && <Button size="sm" variant="danger" icon="currency_exchange" onClick={() => setRefund(true)}>Refund</Button>}
           {i.status === "PAID" && <Button size="sm" variant="outline" icon="undo" onClick={() => setCn(true)}>Credit note</Button>}
         </>} />
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -50,6 +52,7 @@ export default function AdminInvoice() {
         </div>
       </div>
       <PayModal open={pay} onClose={() => setPay(false)} id={id} due={i.total - i.amountPaid} currency={i.currency} onDone={reload} />
+      <RefundModal open={refund} onClose={() => setRefund(false)} id={id} onDone={reload} />
       <CreditNoteModal open={cn} onClose={() => setCn(false)} id={id} max={i.total} currency={i.currency} onDone={reload} />
     </>
   );
@@ -77,6 +80,88 @@ function CreditNoteModal({ open, onClose, id, max, currency, onDone }: any) {
         <Toggle checked={v.toCredit} onChange={(x) => setV({ ...v, toCredit: x })} label="Add to customer's credit balance" />
         <Button onClick={() => api(`/admin/invoices/${id}/credit-note`, { body: { amount: Math.round(Number(v.amount) * 100), reason: v.reason, toCredit: v.toCredit } }).then(() => { toast.success("Credit note issued"); onClose(); onDone(); }).catch((e) => toast.error(e.message))}>Issue</Button>
       </div>
+    </Modal>
+  );
+}
+
+const METHODS = [
+  { k: "gateway", icon: "credit_card", title: "Original payment method", text: "Back to the customer's card / UPI / bank through the gateway — no need to open the gateway dashboard" },
+  { k: "wallet", icon: "account_balance_wallet", title: "Customer wallet", text: "Added to their account credit instantly — used automatically on future invoices" },
+  { k: "manual", icon: "receipt_long", title: "Already refunded outside", text: "You paid it back yourself (NEFT, cash…) — this only records it" },
+] as const;
+
+/** Refund: choose wallet or the original gateway; amounts are limited to what each route can return. */
+function RefundModal({ open, onClose, id, onDone }: { open: boolean; onClose: () => void; id: string; onDone: () => void }) {
+  const { data, reload } = useApi(open ? `/admin/invoices/${id}/refund-options` : null, [open]);
+  const [method, setMethod] = useState<"gateway" | "wallet" | "manual">("gateway");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const cur = data?.currency ?? "INR";
+  const max: number = data?.max?.[method] ?? 0;
+  useEffect(() => {
+    if (!data) return;
+    const m = data.max.gateway > 0 ? "gateway" : "wallet";
+    setMethod(m);
+    setAmount(String(data.max[m] / 100));
+    setReason("");
+  }, [data]);
+  const value = Math.round(Number(amount) * 100);
+  return (
+    <Modal open={open} onClose={onClose} title="Refund invoice" wide>
+      {!data ? <Loading /> : data.max.wallet === 0 ? <p className="text-sm text-mute">Everything on this invoice has already been refunded.</p> : (
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2 text-[13px] font-bold text-slate-700">Where should the money go?</div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {METHODS.map((m) => {
+                const can = (data.max[m.k] ?? 0) > 0;
+                return (
+                  <button key={m.k} type="button" disabled={!can} onClick={() => { setMethod(m.k); setAmount(String(Math.min(data.max[m.k], value || data.max[m.k]) / 100)); }}
+                    className={"flex flex-col gap-1 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 " + (method === m.k ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line hover:border-primary/40")}>
+                    <span className="flex items-center gap-2 text-sm font-bold text-ink"><Icon name={m.icon} className="text-[19px] text-primary-dark" />{m.title}</span>
+                    <span className="text-[11.5px] leading-snug text-mute">{m.text}</span>
+                    <span className="mt-1 text-xs font-bold text-primary-dark">up to {money(data.max[m.k] ?? 0, cur)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-line">
+            <div className="bg-[#fbf9ff] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-mute">Payments on this invoice</div>
+            {data.payments.map((p: any) => (
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2.5 text-sm">
+                <span className="min-w-0"><b className="uppercase">{p.gateway === "credit" ? "Account credit" : p.gateway}</b> <span className="font-mono text-xs text-mute">{p.reference.slice(0, 26)}</span>{p.gatewayNote && <span className="block text-[11.5px] text-mute">{p.gatewayNote}</span>}</span>
+                <span className="text-right text-xs"><b className="text-sm text-ink">{money(p.amount, cur)}</b>{p.refunded > 0 && <span className="block text-sky-700">{money(p.refunded, cur)} refunded</span>}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
+            <Field label={`Amount (${cur})`} hint={`Max ${money(max, cur)}`}>
+              <Input type="number" step="0.01" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </Field>
+            <Field label="Reason (on the credit note)"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Service cancelled within 7 days" /></Field>
+          </div>
+          {method === "gateway" && <Alert tone="info">The refund is sent to {[...new Set(data.payments.filter((p: any) => p.viaGateway).map((p: any) => p.gateway))].join(" / ")} now. Banks usually credit the customer in 5–7 working days. A GST credit note is issued automatically.</Alert>}
+          <Button variant="danger" icon="currency_exchange" loading={busy} disabled={!value || value > max || reason.trim().length < 3}
+            onClick={async () => {
+              if (!confirm(`Refund ${money(value, cur)} ${method === "gateway" ? "through the payment gateway" : method === "wallet" ? "to the customer's wallet" : "(record a manual refund)"}?`)) return;
+              setBusy(true);
+              try {
+                const r = await api(`/admin/invoices/${id}/refund`, { body: { amount: value, method, reason } });
+                toast.success(`Refunded ${money(r.refunded, cur)}${method === "gateway" ? ` — ${r.parts.map((x: any) => `${x.gateway} ${x.refundId}`).join(", ")}` : ""}`);
+                onClose();
+                onDone();
+              } catch (e: any) {
+                toast.error(e.message);
+                reload();
+              }
+              setBusy(false);
+            }}>
+            Refund {value ? money(value, cur) : ""}
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }

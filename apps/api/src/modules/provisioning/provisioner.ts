@@ -659,6 +659,27 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         if (params.notify !== false) await queueEmail("service.terminated", svc.user.email, vars, svc.userId);
         return { ok: true };
       }
+      case "hard_reset": {
+        if (prov === "CPANEL") throw new ProvisionError("Power actions don't apply to hosting accounts", false);
+        if (svc.status !== "ACTIVE") throw new ProvisionError(`Power actions are not allowed while the service is ${svc.status}`, false);
+        const { server, remoteId, node } = requireRemote(svc);
+        if (prov === "PROXMOX") {
+          const c = proxmoxFor(server);
+          if (kindOf(svc) === "qemu") await c.power(node, "qemu", remoteId, "reset");
+          else {
+            await c.power(node, "lxc", remoteId, "stop");
+            await c.power(node, "lxc", remoteId, "start");
+          }
+        } else if (prov === "VIRTUALIZOR") {
+          // Virtualizor has no reset — cut the power, then start it again
+          const c = virtualizorFor(server);
+          await c.power(remoteId, "poweroff");
+          await new Promise((ok) => setTimeout(ok, 5000));
+          await c.power(remoteId, "start");
+        }
+        await log(svc.id, action, true, "Hard reset (power cut and restart)");
+        return { ok: true };
+      }
       case "start":
       case "stop":
       case "shutdown":
@@ -676,7 +697,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
       }
       case "reset_password": {
         const { server, remoteId, node } = requireRemote(svc);
-        const password = (params.password as string) || generatePassword(18);
+        // a password the customer/staff chose arrives encrypted (it sits in the job queue)
+        const password = (params.password as string) || (params.passwordEnc ? decrypt(String(params.passwordEnc)) : "") || generatePassword(18);
         if (prov === "CPANEL") await cpanelPassword(svc, password);
         else if (prov === "PROXMOX") {
           if (kindOf(svc) === "lxc") throw new ProvisionError("Password reset for LXC containers is not supported by the Proxmox API — use Reinstall", false);
@@ -865,18 +887,25 @@ export async function liveStatus(serviceId: string) {
   }
   if (svc.product.provisioner === "VIRTUALIZOR") {
     const client = virtualizorFor(svc.server);
-    const [r, codes] = await Promise.all([client.getVps(svc.remoteId), client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>)]);
+    const [r, codes, u] = await Promise.all([client.getVps(svc.remoteId), client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>), client.liveUsage(svc.remoteId).catch(() => null)]);
     const v = (r.vs?.[svc.remoteId] ?? Object.values(r.vs ?? {})[0] ?? {}) as Record<string, unknown>;
     const st = virtualizorState(codes[svc.remoteId], v);
     const n = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Number(x));
+    const running = st.state === "running";
     return {
       ...st,
-      cpuPct: n(v.used_cpu),
-      memUsedMb: n(v.used_ram),
-      memTotalMb: n(v.ram),
-      diskTotalGb: n(v.space),
-      bandwidthUsedGb: n(v.used_bandwidth),
-      bandwidthGb: n(v.bandwidth),
+      source: u?.reachable ? "live" : "plan",
+      cpuPct: running ? u?.cpuPct ?? n(v.used_cpu) ?? 0 : 0,
+      cpus: n(v.cores),
+      memUsedMb: running ? u?.memUsedMb ?? n(v.used_ram) : 0,
+      memTotalMb: u?.memTotalMb ?? n(v.ram),
+      diskUsedGb: u?.diskUsedGb,
+      diskTotalGb: u?.diskTotalGb ?? n(v.space),
+      netInBps: running ? u?.netInBps : 0,
+      netOutBps: running ? u?.netOutBps : 0,
+      uptimeSec: u?.uptimeSec,
+      bandwidthUsedGb: u?.bandwidthUsedGb ?? n(v.used_bandwidth),
+      bandwidthGb: u?.bandwidthGb ?? n(v.bandwidth),
       ips: Object.values((v.ips ?? {}) as Record<string, string>).map(String),
       node: v.serid !== undefined ? String(v.serid) : undefined,
     };

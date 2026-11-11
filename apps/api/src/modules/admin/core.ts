@@ -8,9 +8,10 @@ import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib
 import { audit } from "../../lib/audit";
 import { cartSchema, rootPasswordSchema, hostingPasswordSchema } from "../orders/pricing";
 import { decrypt, encrypt, randomToken } from "../../lib/crypto";
-import { requireStaff } from "../../middleware/auth";
+import { requireStaff, hasPerm } from "../../middleware/auth";
 import { enqueueProvision, type ProvisionAction } from "../../jobs/queues";
 import { deriveOrderStatus, syncOrderForService, syncOrderStatus } from "../orders/status";
+import { clientWhere, invoiceWhere, orderWhere, phoneDigits, serviceWhere } from "./search";
 import { adjustCredit, applyPayment, cancelInvoice, createInvoice, invoiceEmailVars, invoiceLabel, issueCreditNote } from "../billing/invoices";
 import { renderInvoicePdf } from "../billing/pdf";
 import { reviewOfflinePayment, refundTransaction } from "../payments/service";
@@ -94,7 +95,7 @@ adminCore.get(
     const where: Prisma.UserWhereInput = {
       type: "CLIENT",
       ...(req.query.status ? { status: req.query.status as "ACTIVE" } : {}),
-      ...(q ? { OR: [{ email: { contains: q, mode: "insensitive" } }, { firstName: { contains: q, mode: "insensitive" } }, { lastName: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { profile: { companyName: { contains: q, mode: "insensitive" } } }, { profile: { gstin: { contains: q.toUpperCase() } } }] } : {}),
+      ...(q ? clientWhere(q) : {}),
     };
     const [rows, total] = await Promise.all([
       prisma.user.findMany({
@@ -206,6 +207,30 @@ adminCore.post(
   }),
 );
 
+// ───────────── Search everything ─────────────
+adminCore.get(
+  "/search",
+  requireStaff(),
+  ah(async (req, res) => {
+    const q = String(req.query.q ?? "").trim().slice(0, 120);
+    if (q.length < 2) return res.json({ q, clients: [], services: [], orders: [], invoices: [], domains: [], tickets: [], transactions: [] });
+    const take = Math.min(25, Number(req.query.take) || 6);
+    const can = (perm: string) => hasPerm(req.user, perm);
+    const none = Promise.resolve([] as never[]);
+    const ticketNo = /^#?[\w-]{3,20}$/.test(q) ? q.replace(/^#/, "") : null;
+    const [clients, services, orders, invoices, domains, tickets, transactions] = await Promise.all([
+      can("clients.view") ? prisma.user.findMany({ where: { type: "CLIENT", ...clientWhere(q) }, take, orderBy: { createdAt: "desc" }, select: { id: true, email: true, firstName: true, lastName: true, phone: true, status: true, profile: { select: { companyName: true, gstin: true, city: true } } } }) : none,
+      can("services.view") ? prisma.service.findMany({ where: serviceWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, hostname: true, status: true, remoteId: true, username: true, product: { select: { name: true, provisioner: true } }, ips: { select: { address: true } }, user: { select: { id: true, email: true, firstName: true, lastName: true } } } }) : none,
+      can("orders.view") ? prisma.order.findMany({ where: orderWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, number: true, status: true, total: true, currency: true, createdAt: true, user: { select: { email: true, firstName: true, lastName: true } } } }) : none,
+      can("billing.view") ? prisma.invoice.findMany({ where: invoiceWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, currency: true, user: { select: { email: true, firstName: true, lastName: true } } } }) : none,
+      can("clients.view") ? prisma.domain.findMany({ where: { name: { contains: q.toLowerCase(), mode: "insensitive" } }, take, select: { id: true, name: true, status: true, expiryDate: true, user: { select: { id: true, email: true } } } }) : none,
+      can("tickets.view") ? prisma.ticket.findMany({ where: { OR: [...(ticketNo !== null ? [{ number: { equals: ticketNo, mode: "insensitive" as const } }] : []), { subject: { contains: q, mode: "insensitive" } }, { user: { email: { contains: q, mode: "insensitive" } } }] }, take, orderBy: { lastReplyAt: "desc" }, select: { id: true, number: true, subject: true, status: true, user: { select: { email: true } } } }) : none,
+      can("billing.view") ? prisma.transaction.findMany({ where: { gatewayTxnId: { contains: q } }, take, orderBy: { createdAt: "desc" }, select: { id: true, gateway: true, gatewayTxnId: true, type: true, amount: true, currency: true, invoiceId: true, createdAt: true } }) : none,
+    ]);
+    res.json({ q, phone: phoneDigits(q), clients, services, orders, invoices, domains, tickets, transactions });
+  }),
+);
+
 // ───────────── Orders ─────────────
 adminCore.get(
   "/orders",
@@ -215,7 +240,7 @@ adminCore.get(
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
     const where: Prisma.OrderWhereInput = {
       ...(req.query.status ? { status: req.query.status as OrderStatus } : {}),
-      ...(q ? { OR: [{ number: { contains: q, mode: "insensitive" } }, { user: { email: { contains: q, mode: "insensitive" } } }, { services: { some: { hostname: { contains: q, mode: "insensitive" } } } }] } : {}),
+      ...(q ? orderWhere(q) : {}),
     };
     const [rows, total] = await Promise.all([
       prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, firstName: true, lastName: true, email: true } }, invoice: { select: { id: true, status: true, total: true } }, services: { select: { id: true, hostname: true, status: true, product: { select: { name: true } } } }, domains: { select: { name: true } } } }),
@@ -396,7 +421,7 @@ adminCore.get(
       ...(req.query.serverId ? { serverId: String(req.query.serverId) } : {}),
       ...(req.query.vps === "1" ? { product: { provisioner: { in: ["PROXMOX", "VIRTUALIZOR"] } } } : {}),
       ...(req.query.resellerId ? { resellerId: String(req.query.resellerId) } : {}),
-      ...(q ? { OR: [{ hostname: { contains: q, mode: "insensitive" } }, { remoteId: q }, { ips: { some: { address: { startsWith: q } } } }, { user: { email: { contains: q, mode: "insensitive" } } }] } : {}),
+      ...(q ? serviceWhere(q) : {}),
     };
     const [rows, total] = await Promise.all([
       prisma.service.findMany({
@@ -623,11 +648,13 @@ adminCore.post(
   ah(async (req, res) => {
     const b = parse(
       z.object({
-        action: z.enum(["create", "suspend", "unsuspend", "terminate", "start", "stop", "shutdown", "reboot", "reinstall", "reset_password", "change_package", "sync"]),
+        action: z.enum(["create", "suspend", "unsuspend", "terminate", "start", "stop", "shutdown", "reboot", "hard_reset", "reinstall", "reset_password", "change_package", "sync"]),
         reason: z.string().max(200).optional(),
         package: z.string().max(120).optional(),
         osTemplateId: z.string().optional(),
         notify: z.boolean().optional(),
+        /** reset_password: staff-chosen password (otherwise one is generated) */
+        password: rootPasswordSchema.optional(),
       }),
       req.body,
     );
@@ -645,8 +672,10 @@ adminCore.post(
       // remove a finished/failed create job so it can be queued again under the same id
       if (old && (state === "failed" || state === "completed")) await old.remove();
     }
-    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify, package: b.package }, actorId: req.user!.id });
-    await audit({ actorId: req.user!.id, userId: s.userId, action: `service.${b.action}`, entity: "service", entityId: s.id, details: b });
+    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify, package: b.package, ...(b.action === "reset_password" && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
+    // never put the password in the audit log
+    const { password: chosen, ...logged } = b;
+    await audit({ actorId: req.user!.id, userId: s.userId, action: `service.${b.action}`, entity: "service", entityId: s.id, details: { ...logged, ...(chosen ? { passwordChosen: true } : {}) } });
     res.status(202).json({ queued: true });
   }),
 );
@@ -699,7 +728,7 @@ adminCore.get(
       ...(req.query.status ? { status: req.query.status as InvoiceStatus } : {}),
       ...(req.query.userId ? { userId: String(req.query.userId) } : {}),
       ...(req.query.overdue === "1" ? { status: "UNPAID", dueDate: { lt: new Date() } } : {}),
-      ...(q ? { OR: [{ number: { contains: q } }, { proformaNumber: { contains: q } }, { user: { email: { contains: q, mode: "insensitive" } } }] } : {}),
+      ...(q ? invoiceWhere(q) : {}),
     };
     const [rows, total, sums] = await Promise.all([
       prisma.invoice.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } }),
@@ -818,11 +847,34 @@ adminCore.get(
   }),
 );
 
+/** What can be refunded on an invoice, per payment and per method (wallet / gateway / manual). */
+adminCore.get(
+  "/invoices/:id/refund-options",
+  requireStaff("payments.manage"),
+  ah(async (req, res) => {
+    const { refundOptions } = await import("../payments/refunds");
+    res.json(await refundOptions(req.params.id));
+  }),
+);
+
+/** Refund an invoice: back through the original gateway, to the customer's wallet, or record a manual refund. */
+adminCore.post(
+  "/invoices/:id/refund",
+  requireStaff("payments.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ amount: z.number().int().positive(), method: z.enum(["gateway", "wallet", "manual"]), reason: z.string().trim().min(3).max(300) }), req.body);
+    const { refundInvoice } = await import("../payments/refunds");
+    const r = await refundInvoice({ invoiceId: req.params.id, ...b, actorId: req.user!.id });
+    await audit({ actorId: req.user!.id, action: "invoice.refunded", entity: "invoice", entityId: req.params.id, details: { ...b, parts: r.parts.map((p) => ({ gateway: p.gateway, refundId: p.refundId, amount: p.amount })) } });
+    res.json(r);
+  }),
+);
+
 adminCore.post(
   "/transactions/:id/refund",
   requireStaff("payments.manage"),
   ah(async (req, res) => {
-    const b = parse(z.object({ amount: z.number().int().positive(), toCredit: z.boolean().default(true), reason: z.string().min(3) }), req.body);
+    const b = parse(z.object({ amount: z.number().int().positive(), toCredit: z.boolean().optional(), method: z.enum(["gateway", "wallet", "manual"]).optional(), reason: z.string().min(3) }), req.body);
     const r = await refundTransaction({ transactionId: req.params.id, ...b, actorId: req.user!.id });
     await audit({ actorId: req.user!.id, action: "transaction.refunded", entity: "transaction", entityId: req.params.id, details: b });
     res.json(r);
