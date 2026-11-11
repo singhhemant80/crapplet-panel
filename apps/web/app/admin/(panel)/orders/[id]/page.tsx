@@ -35,15 +35,11 @@ export default function AdminOrder() {
                 {failed ? "Retry provisioning" : "Accept & provision"}
               </Button>
             )}
-            {o.status === "PENDING" && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => confirm("Cancel this order and release reserved IPs?") && act("cancel", {}, "Order cancelled")}>Cancel</Button>
-                <Button size="sm" variant="danger" onClick={() => confirm("Mark this order as fraud?") && act("cancel", { fraud: true }, "Marked as fraud")}>Fraud</Button>
-              </>
-            )}
           </>
         }
       />
+
+      <OrderStatusPanel o={o} onDone={reload} />
 
       {/* at-a-glance strip */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -231,6 +227,100 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
       <p className={cx("mt-3 text-xs text-mute", !s.logs.length && "hidden")}>
         Latest: {s.logs[0]?.action} {s.logs[0]?.success ? "✓" : "✗"} · {s.logs[0] && date(s.logs[0].createdAt, true)}
       </p>
+    </Card>
+  );
+}
+
+const FLOW = ["PENDING", "ACTIVE", "SUSPENDED", "TERMINATED"] as const;
+const STATUS_TEXT: Record<string, string> = {
+  PENDING: "Waiting for payment or setup — becomes Active once every service is delivered.",
+  ACTIVE: "Services delivered and running.",
+  SUSPENDED: "All running services are suspended.",
+  TERMINATED: "All services have been terminated.",
+  CANCELLED: "Cancelled before delivery.",
+  FRAUD: "Marked as fraud.",
+};
+
+/** Order lifecycle: where the order is, why, and actions that apply to all its services. */
+function OrderStatusPanel({ o, onDone }: { o: any; onDone: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const svc = o.services as any[];
+  const count = (st: string[]) => svc.filter((s) => st.includes(s.status)).length;
+  const pending = count(["PENDING", "PROVISIONING", "FAILED"]);
+  const active = count(["ACTIVE"]);
+  const suspended = count(["SUSPENDED"]);
+  const delivered = active + suspended;
+  const run = async (body: Record<string, unknown>, msg: string) => {
+    setBusy(String(body.action));
+    try {
+      const r = await api(`/admin/orders/${o.id}/status`, { body });
+      toast.success(`${msg}${r.queued ? ` — ${r.queued} service action${r.queued > 1 ? "s" : ""} queued` : ""}`);
+      setTimeout(onDone, r.queued ? 2500 : 0);
+      if (r.queued) setTimeout(onDone, 8000);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(null);
+  };
+  const step = FLOW.indexOf(o.status);
+  return (
+    <Card className="mb-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-extrabold text-ink">Order status</span>
+            <Badge status={o.status} />
+            {o.statusLocked && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">Set by hand — not following the services</span>}
+          </div>
+          <p className="mt-1 text-sm text-mute">{STATUS_TEXT[o.status] ?? ""} {!o.statusLocked && "It updates automatically as the services change."}</p>
+          {/* lifecycle */}
+          {!["CANCELLED", "FRAUD"].includes(o.status) && (
+            <div className="mt-4 flex items-center">
+              {FLOW.map((f, i) => (
+                <div key={f} className="flex items-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className={cx("grid h-7 w-7 place-items-center rounded-full text-[12px] font-bold", i === step ? "bg-primary-dark text-white ring-4 ring-primary/15" : i < step ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400")}>{i < step ? <Icon name="check" className="text-[15px]" /> : i + 1}</span>
+                    <span className={cx("text-[11px] font-bold", i === step ? "text-ink" : "text-mute")}>{f[0] + f.slice(1).toLowerCase()}</span>
+                  </div>
+                  {i < FLOW.length - 1 && <span className={cx("mx-1.5 mb-5 h-0.5 w-8 sm:w-14", i < step ? "bg-emerald-400" : "bg-slate-200")} />}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-mute">
+            <span><b className="text-ink">{active}</b> active</span>
+            <span><b className="text-ink">{pending}</b> not delivered</span>
+            <span><b className="text-ink">{suspended}</b> suspended</span>
+            <span><b className="text-ink">{count(["TERMINATED"])}</b> terminated</span>
+            <span><b className="text-ink">{count(["CANCELLED"])}</b> cancelled</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-3 lg:items-end">
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Button size="sm" icon="play_circle" loading={busy === "activate"} disabled={!pending && !suspended} onClick={() => confirm(pending ? (o.invoice && o.invoice.status !== "PAID" ? "The invoice is unpaid. Set up the services anyway?" : "Set up the services that aren't delivered yet?") + (suspended ? " Suspended services are unsuspended too." : "") : "Unsuspend all suspended services?") && run({ action: "activate" }, "Activation started")}>{pending ? "Activate / provision" : "Unsuspend"}</Button>
+            <Button size="sm" variant="outline" icon="pause_circle" loading={busy === "suspend"} disabled={!active} onClick={() => { const reason = prompt("Suspension reason (the customer sees this)", "Suspended by administrator"); if (reason) run({ action: "suspend", reason }, "Suspension started"); }}>Suspend</Button>
+            <Button size="sm" variant="danger" icon="delete_forever" loading={busy === "terminate"} disabled={!delivered && !pending} onClick={() => confirm(`TERMINATE order ${o.number}? ${delivered ? `${delivered} delivered service${delivered > 1 ? "s are" : " is"} destroyed (data deleted). ` : ""}${pending ? "Undelivered services are cancelled. " : ""}An unpaid invoice is cancelled.`) && run({ action: "terminate" }, "Termination started")}>Terminate</Button>
+            <Button size="sm" variant="outline" icon="cancel" loading={busy === "cancel"} disabled={["CANCELLED", "TERMINATED"].includes(o.status) && !pending} onClick={() => {
+              if (delivered) {
+                const both = confirm(`${delivered} service${delivered > 1 ? "s are" : " is"} already delivered.\n\nOK = cancel the order AND terminate the delivered services\nCancel = only cancel what isn't delivered yet`);
+                run({ action: "cancel", terminateDelivered: both }, "Order cancelled");
+              } else if (confirm("Cancel this order? Undelivered services and the unpaid invoice are cancelled and reserved IPs released.")) run({ action: "cancel" }, "Order cancelled");
+            }}>Cancel order</Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-mute">Status label</span>
+            <Select className="h-9 w-56" value={o.statusLocked || o.status === "FRAUD" ? o.status : "AUTO"} onChange={(e) => { const v = e.target.value; if (v === "FRAUD" && !confirm("Mark this order as fraud?")) return; run({ action: "set", status: v }, v === "AUTO" ? "Status follows the services again" : `Status set to ${v.toLowerCase()}`); }}>
+              <option value="AUTO">Automatic (follows services)</option>
+              <option value="PENDING">Pending</option>
+              <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="TERMINATED">Terminated</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="FRAUD">Fraud</option>
+            </Select>
+          </div>
+        </div>
+      </div>
     </Card>
   );
 }

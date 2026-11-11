@@ -14,7 +14,7 @@ export default function Orders() {
   const act = (id: string, path: string, body = {}) => api(`/admin/orders/${id}/${path}`, { body }).then(() => { toast.success("Done"); reload(); }).catch((e) => toast.error(e.message));
   return (
     <>
-      <PageHeader title="Orders" actions={<><Input className="w-56" placeholder="Order #, email, hostname…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /><Select className="w-44" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option>PENDING</option><option>ACTIVE</option><option>CANCELLED</option><option>FRAUD</option></Select><Button icon="add" href="/admin/orders/new">New order</Button></>} />
+      <PageHeader title="Orders" actions={<div className="flex flex-wrap items-center gap-2"><div className="w-full sm:w-64"><Input placeholder="Order #, email, hostname…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div><div className="w-full sm:w-44"><Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="PENDING">Pending</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="TERMINATED">Terminated</option><option value="CANCELLED">Cancelled</option><option value="FRAUD">Fraud</option></Select></div><Button icon="add" href="/admin/orders/new">New order</Button></div>} />
       <Card pad={false}>
         {loading ? <Loading /> : (
           <>

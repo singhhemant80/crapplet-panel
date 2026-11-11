@@ -16,6 +16,7 @@ import { getSettings } from "./lib/settings";
 import { prisma } from "./db";
 import { executeMigrationRun } from "./modules/migration/service";
 import { clearStaleServiceLocks, reconcileProvisioning } from "./modules/provisioning/reconcile";
+import { reconcileOrderStatuses } from "./modules/orders/status";
 
 const connection = bullConnection();
 
@@ -47,6 +48,8 @@ const maintenance = new Worker(
         return { released: await expireReservations() };
       case "reconcile-provisioning":
         return reconcileProvisioning();
+      case "reconcile-orders":
+        return reconcileOrderStatuses();
       case "server-health":
         return checkAllServers();
       case "daily-billing":
@@ -86,6 +89,7 @@ async function schedule() {
   await q.upsertJobScheduler("expire-ip-reservations", { every: 60_000 }, { name: "expire-ip-reservations" });
   await q.upsertJobScheduler("server-health", { every: 5 * 60_000 }, { name: "server-health" });
   await q.upsertJobScheduler("reconcile-provisioning", { every: 5 * 60_000 }, { name: "reconcile-provisioning" });
+  await q.upsertJobScheduler("reconcile-orders", { every: 5 * 60_000 }, { name: "reconcile-orders" });
 
   await q.upsertJobScheduler("daily-billing", { pattern: "0 9 * * *", tz: "Asia/Kolkata" }, { name: "daily-billing" });
   // before billing runs, so renewal invoices use today's rate
@@ -94,6 +98,11 @@ async function schedule() {
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), billing (09:00 IST)");
 }
+
+// bring every order's status in line with its services once at start-up (fixes old orders too)
+reconcileOrderStatuses()
+  .then((r) => r.fixed && console.log(`[worker] corrected the status of ${r.fixed} order(s)`))
+  .catch((e) => console.error("[worker] order status check failed", e));
 
 // clear locks left by a killed run BEFORE taking provisioning jobs, so a fresh lock is never deleted
 clearStaleServiceLocks()

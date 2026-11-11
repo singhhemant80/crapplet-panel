@@ -628,6 +628,8 @@ model IpHistory {
 enum OrderStatus {
   PENDING
   ACTIVE
+  SUSPENDED
+  TERMINATED
   CANCELLED
   FRAUD
 }
@@ -638,6 +640,8 @@ model Order {
   userId      String
   user        User        @relation(fields: [userId], references: [id])
   status      OrderStatus @default(PENDING)
+  /// staff pinned the status by hand — automatic updates from the services are paused
+  statusLocked Boolean    @default(false)
   invoiceId   String?     @unique
   invoice     Invoice?    @relation(fields: [invoiceId], references: [id])
   promoCode   String?

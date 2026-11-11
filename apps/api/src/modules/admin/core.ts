@@ -10,6 +10,7 @@ import { cartSchema, rootPasswordSchema, hostingPasswordSchema } from "../orders
 import { decrypt, encrypt, randomToken } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
 import { enqueueProvision, type ProvisionAction } from "../../jobs/queues";
+import { deriveOrderStatus, syncOrderForService, syncOrderStatus } from "../orders/status";
 import { adjustCredit, applyPayment, cancelInvoice, createInvoice, invoiceEmailVars, invoiceLabel, issueCreditNote } from "../billing/invoices";
 import { renderInvoicePdf } from "../billing/pdf";
 import { reviewOfflinePayment, refundTransaction } from "../payments/service";
@@ -235,7 +236,8 @@ adminCore.post(
         await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
       } else await prisma.service.update({ where: { id: s.id }, data: { status: "ACTIVE" } });
     }
-    await prisma.order.update({ where: { id: o.id }, data: { status: "ACTIVE" } });
+    // Active once delivered — automated services move it there when their setup finishes
+    await syncOrderStatus(o.id);
     await audit({ actorId: req.user!.id, action: "order.accepted", entity: "order", entityId: o.id, details: { invoicePaid: o.invoice?.status === "PAID" } });
     res.json({ ok: true });
   }),
@@ -250,9 +252,86 @@ adminCore.post(
     if (o.invoice?.status === "UNPAID") await cancelInvoice(o.invoice.id, fraud ? "Order marked as fraud" : "Order cancelled");
     await releaseOrderReservations(o.id);
     await prisma.service.updateMany({ where: { orderId: o.id, status: { in: ["PENDING", "FAILED"] } }, data: { status: "CANCELLED" } });
-    await prisma.order.update({ where: { id: o.id }, data: { status: fraud ? "FRAUD" : "CANCELLED" } });
+    await prisma.domain.updateMany({ where: { orderId: o.id, status: { in: ["PENDING", "PENDING_TRANSFER"] } }, data: { status: "CANCELLED" } });
+    if (fraud) await prisma.order.update({ where: { id: o.id }, data: { status: "FRAUD", statusLocked: true } });
+    else await syncOrderStatus(o.id);
     await audit({ actorId: req.user!.id, action: fraud ? "order.fraud" : "order.cancelled", entity: "order", entityId: o.id });
     res.json({ ok: true });
+  }),
+);
+
+/**
+ * Order-level actions — applied to every service in the order, then the order's status follows them:
+ *   activate  → set up anything not delivered yet, unsuspend anything suspended
+ *   suspend   → suspend every running service
+ *   terminate → terminate every delivered service (undelivered ones are cancelled)
+ *   cancel    → cancel undelivered services/domains and the unpaid invoice (optionally terminate delivered ones)
+ *   set       → pin the status label by hand (automatic updates pause) / "AUTO" to follow the services again
+ */
+adminCore.post(
+  "/orders/:id/status",
+  requireStaff("orders.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      z.object({
+        action: z.enum(["activate", "suspend", "terminate", "cancel", "set"]),
+        reason: z.string().trim().max(200).optional(),
+        terminateDelivered: z.boolean().default(false),
+        status: z.enum(["AUTO", "PENDING", "ACTIVE", "SUSPENDED", "TERMINATED", "CANCELLED", "FRAUD"]).optional(),
+      }),
+      req.body,
+    );
+    const o = await prisma.order.findUniqueOrThrow({ where: { id: req.params.id }, include: { services: { include: { product: true } }, domains: true, invoice: true } });
+    const actorId = req.user!.id;
+    const automated = (p: { provisioner: string }) => p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR" || p.provisioner === "CPANEL";
+    let queued = 0;
+    const queue = async (serviceId: string, action: ProvisionAction, params: Record<string, unknown> = {}) => {
+      await enqueueProvision({ serviceId, action, params, actorId });
+      queued++;
+    };
+
+    if (b.action === "set") {
+      if (!b.status) throw badRequest("Choose the status");
+      if (b.status === "AUTO") await prisma.order.update({ where: { id: o.id }, data: { statusLocked: false, status: deriveOrderStatus(o) } });
+      else await prisma.order.update({ where: { id: o.id }, data: { status: b.status, statusLocked: true } });
+      await audit({ actorId, action: "order.status_set", entity: "order", entityId: o.id, details: { status: b.status } });
+      return res.json({ ok: true, status: (await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status });
+    }
+
+    // an action hands control back to the services
+    if (o.statusLocked || o.status === "FRAUD") await prisma.order.update({ where: { id: o.id }, data: { statusLocked: false, ...(o.status === "FRAUD" ? { status: "PENDING" } : {}) } });
+
+    for (const s of o.services) {
+      if (b.action === "activate") {
+        if (s.status === "SUSPENDED") await queue(s.id, "unsuspend");
+        else if (s.status === "PENDING" || s.status === "FAILED") {
+          if (automated(s.product)) {
+            await prisma.service.update({ where: { id: s.id }, data: { status: "PROVISIONING" } });
+            const { provisioningQueue } = await import("../../jobs/queues");
+            const old = await provisioningQueue().getJob(`create-${s.id}`);
+            if (old && ["failed", "completed"].includes(await old.getState())) await old.remove();
+            await queue(s.id, "create");
+          } else await prisma.service.update({ where: { id: s.id }, data: { status: "ACTIVE" } });
+        }
+      } else if (b.action === "suspend") {
+        if (s.status === "ACTIVE") await queue(s.id, "suspend", { reason: b.reason || "Suspended by administrator" });
+      } else if (b.action === "terminate") {
+        if (s.status === "ACTIVE" || s.status === "SUSPENDED") await queue(s.id, "terminate");
+        else if (["PENDING", "FAILED", "PROVISIONING"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED" } });
+      } else if (b.action === "cancel") {
+        if (["PENDING", "FAILED"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED" } });
+        else if (b.terminateDelivered && (s.status === "ACTIVE" || s.status === "SUSPENDED")) await queue(s.id, "terminate");
+      }
+    }
+    if (b.action === "cancel" || b.action === "terminate") {
+      await prisma.domain.updateMany({ where: { orderId: o.id, status: { in: ["PENDING", "PENDING_TRANSFER"] } }, data: { status: "CANCELLED" } });
+      if (o.invoice?.status === "UNPAID" && o.invoice.amountPaid === 0) await cancelInvoice(o.invoice.id, b.action === "cancel" ? "Order cancelled" : "Order terminated");
+      await releaseOrderReservations(o.id);
+    }
+    await syncOrderStatus(o.id);
+    const status = (await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status;
+    await audit({ actorId, action: `order.${b.action}`, entity: "order", entityId: o.id, details: { queued, reason: b.reason, terminateDelivered: b.terminateDelivered } });
+    res.json({ ok: true, status, queued });
   }),
 );
 
@@ -457,6 +536,7 @@ adminCore.post(
     if (old && ["failed", "completed"].includes(await old.getState())) await old.remove();
     await enqueueProvision({ serviceId: s.id, action: "create", actorId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: s.userId, action: "service.recreate", entity: "service", entityId: s.id, details: { previousVpsId: s.remoteId, osTemplateId: b.osTemplateId, hostname: b.hostname, billing: b.billing, passwordChosen: !!b.rootPassword } });
+    await syncOrderForService(s.id);
     res.status(202).json({ queued: true });
   }),
 );
@@ -532,6 +612,7 @@ adminCore.put(
     if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
     await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
     await audit({ actorId: req.user!.id, action: "service.updated", entity: "service", entityId: req.params.id, details: Object.keys(b) });
+    if (b.status) await syncOrderForService(req.params.id);
     res.json({ ok: true });
   }),
 );

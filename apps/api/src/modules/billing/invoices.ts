@@ -249,8 +249,10 @@ export async function cancelInvoice(invoiceId: string, reason = "Cancelled") {
   if (inv.order) {
     const { releaseOrderReservations } = await import("../ipam/service");
     await releaseOrderReservations(inv.order.id);
-    await prisma.order.update({ where: { id: inv.order.id }, data: { status: "CANCELLED" } });
-    await prisma.service.updateMany({ where: { orderId: inv.order.id, status: "PENDING" }, data: { status: "CANCELLED" } });
+    await prisma.service.updateMany({ where: { orderId: inv.order.id, status: { in: ["PENDING", "FAILED"] } }, data: { status: "CANCELLED" } });
+    await prisma.domain.updateMany({ where: { orderId: inv.order.id, status: { in: ["PENDING", "PENDING_TRANSFER"] } }, data: { status: "CANCELLED" } });
+    const { syncOrderStatus } = await import("../orders/status");
+    await syncOrderStatus(inv.order.id);
   }
 }
 

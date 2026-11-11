@@ -53,7 +53,11 @@ export async function onInvoicePaid(invoiceId: string) {
     }
   }
 
-  if (inv.order && inv.order.status === "PENDING") await prisma.order.update({ where: { id: inv.order.id }, data: { status: "ACTIVE" } });
+  // payment alone doesn't make an order Active — it becomes Active once its services are delivered
+  if (inv.order) {
+    const { syncOrderStatus } = await import("../orders/status");
+    await syncOrderStatus(inv.order.id);
+  }
 
   // affiliate commission on first payment of referred clients
   if (settings.affiliates.enabled && !inv.isWalletTopup) {

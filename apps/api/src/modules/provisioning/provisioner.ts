@@ -551,7 +551,13 @@ async function withServiceLock<T>(serviceId: string, fn: () => Promise<T>): Prom
 
 export async function runProvisionAction(serviceId: string, action: ProvisionAction, params: Record<string, unknown> = {}) {
   if (action === "sync") return runProvisionActionUnlocked(serviceId, action, params);
-  return withServiceLock(serviceId, () => runProvisionActionUnlocked(serviceId, action, params));
+  try {
+    return await withServiceLock(serviceId, () => runProvisionActionUnlocked(serviceId, action, params));
+  } finally {
+    // the order's status follows its services (pending → active → suspended → terminated)
+    const { syncOrderForService } = await import("../orders/status");
+    await syncOrderForService(serviceId);
+  }
 }
 
 /** Services imported from WHMCS know their VMID but often not the Proxmox node — look it up once and store it. */
