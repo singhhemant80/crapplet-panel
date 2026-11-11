@@ -65,7 +65,14 @@ const h = (headers: Record<string, string | string[] | undefined>, k: string) =>
 };
 
 async function httpJson<T>(url: string, init: { method: string; headers?: Record<string, string>; body?: string }): Promise<T> {
-  const res = await request(url, { method: init.method as "GET", headers: init.headers, body: init.body });
+  const host = new URL(url).host;
+  let res: Awaited<ReturnType<typeof request>>;
+  try {
+    res = await request(url, { method: init.method as "GET", headers: init.headers, body: init.body, headersTimeout: 30_000, bodyTimeout: 30_000 });
+  } catch (e) {
+    const code = (e as { code?: string }).code ?? (e as Error).name;
+    throw new HttpError(502, `Couldn't connect to ${host} (${code}) — check the server's internet/DNS`, "GATEWAY_UNREACHABLE");
+  }
   const text = await res.body.text();
   let json: unknown;
   try {
@@ -73,7 +80,12 @@ async function httpJson<T>(url: string, init: { method: string; headers?: Record
   } catch {
     json = { raw: text };
   }
-  if (res.statusCode >= 400) throw new HttpError(502, `Gateway error (${res.statusCode}): ${text.slice(0, 300)}`, "GATEWAY_ERROR");
+  if (res.statusCode >= 400) {
+    const j = json as { error?: { description?: string; message?: string } | string; message?: string; error_description?: string };
+    const said = (typeof j.error === "object" ? j.error?.description ?? j.error?.message : j.error) ?? j.message ?? j.error_description ?? text.slice(0, 200);
+    const keys = res.statusCode === 401 || res.statusCode === 403 ? " — check the API keys in Admin → Payment Gateways" : "";
+    throw new HttpError(502, `${host} returned ${res.statusCode}: ${String(said).slice(0, 300)}${keys}`, "GATEWAY_ERROR");
+  }
   return json as T;
 }
 

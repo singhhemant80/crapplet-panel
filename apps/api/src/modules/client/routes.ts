@@ -323,8 +323,9 @@ clientRouter.post(
       if (b.confirm !== s.hostname && b.confirm !== "REINSTALL") throw badRequest("Type REINSTALL to confirm — all data will be erased");
       if (b.osTemplateId && !s.product.osTemplates.some((o) => o.osTemplateId === b.osTemplateId)) throw badRequest("OS not available for this plan");
     }
-    const recent = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 10_000) } } });
-    if (recent) throw conflict("Another action is in progress, please wait a few seconds");
+    // anti double-click: one request per 10 s (finished jobs' own log lines don't count)
+    const recent = await prisma.provisioningLog.count({ where: { serviceId: s.id, action: { endsWith: "_requested" }, createdAt: { gt: new Date(Date.now() - 10_000) } } });
+    if (recent) throw conflict("You just sent a request for this server — please wait a few seconds");
     await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, ...(b.action === "reset_password" && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     await prisma.provisioningLog.create({ data: { serviceId: s.id, action: `${b.action}_requested`, success: true, message: "Queued by customer" } });
     res.status(202).json({ queued: true });

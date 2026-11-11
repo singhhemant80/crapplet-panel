@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, storagesOfNode, type NodeHints, type VirtStorage } from "./virtualizor";
+import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, pickVps, storagesOfNode, type NodeHints, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 import { HostingError, cpanelChangePackage, cpanelCreate, cpanelPassword, cpanelStatus, cpanelSuspend, cpanelTerminate, cpanelUnsuspend } from "./cpanel-provisioner";
 
@@ -838,8 +838,7 @@ export async function syncVirtualizorService(serviceId: string) {
   const svc = await loadService(serviceId);
   if (svc.product.provisioner !== "VIRTUALIZOR" || !svc.server || !svc.remoteId) throw new ProvisionError("This service has no Virtualizor VPS yet", false);
   const client = virtualizorFor(svc.server);
-  const r = await client.getVps(svc.remoteId);
-  const row = (r.vs?.[svc.remoteId] ?? Object.values(r.vs ?? {})[0]) as Record<string, unknown> | undefined;
+  const row = await client.findVps(svc.remoteId);
   if (!row) throw new ProvisionError(`VPS ${svc.remoteId} wasn't found on ${svc.server.name} — it may have been deleted in Virtualizor`, false);
   const ips = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
   if (ips.length) await recordServiceIps(svc.id, svc.server.id, ips);
@@ -888,7 +887,7 @@ export async function liveStatus(serviceId: string) {
   if (svc.product.provisioner === "VIRTUALIZOR") {
     const client = virtualizorFor(svc.server);
     const [r, codes, u] = await Promise.all([client.getVps(svc.remoteId), client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>), client.liveUsage(svc.remoteId).catch(() => null)]);
-    const v = (r.vs?.[svc.remoteId] ?? Object.values(r.vs ?? {})[0] ?? {}) as Record<string, unknown>;
+    const v = pickVps(r, svc.remoteId) ?? {};
     const st = virtualizorState(codes[svc.remoteId], v);
     const n = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Number(x));
     const running = st.state === "running";
@@ -939,9 +938,23 @@ class DryRunProxmox {
   async nextId() {
     return DryRunProxmox.next++;
   }
-  async resources() {
+  async version() {
+    return { version: "8.2.4", release: "8.2", repoid: "dry-run" };
+  }
+  async clusterStatus() {
+    return [{ type: "node", name: "pve-dry", online: 1, local: 1 }];
+  }
+  async resources(type?: "vm" | "storage" | "node") {
     const tpls = await prisma.osTemplate.findMany({ where: { proxmoxKvmVmid: { not: null } } });
-    return tpls.map((t) => ({ id: `qemu/${t.proxmoxKvmVmid}`, type: "qemu", node: "pve-dry", vmid: t.proxmoxKvmVmid!, template: 1 }));
+    const vms = [
+      ...tpls.map((t) => ({ id: `qemu/${t.proxmoxKvmVmid}`, type: "qemu", node: "pve-dry", vmid: t.proxmoxKvmVmid!, name: t.name, template: 1, status: "stopped" })),
+      ...[...DryRunProxmox.guests].map(([vmid, g]) => ({ id: `qemu/${vmid}`, type: "qemu", node: "pve-dry", vmid: Number(vmid), name: `vm-${vmid}`, status: g.status, maxmem: 2048 * 1048576, maxdisk: 40 * 1073741824 })),
+    ];
+    const storage = [{ id: "storage/pve-dry/local-lvm", type: "storage", node: "pve-dry", storage: "local-lvm", disk: 300 * 1073741824, maxdisk: 2000 * 1073741824, status: "available" }];
+    if (type === "vm") return vms;
+    if (type === "storage") return storage;
+    if (type === "node") return [];
+    return [...vms, ...storage];
   }
   async guestStatus(_n: string, _k: string, vmid: number | string) {
     const g = DryRunProxmox.guests.get(String(vmid));

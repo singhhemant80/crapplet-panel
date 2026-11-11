@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../db";
 import { config } from "../../config";
-import { ah, parse } from "../../lib/http";
+import { HttpError, ah, parse } from "../../lib/http";
 import { requireAuth } from "../../middleware/auth";
 import { GATEWAYS, gatewayCurrencies } from "./gateways";
 import { handleWebhook, startPayment, submitOfflineReference, verifyReturn, gatewayConfig } from "./service";
@@ -25,12 +25,23 @@ paymentsRouter.get(
   }),
 );
 
+const isGatewayFailure = (e: unknown) => e instanceof HttpError && (e.code === "GATEWAY_ERROR" || e.code === "GATEWAY_UNREACHABLE");
+
 paymentsRouter.post(
   "/start",
   requireAuth,
   ah(async (req, res) => {
     const body = parse(z.object({ invoiceId: z.string(), gateway: z.string(), amount: z.number().int().positive().optional() }), req.body);
-    res.json(await startPayment({ userId: req.user!.id, ...body }));
+    try {
+      res.json(await startPayment({ userId: req.user!.id, ...body }));
+    } catch (e) {
+      // the customer gets a plain message; the gateway's own answer goes to the log for staff
+      if (isGatewayFailure(e)) {
+        console.error(`[payments] ${body.gateway} start failed for invoice ${body.invoiceId}:`, (e as Error).message);
+        throw new HttpError(502, "We couldn't start this payment with the gateway right now. Please try again in a minute, or choose another payment method.", (e as HttpError).code);
+      }
+      throw e;
+    }
   }),
 );
 
@@ -38,7 +49,15 @@ paymentsRouter.post(
   "/:intentId/verify",
   requireAuth,
   ah(async (req, res) => {
-    res.json(await verifyReturn({ userId: req.user!.id, intentId: req.params.intentId, body: req.body ?? {} }));
+    try {
+      res.json(await verifyReturn({ userId: req.user!.id, intentId: req.params.intentId, body: req.body ?? {} }));
+    } catch (e) {
+      if (isGatewayFailure(e)) {
+        console.error(`[payments] verify failed for intent ${req.params.intentId}:`, (e as Error).message);
+        throw new HttpError(502, "We couldn't confirm this payment with the gateway yet. If money was taken it will be confirmed automatically within a few minutes — please don't pay again.", (e as HttpError).code);
+      }
+      throw e;
+    }
   }),
 );
 

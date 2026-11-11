@@ -528,7 +528,7 @@ adminCore.post(
     // never leave the old VPS running alongside the new one
     if (s.remoteId && s.server?.type === "VIRTUALIZOR") {
       const { virtualizorFor } = await import("../provisioning/provisioner");
-      const still = await virtualizorFor(s.server).getVps(s.remoteId).then((r) => Object.keys(r.vs ?? {}).length > 0).catch(() => false);
+      const still = await virtualizorFor(s.server).findVps(s.remoteId).then((v) => !!v).catch(() => false);
       if (still) throw conflict(`The old VPS ${s.remoteId} still exists in Virtualizor — delete it there (or terminate again) before creating a new one`);
     }
     if (b.osTemplateId) {

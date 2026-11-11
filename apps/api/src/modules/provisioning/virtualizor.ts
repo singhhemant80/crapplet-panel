@@ -259,7 +259,7 @@ export class VirtualizorClient {
    */
   async nodeAddress(vpsid: string): Promise<{ serid: string; name?: string; hosts: string[] }> {
     const r = await this.call<{ vs?: Record<string, Record<string, unknown>> }>("vs", { vpsid }).catch(() => null);
-    const v = r?.vs?.[vpsid] ?? Object.values(r?.vs ?? {})[0];
+    const v = pickVps(r, vpsid);
     const serid = v?.serid !== undefined && v?.serid !== null ? String(v.serid) : "";
     if (!serid || serid === "0") return { serid, hosts: [] };
     const list = await this.servers().catch(() => null);
@@ -274,6 +274,10 @@ export class VirtualizorClient {
 
   getVps(vpsid: string | number) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { vpsid });
+  }
+  /** The row for exactly this VPS (or null) — never "the first one", in case the master ignores the filter and lists others. */
+  async findVps(vpsid: string | number): Promise<Record<string, unknown> | null> {
+    return pickVps(await this.getVps(vpsid), vpsid);
   }
   plans() {
     return this.call<{ plans: Record<string, Record<string, unknown>> }>("plans");
@@ -301,7 +305,7 @@ export class VirtualizorClient {
   /** Details of one VPS, including the IPs Virtualizor gave it. */
   async vpsIps(vpsid: string): Promise<string[]> {
     const r = await this.call<{ vs?: Record<string, { ips?: Record<string, string> | string[] }> }>("vs", { vpsid });
-    const v = r.vs?.[vpsid] ?? Object.values(r.vs ?? {})[0];
+    const v = pickVps(r as never, vpsid) as { ips?: Record<string, string> | string[] } | null;
     const raw = v?.ips ? (Array.isArray(v.ips) ? v.ips : Object.values(v.ips)) : [];
     return raw.map(String).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
   }
@@ -588,4 +592,16 @@ export function collectStorageRefs(obj: unknown, acc: Pick<NodeHints, "uuids" | 
   if (stid !== undefined && stid !== null && /^\d+$/.test(String(stid)) && Number(stid) > 0) acc.stids.push(Number(stid));
   if ((uuid || stid) && acc.diskShapes.length < 4) acc.diskShapes.push(Object.fromEntries(Object.entries(o).filter(([, v]) => v === null || typeof v !== "object").slice(0, 20)));
   for (const v of Object.values(o)) if (v && typeof v === "object") collectStorageRefs(v, acc, depth + 1);
+}
+
+/** Pick one VPS out of an `act=vs` reply: keyed by id, or a row whose vpsid matches; a lone row without a vpsid field is accepted. */
+export function pickVps(r: { vs?: Record<string, Record<string, unknown>> | null } | null | undefined, vpsid: string | number): Record<string, unknown> | null {
+  const vs = r?.vs ?? {};
+  const id = String(vpsid);
+  if (vs[id]) return vs[id];
+  const rows = Object.values(vs);
+  const hit = rows.find((v) => v && String(v.vpsid ?? v.vps_id ?? "") === id);
+  if (hit) return hit;
+  if (rows.length === 1 && rows[0] && rows[0].vpsid === undefined && rows[0].vps_id === undefined) return rows[0];
+  return null;
 }
