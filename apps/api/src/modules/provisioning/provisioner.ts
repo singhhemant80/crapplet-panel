@@ -621,7 +621,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         }
         await prisma.service.update({ where: { id: svc.id }, data: { status: "SUSPENDED", suspendReason: reason } });
         await log(svc.id, action, true, reason);
-        await queueEmail("service.suspended", svc.user.email, { ...vars, reason }, svc.userId);
+        if (params.notify !== false) await queueEmail("service.suspended", svc.user.email, { ...vars, reason }, svc.userId);
         return { ok: true };
       }
       case "unsuspend": {
@@ -635,7 +635,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         }
         await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", suspendReason: null } });
         await log(svc.id, action, true);
-        await queueEmail("service.unsuspended", svc.user.email, vars, svc.userId);
+        if (params.notify !== false) await queueEmail("service.unsuspended", svc.user.email, vars, svc.userId);
         return { ok: true };
       }
       case "terminate": {

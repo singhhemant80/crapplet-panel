@@ -7,7 +7,6 @@ const SECTIONS: Record<string, { title: string; hint?: string }> = {
   company: { title: "Company", hint: "Printed on every invoice. State code decides CGST+SGST vs IGST." },
   tax: { title: "GST", hint: "18% is standard for hosting (SAC 998315). Exports are zero-rated unless 'applyToForeign' is on." },
   invoice: { title: "Invoices", hint: "{FY} is replaced with the Indian financial year, e.g. 2026-27." },
-  automation: { title: "Billing automation", hint: "Runs daily at 09:00 IST. Day lists are comma separated." },
   orders: { title: "Orders" },
   support: { title: "Support" },
   affiliates: { title: "Affiliates", hint: "Amounts in paise." },
@@ -23,7 +22,7 @@ export default function Settings() {
   const set = (k: string, val: any) => setV({ ...v, [tab]: { ...sec, [k]: val } });
   return (
     <>
-      <PageHeader title="Settings" actions={<Button variant="outline" icon="autorenew" onClick={() => api("/admin/billing/run", { body: {} }).then((r) => toast.success(`Billing run complete: ${JSON.stringify(r)}`))}>Run billing now</Button>} />
+      <PageHeader title="Settings" actions={<Button variant="outline" icon="schedule" href="/admin/automation?tab=settings">Automation settings</Button>} />
       <div className="mb-4 flex gap-2 overflow-x-auto">{Object.entries(SECTIONS).map(([k, s]) => <button key={k} onClick={() => setTab(k)} className={cx("whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold", tab === k ? "bg-primary-dark text-white" : "bg-white text-slate-600 ring-1 ring-line")}>{s.title}</button>)}</div>
       <Card title={SECTIONS[tab].title}>
         {SECTIONS[tab].hint && <Alert className="mb-4">{SECTIONS[tab].hint}</Alert>}

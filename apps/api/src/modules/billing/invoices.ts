@@ -104,6 +104,41 @@ export async function createInvoice(
   return invoice;
 }
 
+/**
+ * Add lines to an unpaid invoice (late fee, adjustments) and recompute GST and totals the same way
+ * createInvoice does, using the customer details captured on the invoice.
+ */
+export async function addInvoiceItemsTx(db: Tx, invoiceId: string, extra: NewInvoiceItem[]) {
+  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true } });
+  if (inv.status !== "UNPAID") throw conflict("Only unpaid invoices can be changed");
+  const settings = await getSettings(db);
+  const snap = (inv.billingSnapshot ?? {}) as { country?: string; stateCode?: string | null; gstin?: string | null };
+  for (const i of extra) {
+    const qty = i.quantity ?? 1;
+    await db.invoiceItem.create({
+      data: { invoiceId, type: i.type, relId: i.relId ?? null, description: i.description, hsnSac: i.hsnSac ?? settings.tax.defaultSac, quantity: qty, unitPrice: i.unitPrice, amount: i.unitPrice * qty, taxable: i.taxable ?? true, periodStart: i.periodStart ?? null, periodEnd: i.periodEnd ?? null },
+    });
+  }
+  const items = await db.invoiceItem.findMany({ where: { invoiceId } });
+  const tax = computeGst(
+    items.map((i) => ({ amount: i.amount, taxable: i.taxable })),
+    {
+      enabled: settings.tax.enabled,
+      rate: inv.gstRate ?? settings.tax.gstRate,
+      inclusive: inv.taxInclusive,
+      companyStateCode: settings.company.stateCode,
+      applyToForeign: settings.tax.applyToForeign,
+      customer: { country: snap.country ?? "IN", stateCode: snap.stateCode, gstin: inv.customerGstin ?? snap.gstin },
+    },
+  );
+  const discount = -items.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
+  return db.invoice.update({
+    where: { id: invoiceId },
+    data: { subtotal: tax.subtotal + discount, discount, taxableAmount: tax.taxableAmount, cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst, taxTotal: tax.taxTotal, total: tax.total },
+    include: { items: true },
+  });
+}
+
 /** Sequential tax-invoice number per Indian financial year, assigned when the invoice is paid. */
 async function assignTaxNumber(db: Db, invoiceId: string) {
   const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });

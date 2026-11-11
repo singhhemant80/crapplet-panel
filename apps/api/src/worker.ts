@@ -7,7 +7,7 @@ import { bullConnection, maintenanceQueue, closeQueues, type EmailJob, type Prov
 import { runProvisionAction, markCreateFailed } from "./modules/provisioning/provisioner";
 import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
-import { runBillingCycle } from "./jobs/billing";
+import { maybeRunScheduled } from "./jobs/billing";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
 import { syncVirtualizorOs } from "./modules/provisioning/virtualizor-os";
@@ -52,8 +52,10 @@ const maintenance = new Worker(
         return reconcileOrderStatuses();
       case "server-health":
         return checkAllServers();
-      case "daily-billing":
-        return runBillingCycle();
+      case "daily-billing": // schedule from older versions — replaced by automation-tick
+        return maybeRunScheduled();
+      case "automation-tick":
+        return maybeRunScheduled();
       case "sync-os": {
         // keep OS templates in step with every Virtualizor master
         const masters = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", enabled: true } });
@@ -91,12 +93,14 @@ async function schedule() {
   await q.upsertJobScheduler("reconcile-provisioning", { every: 5 * 60_000 }, { name: "reconcile-provisioning" });
   await q.upsertJobScheduler("reconcile-orders", { every: 5 * 60_000 }, { name: "reconcile-orders" });
 
-  await q.upsertJobScheduler("daily-billing", { pattern: "0 9 * * *", tz: "Asia/Kolkata" }, { name: "daily-billing" });
+  // daily automation: checked every 5 minutes, runs once a day after Settings → Automation → run time
+  await q.removeJobScheduler("daily-billing").catch(() => undefined);
+  await q.upsertJobScheduler("automation-tick", { every: 5 * 60_000 }, { name: "automation-tick" });
   // before billing runs, so renewal invoices use today's rate
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("sync-ips", { every: 10 * 60_000 }, { name: "sync-ips" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
-  console.log("[worker] schedules registered: IP expiry (1m), server health (5m), billing (09:00 IST)");
+  console.log("[worker] schedules registered: IP expiry (1m), server health (5m), automation (daily, checked every 5m)");
 }
 
 // bring every order's status in line with its services once at start-up (fixes old orders too)

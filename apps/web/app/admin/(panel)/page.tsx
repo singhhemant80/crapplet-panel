@@ -26,7 +26,7 @@ export default function AdminDashboard() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle={new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
-        actions={<Button variant="outline" icon="autorenew" onClick={() => api("/admin/billing/run", { body: {} }).then((r) => toast.success(`Billing run: ${r.invoices} invoices, ${r.reminders} reminders, ${r.suspended} suspensions`)).catch((e) => toast.error(e.message))}>Run billing now</Button>} />
+        actions={<Button variant="outline" icon="autorenew" onClick={() => api("/admin/billing/run", { body: {} }).then((r) => toast.success(`Automation run: ${r.invoices} invoices, ${r.reminders} reminders, ${r.suspended} suspensions — details in Automation`)).catch((e) => toast.error(e.message))}>Run billing now</Button>} />
       {(s.pendingPaymentReviews > 0 || s.failedProvisioning > 0) && (
         <div className="mb-6 grid gap-3 md:grid-cols-2">
           {s.pendingPaymentReviews > 0 && <Alert tone="warn"><Link href="/admin/payment-reviews" className="font-bold underline">{s.pendingPaymentReviews} UPI / bank payments</Link> are waiting for verification.</Alert>}

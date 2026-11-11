@@ -40,7 +40,11 @@ export async function onInvoicePaid(invoiceId: string) {
           const stillOverdue = await prisma.invoiceItem.count({
             where: { relId: svc.id, type: "SERVICE", invoice: { status: "UNPAID", dueDate: { lt: new Date() } } },
           });
-          if (!stillOverdue) await enqueueProvision({ serviceId: svc.id, action: "unsuspend" });
+          if (!stillOverdue) {
+            await enqueueProvision({ serviceId: svc.id, action: "unsuspend", params: { notify: settings.automation.unsuspendEmail } });
+            const { recordEvent } = await import("../../jobs/billing");
+            await recordEvent({ action: "unsuspended", entity: "service", entityId: svc.id, userId: svc.userId, label: svc.hostname ?? svc.product.name, message: `Overdue invoices paid (${inv.number ?? inv.proformaNumber})` });
+          }
         }
       }
     }

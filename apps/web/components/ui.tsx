@@ -180,7 +180,7 @@ const PAGE_ICONS: [RegExp, string][] = [
   [/\/monitoring/, "monitor_heart"], [/\/ips/, "router"], [/\/locations/, "location_on"], [/\/provisioning/, "rocket_launch"], [/\/resellers|\/reseller/, "storefront"],
   [/\/affiliates/, "handshake"], [/\/announcements/, "campaign"], [/\/knowledgebase/, "menu_book"], [/\/email/, "mail"], [/\/gateways/, "account_balance"],
   [/\/currencies/, "currency_exchange"], [/\/reports/, "bar_chart"], [/\/activity/, "history"], [/\/staff|\/roles/, "badge"], [/\/security/, "shield_lock"],
-  [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
+  [/\/automation/, "schedule"], [/\/settings/, "settings"], [/\/migration/, "move_up"], [/\/wallet/, "account_balance_wallet"], [/\/downloads/, "download"], [/\/profile/, "person"],
   [/\/admin\/?$|\/client\/?$/, "space_dashboard"],
 ];
 

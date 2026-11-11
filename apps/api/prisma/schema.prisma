@@ -1254,3 +1254,38 @@ model MigrationRun {
   finishedAt  DateTime?
   createdAt   DateTime        @default(now())
 }
+
+/// One run of the daily automation (scheduled or "Run now").
+model AutomationRun {
+  id            String            @id @default(cuid())
+  trigger       String            // schedule | manual
+  triggeredById String?
+  status        String            @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  startedAt     DateTime          @default(now())
+  finishedAt    DateTime?
+  durationMs    Int?
+  summary       Json              @default("{}") // { action: count }
+  error         String?
+  events        AutomationEvent[]
+
+  @@index([startedAt])
+}
+
+/// Something the automation did (or failed to do) — the drill-down behind each count.
+model AutomationEvent {
+  id        String         @id @default(cuid())
+  runId     String?
+  run       AutomationRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  action    String         // invoice_created, reminder_sent, overdue_1, late_fee, suspended, …
+  entity    String?        // invoice | service | order | domain | ticket
+  entityId  String?
+  userId    String?
+  label     String?
+  success   Boolean        @default(true)
+  message   String?
+  createdAt DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([runId])
+}

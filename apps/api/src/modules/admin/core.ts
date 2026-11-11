@@ -997,7 +997,7 @@ adminCore.post(
   "/billing/run",
   requireStaff("settings.manage"),
   ah(async (req, res) => {
-    const r = await runBillingCycle();
+    const r = await runBillingCycle(req.user!.id);
     await audit({ actorId: req.user!.id, action: "billing.run_manual", details: r });
     res.json(r);
   }),

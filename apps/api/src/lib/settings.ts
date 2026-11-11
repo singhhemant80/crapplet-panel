@@ -49,16 +49,43 @@ export const DEFAULT_SETTINGS = {
     lutArn: "",
   },
   automation: {
+    /** master switch for the daily run */
+    enabled: true,
+    /** daily run time, IST (HH:MM) — a missed run is caught up as soon as the worker is back */
+    runAt: "09:00",
+    // invoices
     invoiceDaysBeforeDue: 10,
+    domainInvoiceDaysBeforeDue: 30,
+    invoiceCreatedEmail: true,
+    applyCreditAutomatically: true,
+    // reminders
     reminderDaysBefore: [7, 3],
     overdueReminderDaysAfter: [1, 3, 5],
-    suspendDaysAfterDue: 3,
-    terminateDaysAfterDue: 15,
-    autoSuspend: true,
-    autoUnsuspend: true,
-    autoTerminate: true,
+    // late fees
+    lateFeeEnabled: false,
+    lateFeeType: "percent" as "percent" | "fixed",
+    /** percent of the invoice subtotal, or a fixed amount in the invoice currency (rupees / dollars) */
+    lateFeeAmount: 0,
+    lateFeeMinimum: 0,
+    lateFeeDaysAfterDue: 3,
+    /** legacy (pre-automation-page) setting: a percentage > 0 turns late fees on */
     lateFeePct: 0,
-    applyCreditAutomatically: true,
+    // suspension / termination
+    autoSuspend: true,
+    suspendDaysAfterDue: 3,
+    suspendEmail: true,
+    autoUnsuspend: true,
+    unsuspendEmail: true,
+    autoTerminate: true,
+    terminateDaysAfterDue: 15,
+    terminateEmail: true,
+    // orders
+    /** cancel orders still unpaid after N days (0 = never) — releases held IPs */
+    cancelUnpaidOrdersAfterDays: 0,
+    // domains
+    domainExpiryNoticeDays: [30, 7, 1],
+    // housekeeping
+    historyDays: 180,
   },
   orders: {
     ipReservationMinutes: 15,
