@@ -1,4 +1,6 @@
 "use client";
+import { POWER_TONE } from "@/components/power-tones";
+import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
@@ -17,6 +19,7 @@ export default function AdminService() {
   const os = useApi("/admin/os-templates");
   const [live, setLive] = useState<any>(null);
   const [resetPw, setResetPw] = useState(false);
+  const [reinstall, setReinstall] = useState(false);
   const [edit, setEdit] = useState<any>(null);
   useEffect(() => {
     if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
@@ -104,20 +107,17 @@ export default function AdminService() {
             {isVps && s.status === "ACTIVE" && (
               <>
                 <Group label="Power">
-                  <div className="flex max-w-full flex-wrap overflow-hidden rounded-xl border border-line">
-                    {([["play_arrow", "Start", () => act("start"), running], ["restart_alt", "Reboot", () => act("reboot")], ["power_settings_new", "Shutdown", () => act("shutdown")], ["stop", "Power off", () => act("stop")], ["bolt", "Hard reset", () => confirm("Hard reset: cut the power and start the server again? Unsaved data is lost.") && act("hard_reset")]] as [string, string, () => void, boolean?][]).map(([i, l, f, dis], n) => (
-                      <button key={l} disabled={dis} onClick={f} className={cx("inline-flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold text-slate-700 transition hover:bg-primary-tint hover:text-primary-dark disabled:opacity-40 disabled:hover:bg-transparent", n > 0 && "border-l border-line")}>
-                        <Icon name={i} className="text-[18px]" />{l}
-                      </button>
-                    ))}
-                  </div>
+                  {([["start", "play_arrow", "Start", () => act("start"), running], ["reboot", "restart_alt", "Reboot", () => act("reboot")], ["shutdown", "power_settings_new", "Shutdown", () => confirm("Shut down the server gracefully?") && act("shutdown")], ["stop", "stop", "Power off", () => confirm("Force power-off? Unsaved data may be lost.") && act("stop")], ["hard_reset", "bolt", "Hard reset", () => confirm("Hard reset: cut the power and start the server again? Unsaved data is lost.") && act("hard_reset")]] as [string, string, string, () => void, boolean?][]).map(([k, i, l, f, dis]) => (
+                    <Button key={k} size="sm" variant="outline" icon={i} className={POWER_TONE[k]} disabled={dis} onClick={f}>{l}</Button>
+                  ))}
                 </Group>
                 <Group label="Access">
                   <Button variant="outline" size="sm" icon="key" onClick={() => setResetPw(true)}>Reset password</Button>
                   <ResetPasswordModal open={resetPw} onClose={() => setResetPw(false)} windows={/windows/i.test(s.osTemplate?.family ?? s.osTemplate?.name ?? "")} onSubmit={(password) => { setResetPw(false); act("reset_password", password ? { password } : {}); }} />
                 </Group>
-                <Group label="Reinstall OS">
-                  <div className="w-56"><Select className="h-9" defaultValue="" onChange={(e) => { if (e.target.value && confirm("Reinstall will ERASE the server. Continue?")) act("reinstall", { osTemplateId: e.target.value }); e.target.value = ""; }}><option value="">Choose an OS…</option>{P.osTemplates.filter((x: any) => x.osTemplate.enabled).map((x: any) => <option key={x.osTemplate.id} value={x.osTemplate.id}>{x.osTemplate.name}</option>)}</Select></div>
+                <Group label="Operating system">
+                  <Button variant="outline" size="sm" icon="install_desktop" onClick={() => setReinstall(true)}>Reinstall</Button>
+                  <ReinstallModal staff open={reinstall} onClose={() => setReinstall(false)} svc={s} onSubmit={(osId) => { setReinstall(false); act("reinstall", { osTemplateId: osId }); }} />
                 </Group>
               </>
             )}

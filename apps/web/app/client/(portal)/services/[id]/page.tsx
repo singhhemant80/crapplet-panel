@@ -1,6 +1,7 @@
 "use client";
+import { POWER_TONE } from "@/components/power-tones";
+import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
-import { OsChooser } from "@/components/os-chooser";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -125,11 +126,11 @@ export default function ServicePage() {
               <div className="text-xs text-mute">{live?.state && live.state !== "running" ? "The server is not running — start it to see live figures" : live?.uptimeSec ? `Up ${Math.floor(live.uptimeSec / 86400) ? `${Math.floor(live.uptimeSec / 86400)}d ` : ""}${Math.floor((live.uptimeSec % 86400) / 3600)}h ${Math.floor((live.uptimeSec % 3600) / 60)}m` : live?.state === "locked" ? "A task is running on this server — try again in a minute" : "Live from the hypervisor"}</div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" icon="play_arrow" disabled={running} loading={busy === "start"} onClick={() => act("start")}>Start</Button>
-              <Button size="sm" variant="outline" icon="restart_alt" disabled={!running} loading={busy === "reboot"} onClick={() => act("reboot")}>Reboot</Button>
-              <Button size="sm" variant="outline" icon="power_settings_new" disabled={!running} loading={busy === "shutdown"} onClick={() => confirm("Shut down the server gracefully?") && act("shutdown")}>Shutdown</Button>
-              <Button size="sm" variant="outline" icon="stop" disabled={!running} loading={busy === "stop"} onClick={() => confirm("Force power-off? Unsaved data may be lost.") && act("stop")}>Power off</Button>
-              <Button size="sm" variant="outline" icon="bolt" disabled={!running} loading={busy === "hard_reset"} onClick={() => confirm("Hard reset cuts the power and starts the server again — like pressing the reset button. Use it only if the server is frozen; unsaved data is lost. Continue?") && act("hard_reset")}>Hard reset</Button>
+              <Button size="sm" variant="outline" className={POWER_TONE.start} icon="play_arrow" disabled={running} loading={busy === "start"} onClick={() => act("start")}>Start</Button>
+              <Button size="sm" variant="outline" className={POWER_TONE.reboot} icon="restart_alt" disabled={!running} loading={busy === "reboot"} onClick={() => act("reboot")}>Reboot</Button>
+              <Button size="sm" variant="outline" className={POWER_TONE.shutdown} icon="power_settings_new" disabled={!running} loading={busy === "shutdown"} onClick={() => confirm("Shut down the server gracefully?") && act("shutdown")}>Shutdown</Button>
+              <Button size="sm" variant="outline" className={POWER_TONE.stop} icon="stop" disabled={!running} loading={busy === "stop"} onClick={() => confirm("Force power-off? Unsaved data may be lost.") && act("stop")}>Power off</Button>
+              <Button size="sm" variant="outline" className={POWER_TONE.hard_reset} icon="bolt" disabled={!running} loading={busy === "hard_reset"} onClick={() => confirm("Hard reset cuts the power and starts the server again — like pressing the reset button. Use it only if the server is frozen; unsaved data is lost. Continue?") && act("hard_reset")}>Hard reset</Button>
               <Button size="sm" variant="secondary" icon="install_desktop" onClick={() => setModal("reinstall")}>Reinstall</Button>
             </div>
           </div>
@@ -444,35 +445,6 @@ function HostingPasswordModal({ open, onClose, id, username, onDone }: { open: b
   );
 }
 
-function ReinstallModal({ open, onClose, svc, onSubmit, busy }: { open: boolean; onClose: () => void; svc: any; onSubmit: (os: string, c: string) => void; busy: boolean }) {
-  const [os, setOs] = useState(svc.osTemplate?.id ?? "");
-  const [c, setC] = useState("");
-  return (
-    <Modal open={open} onClose={onClose} title="Reinstall operating system" wide>
-      <Alert tone="error" className="mb-4">
-        All data on this server will be permanently erased. Your IP address stays the same; a new password will be emailed to you.
-      </Alert>
-      <div className="space-y-4">
-        <Field label="Operating system">
-          <OsChooser
-            value={os}
-            onChange={setOs}
-            options={svc.product.osTemplates
-              .map((o: any) => o.osTemplate)
-              // only images available on the server this VPS lives on
-              .filter((o: any) => o.enabled !== false && (!o.virtualizorServerId || !svc.serverId || o.virtualizorServerId === svc.serverId))}
-          />
-        </Field>
-        <Field label='Type "REINSTALL" to confirm'>
-          <Input value={c} onChange={(e) => setC(e.target.value)} />
-        </Field>
-        <Button variant="danger" className="w-full" disabled={c !== "REINSTALL"} loading={busy} onClick={() => onSubmit(os, c)}>
-          Erase and reinstall
-        </Button>
-      </div>
-    </Modal>
-  );
-}
 
 function CancelModal({ open, onClose, id }: { open: boolean; onClose: () => void; id: string }) {
   const [reason, setReason] = useState("");
