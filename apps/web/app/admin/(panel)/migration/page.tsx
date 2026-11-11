@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, date } from "@/lib/api";
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Table, Td, Toggle, cx, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Icon, Input, PageHeader, Table, Td, Toggle, cx, toast, useApi } from "@/components/ui";
+import { DumpUpload, type DumpState } from "@/components/admin/dump-upload";
 
 const LABELS: Record<string, string> = {
   currencies: "Currencies", staff: "Staff accounts", clients: "Clients (with passwords, GSTIN, credit)", productGroups: "Product groups", servers: "Servers (imported disabled)",
@@ -18,6 +19,9 @@ export default function Migration() {
   const [since, setSince] = useState("");
   const [info, setInfo] = useState<any>(null);
   const [connErr, setConnErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<"file" | "db">("file");
+  const [dump, setDump] = useState<DumpState | null>(null);
+  const ready = mode === "file" ? dump?.status === "ready" : !!info;
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -37,7 +41,7 @@ export default function Migration() {
     if (!dryRun && !confirm("Import into the live database now? Re-running later only adds/updates records — nothing is duplicated.")) return;
     setBusy(dryRun ? "dry" : "real");
     try {
-      const r = await api("/admin/migration/whmcs/runs", { body: { connection: conn, ccEncryptionHash: hash || undefined, entities, dryRun, overwritePricing, historySince: since || null } });
+      const r = await api("/admin/migration/whmcs/runs", { body: { ...(mode === "file" ? { dumpId: dump!.id } : { connection: conn }), ccEncryptionHash: hash || undefined, entities, dryRun, overwritePricing, historySince: since || null } });
       toast.success(dryRun ? "Dry run started" : "Import started");
       setOpen(r.id);
       runs.reload();
@@ -49,7 +53,16 @@ export default function Migration() {
       <PageHeader title="WHMCS Migration" subtitle="Copy customers, services, IPs, invoices, tickets and more from your existing WHMCS into this panel." />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="space-y-6">
-          <Card title="1. Connect to the WHMCS database">
+          <Card title="1. Your WHMCS data">
+            <div className="mb-5 grid gap-2 sm:grid-cols-2">
+              {([["file", "upload_file", "Upload a .sql file", "A database export — no remote access needed"], ["db", "cable", "Connect to the database", "Read directly from the WHMCS MySQL server"]] as const).map(([k, i, t, d]) => (
+                <button key={k} type="button" onClick={() => setMode(k)} className={cx("flex items-start gap-3 rounded-xl border p-3.5 text-left transition", mode === k ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line bg-white hover:border-primary/40")}>
+                  <span className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-lg", mode === k ? "bg-primary-dark text-white" : "bg-primary-soft text-primary-dark")}><Icon name={i} className="text-[19px]" /></span>
+                  <span><span className="block text-sm font-extrabold text-ink">{t}</span><span className="text-xs text-mute">{d}</span></span>
+                </button>
+              ))}
+            </div>
+            {mode === "file" ? <DumpUpload value={dump} onChange={setDump} /> : <>
             <Alert className="mb-4">Create a <b>read-only</b> MySQL user on the WHMCS server, e.g. <code className="text-xs">GRANT SELECT ON whmcs.* TO &apos;migrate&apos;@&apos;&lt;this server IP&gt;&apos;</code>, and allow port 3306 from this server only (or use an SSH tunnel and host 127.0.0.1).</Alert>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="MySQL host"><Input value={conn.host} onChange={(e) => setConn({ ...conn, host: e.target.value })} placeholder="whmcs-db.crapplet.in" /></Field>
@@ -58,9 +71,6 @@ export default function Migration() {
               <Field label="User"><Input value={conn.user} onChange={(e) => setConn({ ...conn, user: e.target.value })} /></Field>
               <Field label="Password"><Input type="password" value={conn.password} onChange={(e) => setConn({ ...conn, password: e.target.value })} /></Field>
               <div className="flex items-end pb-2"><Toggle checked={conn.ssl} onChange={(v) => setConn({ ...conn, ssl: v })} label="Use TLS" /></div>
-              <Field label="cc_encryption_hash" className="sm:col-span-2" hint="From WHMCS configuration.php. Needed to carry over VPS root passwords and server passwords; everything else imports without it.">
-                <Input type="password" value={hash} onChange={(e) => setHash(e.target.value)} />
-              </Field>
             </div>
             <Button className="mt-4" variant="outline" icon="cable" loading={busy === "test"} disabled={!conn.host || !conn.database || !conn.user} onClick={test}>Test connection</Button>
             {connErr && <Alert tone="error" className="mt-4"><div className="text-sm leading-relaxed">{connErr.replace(/^Could not read the WHMCS database: /, "")}</div></Alert>}
@@ -72,6 +82,10 @@ export default function Migration() {
                 </div>
               </div>
             )}
+            </>}
+            <Field label="cc_encryption_hash (optional)" className="mt-5" hint="From WHMCS configuration.php (the $cc_encryption_hash line). Needed to carry over VPS root passwords and server passwords; everything else imports without it.">
+              <Input type="password" value={hash} onChange={(e) => setHash(e.target.value)} />
+            </Field>
           </Card>
 
           <Card title="2. Choose what to import">
@@ -89,9 +103,9 @@ export default function Migration() {
               <Field label="Skip closed history older than (optional)" hint="Unpaid invoices and open tickets are always imported."><Input type="date" value={since} onChange={(e) => setSince(e.target.value)} /></Field>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Button icon="science" loading={busy === "dry"} disabled={!info || active} onClick={() => start(true)}>Dry run (no changes)</Button>
-              <Button variant="danger" icon="move_up" loading={busy === "real"} disabled={!info || active} onClick={() => start(false)}>Import now</Button>
-              {!info && <span className="self-center text-xs text-mute">Test the connection first.</span>}
+              <Button icon="science" loading={busy === "dry"} disabled={!ready || active} onClick={() => start(true)}>Dry run (no changes)</Button>
+              <Button variant="danger" icon="move_up" loading={busy === "real"} disabled={!ready || active} onClick={() => start(false)}>Import now</Button>
+              {!ready && <span className="self-center text-xs text-mute">{mode === "file" ? "Upload the .sql file first." : "Test the connection first."}</span>}
             </div>
           </Card>
 

@@ -1,9 +1,13 @@
 import { prisma, Prisma } from "../../db";
 import { decryptJson } from "../../lib/crypto";
 import { mysqlSource, runWhmcsImport, type Entity, type MysqlConn } from "./whmcs";
+import { dumpSource } from "./sqldump";
+import { dumpFile } from "./dumps";
 
 export interface StoredRunOptions {
-  connection: MysqlConn;
+  connection?: MysqlConn;
+  /** an uploaded .sql dump instead of a live connection */
+  dumpId?: string;
   ccEncryptionHash?: string;
   entities: Entity[];
   overwritePricing?: boolean;
@@ -19,7 +23,7 @@ export async function executeMigrationRun(runId: string) {
   const progress: Record<string, { done: number; total: number }> = {};
   let src;
   try {
-    src = await mysqlSource(opts.connection);
+    src = opts.dumpId ? await dumpSource(dumpFile(opts.dumpId)) : await mysqlSource(opts.connection!);
     const result = await runWhmcsImport(src, { entities: opts.entities, dryRun: run.dryRun, ccEncryptionHash: opts.ccEncryptionHash, overwritePricing: opts.overwritePricing, historySince: opts.historySince }, async (p) => {
       progress[p.entity] = { done: p.done, total: p.total };
       await prisma.migrationRun.update({ where: { id: runId }, data: { progress: progress as Prisma.InputJsonValue } }).catch(() => undefined);

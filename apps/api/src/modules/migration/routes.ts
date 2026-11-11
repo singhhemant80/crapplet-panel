@@ -7,8 +7,10 @@ import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
 import { migrationQueue } from "../../jobs/queues";
 import { DEFAULT_ENTITIES, ENTITIES, inspectSource, mysqlSource } from "./whmcs";
+import { dumpRouter, readState } from "./dumps";
 
 export const migrationRouter = Router();
+migrationRouter.use(dumpRouter);
 
 const connSchema = z.object({
   host: z.string().min(1),
@@ -42,7 +44,9 @@ migrationRouter.post(
   ah(async (req, res) => {
     const b = parse(
       z.object({
-        connection: connSchema,
+        // either a live database connection or an uploaded .sql dump
+        connection: connSchema.optional(),
+        dumpId: z.string().regex(/^[a-f0-9]{24}$/).optional(),
         ccEncryptionHash: z.string().max(200).optional(),
         entities: z.array(z.enum(ENTITIES)).min(1).default(DEFAULT_ENTITIES),
         dryRun: z.boolean().default(true),
@@ -51,11 +55,14 @@ migrationRouter.post(
       }),
       req.body,
     );
+    if (!b.connection === !b.dumpId) throw badRequest("Choose a source: upload a .sql file or connect to the WHMCS database");
+    const dump = b.dumpId ? await readState(b.dumpId) : null;
+    if (dump && dump.status !== "ready") throw badRequest(dump.status === "error" ? `The uploaded file couldn't be read: ${dump.error}` : "The uploaded file is still being prepared — wait until it shows as ready");
     if (await prisma.migrationRun.count({ where: { status: { in: ["QUEUED", "RUNNING"] } } })) throw conflict("Another import is already running");
     const { dryRun, entities, ...stored } = b;
     const run = await prisma.migrationRun.create({ data: { dryRun, entities, createdById: req.user!.id, optionsEnc: encryptJson({ ...stored, entities }) } });
     await migrationQueue().add("whmcs", { runId: run.id }, { jobId: run.id, attempts: 1 });
-    await audit({ actorId: req.user!.id, action: dryRun ? "migration.dry_run" : "migration.import", entity: "migrationRun", entityId: run.id, details: { entities, host: b.connection.host, database: b.connection.database } });
+    await audit({ actorId: req.user!.id, action: dryRun ? "migration.dry_run" : "migration.import", entity: "migrationRun", entityId: run.id, details: { entities, ...(dump ? { file: dump.name } : { host: b.connection!.host, database: b.connection!.database }) } });
     res.status(202).json({ id: run.id });
   }),
 );
