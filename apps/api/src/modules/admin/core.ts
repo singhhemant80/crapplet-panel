@@ -1,3 +1,4 @@
+import { readSyncAll, startSyncAll } from "../provisioning/virtualizor-sync-all";
 import { getSettings } from "../../lib/settings";
 import { inrPerUnit, listCurrencies, requireCurrency } from "../../lib/currency";
 import { Router } from "express";
@@ -585,6 +586,24 @@ adminCore.get(
   ah(async (req, res) => {
     const ids = String(req.query.ids ?? "").split(",").filter(Boolean).slice(0, 200);
     res.json({ states: await liveStates(ids) });
+  }),
+);
+
+/** Sync every Virtualizor service at once (runs in the background; poll GET for progress). */
+adminCore.post(
+  "/virtualizor/sync-all",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const st = await startSyncAll(req.user!.id);
+    await audit({ actorId: req.user!.id, action: "service.virtualizor_sync_all", entity: "service", entityId: "*", details: { startedAt: st.startedAt } });
+    res.status(202).json(st);
+  }),
+);
+adminCore.get(
+  "/virtualizor/sync-all",
+  requireStaff("services.manage"),
+  ah(async (_req, res) => {
+    res.json((await readSyncAll()) ?? { status: "never" });
   }),
 );
 

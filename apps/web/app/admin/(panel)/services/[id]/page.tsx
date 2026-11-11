@@ -1,4 +1,5 @@
 "use client";
+import { VirtualizorSyncAll } from "@/components/admin/virtualizor-sync-all";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
@@ -197,7 +198,7 @@ export default function AdminService() {
                     </table>
                   </div>
                 ) : <p className="text-sm text-mute">No IP assigned.</p>}
-                {ok && live.ips?.length > 0 && live.ips.join(",") !== s.ips.map((i: any) => i.address).join(",") && <p className="mt-2 text-xs font-semibold text-amber-700">Virtualizor shows {live.ips.join(", ")} — click “Sync from Virtualizor” to update the panel.</p>}
+                {ok && live.ips?.length > 0 && live.ips.join(",") !== s.ips.map((i: any) => i.address).join(",") && <p className="mt-2 text-xs font-semibold text-amber-700">Virtualizor shows {live.ips.join(", ")} — click “Sync from Virtualizor” to update this one, or <span className="inline-block align-middle"><VirtualizorSyncAll label="sync all services" variant="outline" /></span>.</p>}
               </div>
               {(s.hasPassword || s.username) && (
                 <div className="mt-5 border-t border-line pt-4">

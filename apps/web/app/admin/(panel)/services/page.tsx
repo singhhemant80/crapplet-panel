@@ -1,4 +1,5 @@
 "use client";
+import { VirtualizorSyncAll } from "@/components/admin/virtualizor-sync-all";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -13,12 +14,12 @@ function Services() {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const { data, loading } = useApi(`/admin/services?page=${page}&status=${status}&vps=${vps}&q=${encodeURIComponent(query)}`, [page, status, vps, query]);
+  const { data, loading, reload } = useApi(`/admin/services?page=${page}&status=${status}&vps=${vps}&q=${encodeURIComponent(query)}`, [page, status, vps, query]);
   const liveIds = (data?.items ?? []).filter((s: any) => s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s: any) => s.id).join(",");
   const live = useLiveStates(liveIds ? `/admin/live-states?ids=${liveIds}` : null);
   return (
     <>
-      <PageHeader title="VPS & Services" subtitle="Every customer service. Open a VPS to run power actions, reinstall or suspend." />
+      <PageHeader title="VPS & Services" subtitle="Every customer service. Open a VPS to run power actions, reinstall or suspend." actions={<VirtualizorSyncAll onDone={reload} />} />
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px_180px]">
         <form onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(q); }}><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hostname, IP, VMID or customer email" /></form>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED", "FAILED", "TERMINATED", "CANCELLED"].map((s) => <option key={s}>{s}</option>)}</Select>
