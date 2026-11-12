@@ -175,6 +175,9 @@ const ITEM_TYPE: Record<string, InvoiceItemType> = {
 
 function guessType(name: string, group: string, whmcsType: string) {
   const s = `${group} ${name}`.toLowerCase();
+  // WHMCS already says it's a hosting account: only the flavour is guessed ("Windows Hosting" is still shared hosting)
+  if (whmcsType === "reselleraccount") return "RESELLER_HOSTING";
+  if (whmcsType === "hostingaccount") return /wordpress|\bwp\b|woocommerce/.test(s) ? "WORDPRESS" : /reseller/.test(s) ? "RESELLER_HOSTING" : "SHARED";
   if (/windows/.test(s)) return "VPS_WINDOWS";
   if (/forex|mt4|mt5/.test(s)) return "VPS_FOREX";
   if (/tally/.test(s)) return "TALLY";
@@ -190,6 +193,16 @@ function guessType(name: string, group: string, whmcsType: string) {
   if (whmcsType === "hostingaccount") return "SHARED";
   if (whmcsType === "server") return "DEDICATED";
   return "CUSTOM";
+}
+
+/** WHMCS tblproducts.freedomain / freedomainpaymentterms / freedomaintlds → our free-domain settings */
+export function whmcsFreeDomain(p: Record<string, unknown>) {
+  const f = String(p.freedomain ?? "").toLowerCase();
+  const freeDomain = f === "once" ? "once" : f === "on" ? "recurring" : "none";
+  if (freeDomain === "none") return { freeDomain };
+  const freeDomainCycles = [...new Set(String(p.freedomainpaymentterms ?? "").split(",").map((x) => CYCLE_MAP[x.trim().toLowerCase()]).filter((x): x is BillingCycle => !!x && x !== "ONETIME"))];
+  const freeDomainTlds = [...new Set(String(p.freedomaintlds ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).map((x) => (x.startsWith(".") ? x : `.${x}`)))];
+  return { freeDomain, freeDomainCycles, freeDomainTlds };
 }
 
 // ───────────────────────── connection test ─────────────────────────
@@ -352,7 +365,11 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         if (get("productGroup", g.id)) { c("productGroups").skipped++; continue; }
         const slug = slugify(str(g.name));
         const existing = await tx.productGroup.findUnique({ where: { slug } });
-        const local = existing ?? (await tx.productGroup.create({ data: { name: str(g.name), slug, headline: nul(g.headline) ?? nul(g.tagline), hidden: !!Number(g.hidden), sortOrder: Number(g.order) || 0 } }));
+        const gid = Number(g.id) || null;
+        const gidFree = gid && !(await tx.productGroup.findUnique({ where: { legacyGid: gid } }));
+        const local = existing ?? (await tx.productGroup.create({ data: { name: str(g.name), slug, headline: nul(g.headline) ?? nul(g.tagline), hidden: !!Number(g.hidden), sortOrder: Number(g.order) || 0, legacyGid: gidFree ? gid : null } }));
+        // keep old website links like cart.php?gid=2 working
+        if (existing && !existing.legacyGid && gidFree) await tx.productGroup.update({ where: { id: existing.id }, data: { legacyGid: gid } });
         await setMap("productGroup", g.id, local.id);
         c("productGroups")[existing ? "skipped" : "created"]++;
       }
@@ -414,6 +431,9 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         let localId = get("product", p.id) ?? (await tx.product.findUnique({ where: { legacyPid: Number(p.id) } }))?.id;
         if (localId) {
           if (!get("product", p.id)) await setMap("product", p.id, localId);
+          // fill in WHMCS's free-domain offer on plans imported before it was supported (never overrides staff changes)
+          const fd = whmcsFreeDomain(p);
+          if (fd.freeDomain !== "none") await tx.product.updateMany({ where: { id: localId, freeDomain: "none" }, data: fd });
           if (opts.overwritePricing && prices.length) {
             await tx.productPricing.deleteMany({ where: { productId: localId } });
             await tx.productPricing.createMany({ data: prices.map((x) => ({ ...x, productId: localId! })) });
@@ -434,6 +454,8 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
               groupId: gid, legacyPid: Number(p.id), name: str(p.name), slug, type: guessType(str(p.name), groupName.get(String(p.gid)) ?? "", str(p.type)) as never,
               description: nul(p.description), provisioner, allowIpSelection: isVm, ipv4Count: isVm ? 1 : 0, moduleConfig,
               enabled: !Number(p.retired), hidden: !!Number(p.hidden), sortOrder: Number(p.order) || 0, autoSetup: provisioner === "MANUAL" ? "MANUAL" : "ON_PAYMENT",
+              // WHMCS free domain: freedomain "once" | "on" (recurring), qualifying cycles and TLDs
+              ...whmcsFreeDomain(p),
               pricing: { create: prices },
             },
           });

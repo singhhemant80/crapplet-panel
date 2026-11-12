@@ -15,12 +15,16 @@ export interface CartItem {
   config: Record<string, string | number | boolean>;
   addonIds: string[];
   quantity: number;
+  /** hosting: how the domain was chosen (register / transfer come with a CartDomain linked by forItem) */
+  domainAction?: "register" | "transfer" | "existing";
 }
 export interface CartDomain {
   name: string;
   action: "register" | "transfer";
   years: number;
   eppCode?: string;
+  /** key of the hosting item this domain was chosen for */
+  forItem?: string;
 }
 export interface Cart {
   items: CartItem[];
@@ -50,7 +54,7 @@ export function cartCount() {
 export function toApiCart(c: Cart, currency = "INR") {
   return {
     items: c.items.map(({ productId, cycle, osTemplateId, hostname, serverId, ipId, config, addonIds, quantity }) => ({ productId, cycle, osTemplateId: osTemplateId || null, hostname: hostname || null, serverId: serverId || null, ipId: ipId || null, config, addonIds, quantity })),
-    domains: c.domains,
+    domains: c.domains.map(({ name, action, years, eppCode }) => ({ name, action, years, eppCode: eppCode || undefined })),
     promoCode: c.promoCode || null,
     currency,
   };

@@ -8,6 +8,10 @@ import { Alert, Button, Field, Icon, Input, Loading, Select, Spinner, cx, toast,
 import { OrderSteps } from "@/components/order-steps";
 import { OsChooser } from "@/components/os-chooser";
 import { CurrencySwitch, pick, priceRow, rowsIn, useCurrency } from "@/lib/currency";
+import { DomainSummary, HostingDomainStep, freeDomainApplies, freeDomainText, DOMAIN_OK, type DomainChoice } from "@/components/hosting-domain";
+
+/** WHMCS link names for billing cycles (cart.php?...&billingcycle=annually) */
+const WHMCS_CYCLE: Record<string, string> = { monthly: "MONTHLY", quarterly: "QUARTERLY", semiannually: "SEMIANNUAL", annually: "ANNUAL", biennially: "BIENNIAL", triennially: "TRIENNIAL", onetime: "ONETIME" };
 
 /** A numbered configuration step. */
 function Step({ n, title, sub, action, children }: { n?: number; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode }) {
@@ -53,7 +57,11 @@ function Configure() {
   const p = data?.product;
   const locs = useApi(p?.isVps ? `/catalog/products/${p.slug}/locations` : null, [p?.slug]);
 
-  const [cycle, setCycle] = useState("MONTHLY");
+  const [cycle, setCycle] = useState(WHMCS_CYCLE[(sp.get("billingcycle") ?? "").toLowerCase()] ?? ((sp.get("cycle") ?? "").toUpperCase() || "MONTHLY"));
+  // hosting: the domain chosen in the first step (kept per plan so "back" / sign-in doesn't lose it)
+  const [dom, setDom] = useState<DomainChoice | null>(null);
+  const [pickingDomain, setPickingDomain] = useState(false);
+  const tldPrices = useApi(p?.isHosting && dom && dom.action !== "existing" ? "/catalog/domains/pricing" : null, [p?.isHosting, dom?.action]);
   const [serverId, setServerId] = useState<string>("");
   const [os, setOs] = useState("");
   const [hostname, setHostname] = useState("");
@@ -71,6 +79,17 @@ function Configure() {
     if (!p) return;
     const rows = rowsIn(p.pricing, currency);
     if (rows.length && !rows.some((x: any) => x.cycle === cycle)) setCycle(rows[0].cycle);
+    if (p.isHosting && !dom) {
+      // WHMCS-style links: ?sld=name&tld=.com&domainoption=register|transfer|owndomain, or ?domain=example.com
+      const sld = sp.get("sld"), tld = sp.get("tld"), q = (sp.get("domain") ?? sp.get("query") ?? "").toLowerCase();
+      const name = sld && tld ? `${sld}${tld.startsWith(".") ? tld : `.${tld}`}`.toLowerCase() : DOMAIN_OK.test(q) ? q : "";
+      const opt = (sp.get("domainoption") ?? "").toLowerCase();
+      let saved: DomainChoice | null = null;
+      try { saved = JSON.parse(sessionStorage.getItem(`cc_dom_${p.slug}`) ?? "null"); } catch { /* ignore */ }
+      if (name && (opt === "owndomain" || opt === "existing")) setDom({ name, action: "existing", years: 0 });
+      else if (saved && !name) setDom(saved);
+      else if (name) { setDom(null); setPickingDomain(true); sessionStorage.setItem(`cc_dom_seed_${p.slug}`, JSON.stringify({ name, action: opt === "transfer" ? "transfer" : "register", years: 1 })); }
+    }
     if (p.osTemplates.length && !os) setOs(defaultOs(p.osTemplates));
     try {
       const pending = JSON.parse(sessionStorage.getItem(`cc_pick_${p.slug}`) ?? "null");
@@ -128,10 +147,22 @@ function Configure() {
   }, [p, cfg, addons, currency]);
   const addonSetup = p ? p.addons.filter((a: any) => addons.includes(a.id)).reduce((t: number, a: any) => t + pick(a.prices?.setupFee, currency, a.setupFee), 0) : 0;
 
+  const chooseDomain = (c: DomainChoice) => {
+    setDom(c);
+    setPickingDomain(false);
+    try { sessionStorage.setItem(`cc_dom_${p.slug}`, JSON.stringify(c)); } catch { /* ignore */ }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  // price of the chosen domain (first payment) and whether this plan + cycle makes it free
+  const tldRow = dom && dom.action !== "existing" ? tldPrices.data?.tlds?.find((t: any) => t.tld === "." + dom.name.split(".").slice(1).join(".")) : null;
+  const domainFree = !!(p?.freeDomain && dom && dom.action !== "existing" && freeDomainApplies(p.freeDomain, cycle, dom.name));
+  const domainPrice = !tldRow || !dom ? null : dom.action === "transfer" ? pick(tldRow.prices?.transfer, currency, tldRow.transfer) : pick(tldRow.prices?.register, currency, tldRow.register) * dom.years;
+  const domainCharge = domainPrice == null ? 0 : domainFree ? (dom!.action === "register" ? pick(tldRow.prices?.renew, currency, tldRow.renew) * (dom!.years - 1) : 0) : domainPrice;
+
   if (loading) return <Loading />;
   if (error || !p) return <div className="mx-auto max-w-3xl px-4 py-16"><Alert tone="error">This plan is not available. <a className="font-bold underline" href="/order">Browse plans</a></Alert></div>;
 
-  const total = (price?.price ?? 0) + optionsMonthly * months + (price?.setupFee ?? 0) + addonSetup;
+  const total = (price?.price ?? 0) + optionsMonthly * months + (price?.setupFee ?? 0) + addonSetup + (p.isHosting ? domainCharge : 0);
 
   async function pickIp(ip: any) {
     if (!me || me.type !== "CLIENT") {
@@ -156,17 +187,19 @@ function Configure() {
 
   function addToCart() {
     if (p.isVps && p.osTemplates.length && !os) return toast.error("Choose an operating system");
-    if (p.isHosting && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter your domain name, like example.com");
+    if (p.isHosting && !dom) { setPickingDomain(true); return toast.error("Choose a domain for your hosting first"); }
     if (!p.isHosting && p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
     const loc = locs.data?.locations.find((l: any) => l.serverId === serverId);
+    const key = `${p.id}-${Date.now()}`;
     const item: CartItem = {
-      key: `${p.id}-${Date.now()}`,
+      key,
       productId: p.slug,
       productName: p.name,
       cycle,
       osTemplateId: os || null,
       osName: p.osTemplates.find((o: any) => o.id === os)?.name,
-      hostname: hostname || null,
+      hostname: p.isHosting ? dom!.name : hostname || null,
+      domainAction: p.isHosting ? dom!.action : undefined,
       serverId: serverId || null,
       location: loc?.name,
       ipId: reservation?.ipId ?? null,
@@ -177,23 +210,29 @@ function Configure() {
       quantity: 1,
     };
     const c = readCart();
-    writeCart({ ...c, items: [...c.items, item] });
+    // a domain registered / transferred for this hosting goes in the cart with it (replacing any earlier copy)
+    const domains = p.isHosting && dom && dom.action !== "existing" ? [...c.domains.filter((d) => d.name !== dom.name), { name: dom.name, action: dom.action, years: dom.years, eppCode: dom.eppCode, forItem: key }] : c.domains;
+    writeCart({ ...c, items: [...c.items, item], domains });
     sessionStorage.removeItem(`cc_pick_${p.slug}`);
+    sessionStorage.removeItem(`cc_dom_${p.slug}`);
     router.push("/order/cart");
   }
 
   const filtered = ips;
   // number the steps that are shown
-  const order = ["cycle", p.isVps && "location", p.allowIpSelection && serverId && "ip", p.isHosting && "domain", !p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && "setup", (p.configOptions.length > 0 || p.addons.length > 0) && "extras"].filter(Boolean) as string[];
+  const order = [p.isHosting && "domain", "cycle", p.isVps && "location", p.allowIpSelection && serverId && "ip", !p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && "setup", (p.configOptions.length > 0 || p.addons.length > 0) && "extras"].filter(Boolean) as string[];
+  const domainStep = p.isHosting && (!dom || pickingDomain);
+  let seed: DomainChoice | null = dom;
+  if (!seed) try { seed = JSON.parse(sessionStorage.getItem(`cc_dom_seed_${p.slug}`) ?? "null"); } catch { /* ignore */ }
   const num = (k: string) => order.indexOf(k) + 1;
   const loc = locs.data?.locations.find((l: any) => l.serverId === serverId);
   const osName = p.osTemplates.find((o: any) => o.id === os)?.name;
   const gst = currency === "INR" ? Math.round(total * 0.18) : 0;
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6">
-      <OrderSteps step={2} />
-      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
+      <OrderSteps step={p.isHosting ? (domainStep ? 2 : 3) : 2} hosting={p.isHosting} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6">
           <div className="rounded-2xl border border-line bg-white p-6 shadow-card">
             <a href={`/order${p.group?.slug ? `?group=${p.group.slug}` : ""}`} className="inline-flex items-center gap-1 text-[13px] font-bold text-primary-dark hover:underline"><Icon name="arrow_back" className="text-[16px]" />{p.group?.name ?? "All plans"}</a>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
@@ -201,6 +240,11 @@ function Configure() {
               <CurrencySwitch />
             </div>
             <p className="mt-1 text-mute">{p.tagline}</p>
+            {p.isHosting && p.features?.length > 0 && (
+              <ul className="mt-4 flex flex-wrap gap-2 text-[12.5px] font-semibold text-slate-700">
+                {p.features.slice(0, 6).map((f: string) => <li key={f} className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf7ff] px-2.5 py-1 ring-1 ring-[#ede4ff]"><Icon name="check" className="text-[16px] text-primary-dark" />{f}</li>)}
+              </ul>
+            )}
             {p.isVps && (
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
                 {[["developer_board", `${p.specs.cpuCores} vCPU`], ["memory", gb(p.specs.ramMb)], ["database", `${p.specs.diskGb} GB SSD`], ["public", `${p.specs.ipv4Count} × IPv4`]].map(([i, t]) => (
@@ -210,7 +254,13 @@ function Configure() {
             )}
           </div>
 
-          <Step n={num("cycle")} title="Billing cycle" sub="Pay for longer and save — you can change it at renewal.">
+          {domainStep ? (
+            <HostingDomainStep product={p} currency={currency} initial={seed} onChoose={chooseDomain} cycleLabels={CYCLES} />
+          ) : (
+          <>
+          {p.isHosting && dom && <DomainSummary choice={dom} onChange={() => setPickingDomain(true)} free={domainFree} cm={(v) => cm(v).replace(".00", "")} price={domainPrice} />}
+
+          <Step n={num("cycle")} title="Billing cycle" sub={p.freeDomain && p.isHosting ? (freeDomainText(p.freeDomain, CYCLES) ?? undefined) : "Pay for longer and save — you can change it at renewal."}>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {rowsIn(p.pricing, currency).map((x: any) => {
                 const monthlyBase = priceRow(p.pricing, "MONTHLY", currency)?.price;
@@ -273,21 +323,6 @@ function Configure() {
             </Step>
           )}
 
-          {p.isHosting && (
-            <Step n={num("domain")} title="Your domain" sub="The main website on this hosting account.">
-              <Field label="Domain name" hint="The main website on this hosting account. You can add more domains later in cPanel.">
-                <div className="relative">
-                  <Icon name="language" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-mute" />
-                  <Input className="pl-10" value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, ""))} placeholder="yourbusiness.com" />
-                </div>
-              </Field>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                <span className="inline-flex items-center gap-1"><Icon name="check_circle" className="text-[15px] text-emerald-600" />Use a domain you already own — point it to our nameservers after setup</span>
-                <a href="/order/domain" className="font-bold text-primary-dark hover:underline">Need a domain? Register one →</a>
-              </div>
-            </Step>
-          )}
-
           {!p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && (
             <Step n={num("setup")} title="Server setup" sub="Operating system and hostname — you can reinstall another OS later.">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -329,6 +364,8 @@ function Configure() {
               </div>
             </Step>
           )}
+          </>
+          )}
         </div>
 
         <aside>
@@ -343,12 +380,16 @@ function Configure() {
                 {p.isVps && <div className="flex justify-between gap-3"><dt className="text-mute">Resources</dt><dd className="text-right font-semibold text-ink">{p.specs.cpuCores} vCPU · {gb(p.specs.ramMb)} · {p.specs.diskGb} GB</dd></div>}
                 {loc && <div className="flex justify-between gap-3"><dt className="text-mute">Location</dt><dd className="font-semibold text-ink">{loc.name}</dd></div>}
                 {osName && <div className="flex justify-between gap-3"><dt className="text-mute">OS</dt><dd className="truncate font-semibold text-ink">{osName}</dd></div>}
-                {hostname && <div className="flex justify-between gap-3"><dt className="text-mute">{p.isHosting ? "Domain" : "Hostname"}</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
-                <div className="flex justify-between gap-3"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold text-ink">{reservation?.address ?? (p.isVps ? "Auto-assigned" : "Shared")}</dd></div>
+                {!p.isHosting && hostname && <div className="flex justify-between gap-3"><dt className="text-mute">Hostname</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
+                {p.isHosting && <div className="flex justify-between gap-3"><dt className="text-mute">Domain</dt><dd className="min-w-0 truncate font-semibold text-ink">{dom?.name ?? <span className="text-mute">not chosen yet</span>}</dd></div>}
+                {!p.isHosting && <div className="flex justify-between gap-3"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold text-ink">{reservation?.address ?? (p.isVps ? "Auto-assigned" : "Shared")}</dd></div>}
               </dl>
               <div className="my-4 border-t border-dashed border-line" />
               <dl className="space-y-2 text-[13px]">
                 <div className="flex justify-between"><dt className="text-mute">Plan ({CYCLES[cycle].toLowerCase()})</dt><dd className="font-semibold text-ink">{cm(price?.price)}</dd></div>
+                {p.isHosting && dom && dom.action !== "existing" && domainPrice != null && (
+                  <div className="flex justify-between gap-3"><dt className="min-w-0 truncate text-mute">{dom.action === "transfer" ? "Domain transfer" : `Domain (${dom.years} yr)`}</dt><dd className={cx("font-semibold", domainFree ? "text-emerald-600" : "text-ink")}>{domainFree && domainCharge === 0 ? "FREE" : cm(domainCharge)}</dd></div>
+                )}
                 {optionsMonthly > 0 && <div className="flex justify-between"><dt className="text-mute">Extras × {months} mo</dt><dd className="font-semibold text-ink">{cm(optionsMonthly * months)}</dd></div>}
                 {(price?.setupFee ?? 0) + addonSetup > 0 && <div className="flex justify-between"><dt className="text-mute">Setup fee</dt><dd className="font-semibold text-ink">{cm((price?.setupFee ?? 0) + addonSetup)}</dd></div>}
                 <div className="flex justify-between"><dt className="text-mute">Subtotal</dt><dd className="font-semibold text-ink">{cm(total)}</dd></div>
@@ -359,11 +400,15 @@ function Configure() {
                 <div className="text-2xl font-extrabold tracking-tight text-primary-dark">{cm(total + gst)}</div>
               </div>
               {reservation && countdown && <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><Icon name="timer" className="text-[16px]" />{reservation.address} held for {countdown.label}</div>}
-              <Button size="lg" className="mt-4 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue to checkout</Button>
+              {domainStep ? (
+                <Button size="lg" className="mt-4 w-full" icon="language" variant="secondary" disabled>Choose a domain first</Button>
+              ) : (
+                <Button size="lg" className="mt-4 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue to checkout</Button>
+              )}
               <p className="mt-2 text-center text-[11.5px] text-mute">Review your cart and apply a promo code next.</p>
               <ul className="mt-4 space-y-2 border-t border-line pt-4 text-xs font-semibold text-slate-600">
-                <li className="flex items-center gap-2"><Icon name="bolt" className="text-[18px] text-primary" /> Deployed automatically after payment</li>
-                <li className="flex items-center gap-2"><Icon name="shield" className="text-[18px] text-primary" /> DDoS protected network</li>
+                <li className="flex items-center gap-2"><Icon name="bolt" className="text-[18px] text-primary" /> {p.isHosting ? "Account set up after payment" : "Deployed automatically after payment"}</li>
+                <li className="flex items-center gap-2"><Icon name={p.isHosting ? "lock" : "shield"} className="text-[18px] text-primary" /> {p.isHosting ? "Free SSL for your domain" : "DDoS protected network"}</li>
                 <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-[18px] text-primary" /> {currency === "INR" ? "GST invoice with your GSTIN" : `Invoice in ${currency} · cards & PayPal`}</li>
               </ul>
             </div>

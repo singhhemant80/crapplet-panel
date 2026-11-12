@@ -21,7 +21,7 @@ export const adminCatalog = Router();
 const slug = z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/, "Use lowercase letters, numbers and dashes");
 
 // ───────────── Product groups ─────────────
-crud(adminCatalog, "/product-groups", "productGroup", z.object({ name: z.string().min(1), slug, description: z.string().nullable().optional(), headline: z.string().nullable().optional(), sortOrder: z.number().int().default(0), hidden: z.boolean().default(false) }), "products.manage", {
+crud(adminCatalog, "/product-groups", "productGroup", z.object({ name: z.string().min(1), slug, description: z.string().nullable().optional(), headline: z.string().nullable().optional(), sortOrder: z.number().int().default(0), hidden: z.boolean().default(false), legacyGid: z.number().int().positive().nullable().optional() }), "products.manage", {
   orderBy: { sortOrder: "asc" },
   include: { _count: { select: { products: true } } },
 });
@@ -47,6 +47,9 @@ const productSchema = z.object({
   ipv6Enabled: z.boolean().default(false),
   allowIpSelection: z.boolean().default(false),
   requireHostname: z.boolean().default(false),
+  freeDomain: z.enum(["none", "once", "recurring"]).default("none"),
+  freeDomainCycles: z.array(z.nativeEnum(BillingCycle)).default([]),
+  freeDomainTlds: z.array(z.string().trim().toLowerCase().regex(/^\.?[a-z0-9-]+(\.[a-z0-9-]+)*$/, "TLDs look like .com or .co.in").transform((t) => (t.startsWith(".") ? t : `.${t}`))).default([]),
   hsnSac: z.string().max(10).default("998315"),
   taxable: z.boolean().default(true),
   stockControl: z.boolean().default(false),

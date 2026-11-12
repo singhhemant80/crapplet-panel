@@ -1,5 +1,25 @@
 import { prisma } from "../../db";
 import type { VirtualizorModuleConfig } from "../provisioning/provisioner";
+import { isHostingProduct, isVpsProduct } from "../../lib/product-kind";
+
+const KIND_LABEL: Record<string, string> = { shared: "Shared Hosting", reseller: "Reseller Hosting", wordpress: "WordPress Hosting", server: "VPS / servers" };
+/** Which shelf of the order page a plan type belongs on. */
+export function planKind(type: string) {
+  if (type === "RESELLER_HOSTING") return "reseller";
+  if (type === "WORDPRESS") return "wordpress";
+  if (type === "SHARED") return "shared";
+  if (type === "CUSTOM") return null;
+  return "server";
+}
+/** What a group's name says it sells (null = can't tell). */
+export function groupKind(name: string) {
+  const n = name.toLowerCase();
+  if (/reseller/.test(n)) return "reseller";
+  if (/wordpress|\bwp\b|woocommerce/.test(n)) return "wordpress";
+  if (/vps|server|cloud|dedicated|gpu|forex|tally|minecraft|n8n|colo/.test(n)) return "server";
+  if (/shared|web hosting|linux hosting|cpanel|hosting/.test(n)) return "shared";
+  return null;
+}
 
 export type Check = { key: string; label: string; status: "ok" | "warn" | "error"; detail: string; fix?: string; href?: string };
 
@@ -10,7 +30,7 @@ export type Check = { key: string; label: string; status: "ok" | "warn" | "error
 export async function productReadiness(productId: string): Promise<{ ready: boolean; checks: Check[] }> {
   const p = await prisma.product.findUniqueOrThrow({
     where: { id: productId },
-    include: { pricing: true, servers: { include: { server: true } }, osTemplates: { include: { osTemplate: true } } },
+    include: { pricing: true, servers: { include: { server: true } }, osTemplates: { include: { osTemplate: true } }, group: true },
   });
   const checks: Check[] = [];
   const add = (c: Check) => checks.push(c);
@@ -18,6 +38,15 @@ export async function productReadiness(productId: string): Promise<{ ready: bool
 
   add(p.enabled ? { key: "enabled", label: "Plan is on sale", status: "ok", detail: p.hidden ? "Enabled (hidden from the order page)" : "Enabled" } : { key: "enabled", label: "Plan is on sale", status: "warn", detail: "Disabled — customers can't order it", fix: "Turn on “Enabled”", href: edit });
   const inr = p.pricing.filter((x) => x.currency === "INR" && x.enabled);
+  // order page: the plan sits on the right shelf and gets the right order flow
+  const pk = planKind(p.type);
+  const gk = groupKind(p.group.name);
+  if (p.group.hidden) add({ key: "group", label: "Order page", status: "warn", detail: `The group “${p.group.name}” is hidden — the plan can only be ordered by a direct link`, fix: "Unhide the group or move the plan", href: "/admin/product-groups" });
+  else if (pk && gk && pk !== gk && !(pk === "server" && gk === "server"))
+    add({ key: "group", label: "Order page", status: "warn", detail: `A ${KIND_LABEL[pk]} plan in the “${p.group.name}” group — customers looking for ${KIND_LABEL[pk]} won't find it there`, fix: "Change Group (or Type) under Details", href: edit });
+  else add({ key: "group", label: "Order page", status: "ok", detail: `Listed under “${p.group.name}” · /order?group=${p.group.slug}${isHostingProduct(p) ? " · customers choose a domain first" : ""}` });
+  if (isHostingProduct(p) && isVpsProduct(p)) add({ key: "kind", label: "Plan type", status: "error", detail: `Type ${p.type} is hosting, but it's provisioned on ${p.provisioner}`, fix: "Use a VPS type, or provision it with cPanel / Manual", href: edit });
+
   add(inr.length ? { key: "pricing", label: "Pricing", status: "ok", detail: `${inr.length} billing cycle${inr.length === 1 ? "" : "s"} priced` } : { key: "pricing", label: "Pricing", status: "error", detail: "No INR price", fix: "Add at least a monthly price", href: edit });
 
   if (p.provisioner === "CPANEL") {

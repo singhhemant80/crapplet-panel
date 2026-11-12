@@ -1,5 +1,6 @@
 "use client";
 import { OsLogo } from "@/components/os-logo";
+import { CopyLink } from "@/components/admin/copy-link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, CYCLES } from "@/lib/api";
@@ -7,6 +8,7 @@ import { Alert, Button, Card, Field, Input, Loading, PageHeader, Select, Textare
 
 const TYPES = ["SHARED", "RESELLER_HOSTING", "WORDPRESS", "VPS_LINUX", "VPS_WINDOWS", "VPS_FOREX", "TALLY", "VPS_N8N", "VPS_MINECRAFT", "VPS_GOLD", "DEDICATED", "GPU", "COLOCATION", "CUSTOM"];
 const CYC = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "BIENNIAL", "TRIENNIAL", "ONETIME"];
+const HOSTING_TYPES = ["SHARED", "RESELLER_HOSTING", "WORDPRESS"];
 
 /** Mirrors the API's conversion (lib/currency.ts) so the editor can preview auto-converted prices. */
 function makeConverter(rate: number | undefined, cfg: { autoConvert?: boolean; markupPct?: number; rounding?: string } | undefined) {
@@ -35,12 +37,14 @@ export default function ProductEditor() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, pricingUsd: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
+    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, freeDomain: "none", freeDomainCycles: [], freeDomainTlds: "", moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, pricingUsd: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
     else if (prod.data) {
       const x = prod.data.product;
       setP({
         ...x,
         features: x.features.join("\n"),
+        freeDomainTlds: (x.freeDomainTlds ?? []).join(", "),
+        freeDomainCycles: x.freeDomainCycles ?? [],
         pricing: Object.fromEntries(x.pricing.filter((r: any) => r.currency === "INR").map((r: any) => [r.cycle, { price: r.price / 100, setupFee: r.setupFee / 100, enabled: r.enabled }])),
         pricingUsd: Object.fromEntries(x.pricing.filter((r: any) => r.currency === "USD").map((r: any) => [r.cycle, { price: r.price / 100, setupFee: r.setupFee / 100, enabled: r.enabled }])),
         wholesale: Object.fromEntries(x.wholesalePricing.map((r: any) => [r.cycle, r.price / 100])),
@@ -78,7 +82,9 @@ export default function ProductEditor() {
       groupId: p.groupId, legacyPid: num(p.legacyPid), name: p.name, slug: p.slug, type: p.type, tagline: p.tagline || null, description: p.description || null,
       features: String(p.features).split("\n").map((s: string) => s.trim()).filter(Boolean), imageUrl: p.imageUrl || null,
       provisioner: p.provisioner, virtType: p.virtType, cpuCores: num(p.cpuCores), ramMb: num(p.ramMb), diskGb: num(p.diskGb), bandwidthGb: num(p.bandwidthGb),
-      ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname, hsnSac: p.hsnSac, taxable: p.taxable,
+      ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname,
+      freeDomain: p.freeDomain ?? "none", freeDomainCycles: p.freeDomainCycles ?? [], freeDomainTlds: String(p.freeDomainTlds ?? "").split(/[\s,]+/).map((t: string) => t.trim()).filter(Boolean),
+      hsnSac: p.hsnSac, taxable: p.taxable,
       stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
       resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) }, cpanel: { ...p.moduleConfig.cpanel, accountLimit: num(p.moduleConfig.cpanel?.accountLimit), diskMb: num(p.moduleConfig.cpanel?.diskMb), bandwidthMb: num(p.moduleConfig.cpanel?.bandwidthMb) } },
       pricing: [
@@ -111,6 +117,8 @@ export default function ProductEditor() {
   const isHosting = p.provisioner === "CPANEL";
   const srvType = p.provisioner === "VIRTUALIZOR" ? "VIRTUALIZOR" : isHosting ? "CPANEL" : "PROXMOX";
   const typed = isVps || isHosting;
+  const hostingPlan = HOSTING_TYPES.includes(p.type) || isHosting;
+  const group = groups.data?.items?.find((g: any) => g.id === p.groupId);
   return (
     <>
       {!isNew && readiness.data && <Readiness data={readiness.data} onRecheck={readiness.reload} loading={readiness.loading} />}
@@ -244,6 +252,40 @@ export default function ProductEditor() {
                 setDisk={(v) => set({ diskGb: v })}
                 setBandwidth={(v) => set({ bandwidthGb: v })}
               />
+            )}
+          </div>
+        </Card>
+        <Card title={hostingPlan ? "Order page & free domain" : "Order page"}>
+          <div className="space-y-4">
+            {!isNew && (
+              <div className="space-y-1.5 rounded-xl bg-[#faf7ff] p-3 ring-1 ring-[#ede4ff]">
+                <div className="text-[12px] font-bold uppercase tracking-wider text-mute">Links for your website</div>
+                <CopyLink label="This plan" path={`/order/configure?product=${p.slug}`} />
+                {group && <div><CopyLink label="Its group" path={`/order?group=${group.slug}`} /></div>}
+                {p.legacyPid && <div><CopyLink label="Old WHMCS link" path={`/clientarea/cart.php?a=add&pid=${p.legacyPid}`} /></div>}
+              </div>
+            )}
+            {hostingPlan ? (
+              <>
+                <p className="text-[13px] text-mute">Customers choose a domain first (register, transfer or use their own), like WHMCS. You can include a free domain with the plan:</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Free domain">
+                    <Select value={p.freeDomain ?? "none"} onChange={(e) => set({ freeDomain: e.target.value })}>
+                      <option value="none">No free domain</option>
+                      <option value="once">Free first year (renews at normal price)</option>
+                      <option value="recurring">Free while the plan is kept (free renewals)</option>
+                    </Select>
+                  </Field>
+                  <Field label="Qualifying TLDs" hint="e.g. .com, .in — blank = any TLD you sell">
+                    <Input value={p.freeDomainTlds ?? ""} disabled={p.freeDomain === "none"} onChange={(e) => set({ freeDomainTlds: e.target.value })} placeholder=".com, .in, .co.in" />
+                  </Field>
+                </div>
+                {p.freeDomain !== "none" && (
+                  <Chips label="Qualifying billing cycles (none ticked = any)" items={CYC.filter((c) => c !== "ONETIME").map((c) => ({ id: c, label: CYCLES[c] }))} selected={p.freeDomainCycles ?? []} onToggle={(v) => toggleIn("freeDomainCycles", v)} />
+                )}
+              </>
+            ) : (
+              <p className="text-[13px] text-mute">{isVps ? "Customers pick the location, operating system and hostname." : "Set the Type to Shared, Reseller or WordPress hosting to ask for a domain at order time."}</p>
             )}
           </div>
         </Card>

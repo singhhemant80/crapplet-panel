@@ -6,6 +6,8 @@ import { CYCLE_MONTHS, gb, money } from "@/lib/api";
 import { Icon, Loading, cx, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
 import { CurrencySwitch, priceRow, rowsIn, useCurrency } from "@/lib/currency";
+import { CYCLES } from "@/lib/api";
+import { freeDomainText } from "@/components/hosting-domain";
 
 /** Icon for a product group, from its name. */
 function groupIcon(name: string) {
@@ -26,6 +28,12 @@ const bw = (g?: number | null) => (!g ? "Unmetered" : g >= 1024 ? `${+(g / 1024)
 
 /** Spec rows shown on a plan card — VPS get a hardware table, hosting its feature list. */
 function specRows(p: any): [string, string, string][] {
+  if (p.isHosting && !p.features.length) {
+    const rows: [string, string, string][] = [];
+    if (p.specs.diskGb) rows.push(["database", "SSD storage", `${p.specs.diskGb} GB`]);
+    if (p.specs.bandwidthGb !== null && p.specs.bandwidthGb !== undefined) rows.push(["speed", "Bandwidth", bw(p.specs.bandwidthGb)]);
+    return rows;
+  }
   if (p.isVps)
     return [
       ["developer_board", "vCPU", `${p.specs.cpuCores} cores`],
@@ -70,6 +78,12 @@ function PlanCard({ p, currency }: { p: any; currency: string }) {
           {save > 0 && <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 ring-1 ring-emerald-200">Save {save}% yearly</span>}
         </div>
       </div>
+      {p.isHosting && p.freeDomain && (
+        <div className="mx-6 mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[12.5px] font-bold text-emerald-800 ring-1 ring-emerald-200">
+          <Icon name="redeem" className="text-[18px] text-emerald-600" />
+          <span>{freeDomainText(p.freeDomain, CYCLES)}</span>
+        </div>
+      )}
       <div className="mx-6 border-t border-dashed border-line" />
       {rows.length ? (
         <dl className="space-y-0 px-6 py-4 text-[13px]">
@@ -161,10 +175,18 @@ function Catalog() {
   const { currency } = useCurrency();
   const groups = (data?.groups ?? []).filter((g: any) => g.products.length);
   const [group, setGroup] = useState<string>(sp.get("group") ?? "");
+  // old WHMCS links: cart.php?a=add&pid=2 (straight to the plan) and cart.php?gid=3 (a group)
+  const pid = sp.get("pid");
   useEffect(() => {
-    if (!group && groups.length) setGroup(groups[0].slug);
+    if (pid) router.replace(`/order/configure?${sp.toString()}`);
+  }, [pid]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const gid = Number(sp.get("gid"));
+    const byGid = gid ? groups.find((x: any) => x.legacyGid === gid) : null;
+    if (byGid) setGroup(byGid.slug);
+    else if ((!group || !groups.some((x: any) => x.slug === group)) && groups.length) setGroup(groups[0].slug);
   }, [groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (loading || !data) return <Loading />;
+  if (loading || !data || pid) return <Loading />;
   const g = groups.find((x: any) => x.slug === group) ?? groups[0];
   const choose = (slug: string) => {
     setGroup(slug);
@@ -205,7 +227,16 @@ function Catalog() {
               <p className="text-sm text-white/75">{g.headline || g.description || "Choose the plan that fits — upgrade any time."}</p>
             </div>
             <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] font-semibold text-white/85">
-              {(g.products[0]?.isVps ? ["Instant setup", "Full root access", "DDoS protection", "NVMe SSD"] : ["Free SSL", "cPanel included", "Daily backups", "LiteSpeed"]).map((t) => (
+              {(g.products.every((x: any) => x.isVps)
+                ? ["Instant setup", "Full root access", "DDoS protection", "NVMe SSD"]
+                : g.products.every((x: any) => x.isHosting)
+                  ? g.products.every((x: any) => x.type === "RESELLER_HOSTING")
+                    ? ["WHM + cPanel", "Sell under your brand", "Free SSL", "24/7 support"]
+                    : g.products.every((x: any) => x.type === "WORDPRESS")
+                      ? ["WordPress ready", "Free SSL", "cPanel included", "24/7 support"]
+                      : ["Free SSL", "cPanel included", "Your domain, set up for you", "24/7 support"]
+                  : ["Fast setup", "24/7 expert support", "GST invoice"]
+              ).map((t) => (
                 <li key={t} className="flex items-center gap-1.5"><Icon name="verified" className="text-[16px] text-emerald-300" />{t}</li>
               ))}
             </ul>

@@ -14,6 +14,8 @@ import { getSettings } from "../lib/settings";
 import { addInvoiceItemsTx, createInvoice, invoiceEmailVars, applyCreditToInvoice, cancelInvoice, type NewInvoiceItem } from "../modules/billing/invoices";
 import { queueEmail } from "../modules/email/mailer";
 import { enqueueProvision } from "./queues";
+import { qualifiesForFreeDomain } from "../lib/product-kind";
+import { jsonPrice, priceResolver } from "../lib/currency";
 
 const dayDiff = (a: Date, b: Date) => Math.round((istDayStart(a).getTime() - istDayStart(b).getTime()) / 86400000);
 const invNo = (i: { number: string | null; proformaNumber: string }) => i.number ?? i.proformaNumber;
@@ -84,10 +86,13 @@ export async function generateRenewalInvoices(opts: { userId?: string; rec?: Rec
       const periodStart = d.nextDueDate!;
       const exists = await prisma.invoiceItem.count({ where: { relId: d.id, type: "DOMAIN", periodStart, invoice: { status: { notIn: ["CANCELLED"] } } } });
       if (exists) continue;
+      const price = await domainRenewalPrice(d);
       const inv = await prisma.$transaction((tx) =>
-        createInvoice(tx, { userId: d.userId, dueDate: periodStart, currency: d.currency, items: [{ type: "DOMAIN", relId: d.id, description: `Domain renewal — ${d.name} (1 yr)`, unitPrice: d.recurringAmount, periodStart, periodEnd: addMonths(periodStart, 12) }] }),
+        createInvoice(tx, { userId: d.userId, dueDate: periodStart, currency: d.currency, items: [{ type: "DOMAIN", relId: d.id, description: `Domain renewal — ${d.name} (1 yr)${price.freeWith ? ` — free with ${price.freeWith}` : ""}`, unitPrice: price.amount, periodStart, periodEnd: addMonths(periodStart, 12) }] }),
       );
       created++;
+      // a free renewal is "paid" straight away — renew it now
+      if (inv.status === "PAID") await (await import("../modules/billing/hooks")).onInvoicePaid(inv.id);
       await rec({ action: "invoice_created", entity: "invoice", entityId: inv.id, userId: d.userId, label: `${invNo(inv)} · ${d.name}`, message: "Domain renewal" });
       if (a.invoiceCreatedEmail) await queueEmail("invoice.created", d.user.email, invoiceEmailVars(inv, d.user.firstName), d.userId);
     } catch (e) {
@@ -235,6 +240,24 @@ export async function cancelUnpaidOrders(rec: Recorder = noop) {
     }
   }
   return cancelled;
+}
+
+/**
+ * Renewal price for a domain. A domain that came free with a hosting plan ("recurring" free domain) stays
+ * free only while that plan is active on a qualifying cycle; otherwise it renews at the normal price.
+ */
+export async function domainRenewalPrice(d: { name: string; userId: string; currency: string; recurringAmount: number }): Promise<{ amount: number; freeWith?: string }> {
+  if (d.recurringAmount > 0) return { amount: d.recurringAmount };
+  const host = await prisma.service.findFirst({
+    where: { userId: d.userId, hostname: d.name, status: { in: ["ACTIVE", "SUSPENDED"] }, product: { freeDomain: "recurring" } },
+    include: { product: true },
+  });
+  if (host && qualifiesForFreeDomain(host.product, host.billingCycle, d.name)) return { amount: 0, freeWith: host.product.name };
+  const tld = "." + d.name.split(".").slice(1).join(".");
+  const pr = await prisma.domainPricing.findUnique({ where: { tld } });
+  if (!pr) throw new Error(`No price for ${tld} renewals — set it in Domain pricing`);
+  const r = await priceResolver(d.currency);
+  return { amount: r.must(pr.renew, jsonPrice(pr.prices, r.currency.code, "renew"), `${tld} renewals`) };
 }
 
 export async function domainExpiryAlerts(rec: Recorder = noop) {

@@ -5,6 +5,7 @@ import { CYCLE_LABEL, CYCLE_MONTHS } from "../../lib/money";
 import { getSettings } from "../../lib/settings";
 import { computeGst } from "../billing/gst";
 import { BASE_CURRENCY, jsonPrice, priceResolver } from "../../lib/currency";
+import { qualifiesForFreeDomain } from "../../lib/product-kind";
 
 type Resolver = Awaited<ReturnType<typeof priceResolver>>;
 
@@ -67,6 +68,8 @@ export type Cart = z.infer<typeof cartSchema>;
 export interface PricedLine {
   kind: "product" | "setup" | "addon" | "domain" | "promo";
   description: string;
+  /** domain included free with a hosting plan in the same cart */
+  freeWith?: string;
   productId?: string;
   itemIndex?: number;
   domainIndex?: number;
@@ -170,13 +173,22 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
     if (item.osTemplateId && !p.osTemplates.some((o) => o.osTemplateId === item.osTemplateId)) throw badRequest(`Selected OS is not available for ${p.name}`);
   }
 
+  // each hosting plan in the cart can include one free domain (WHMCS "free domain" — the plan's own domain)
+  const freeUsed = new Set<number>();
   for (const [idx, d] of cart.domains.entries()) {
     const tld = "." + d.name.split(".").slice(1).join(".");
     const pr = await db.domainPricing.findUnique({ where: { tld } });
     if (!pr || !pr.enabled) throw badRequest(`We don't sell ${tld} domains yet`);
     const unit = r.must(d.action === "register" ? pr.register : pr.transfer, jsonPrice(pr.prices, code, d.action), `${tld} domains`);
     const renew = r.must(pr.renew, jsonPrice(pr.prices, code, "renew"), `${tld} renewals`);
-    lines.push({ kind: "domain", description: `Domain ${d.action === "register" ? "registration" : "transfer"} — ${d.name} (${d.years} yr)`, domainIndex: idx, amount: unit * d.years, recurring: renew, taxable: true, hsnSac: settings.tax.domainSac });
+    const host = opts.wholesale ? -1 : cart.items.findIndex((it, i) => !freeUsed.has(i) && (it.hostname ?? "").toLowerCase() === d.name && qualifiesForFreeDomain(products[i], it.cycle, d.name));
+    const label = `Domain ${d.action === "register" ? "registration" : "transfer"} — ${d.name} (${d.years} yr)`;
+    if (host >= 0) {
+      freeUsed.add(host);
+      const p = products[host];
+      // first year free; extra years at the renewal price; "recurring" keeps renewals free while the plan is kept
+      lines.push({ kind: "domain", description: `${label} — free with ${p.name}`, domainIndex: idx, amount: renew * (d.years - 1), recurring: p.freeDomain === "recurring" ? 0 : renew, taxable: true, hsnSac: settings.tax.domainSac, freeWith: p.name });
+    } else lines.push({ kind: "domain", description: label, domainIndex: idx, amount: unit * d.years, recurring: renew, taxable: true, hsnSac: settings.tax.domainSac });
   }
 
   // promo code

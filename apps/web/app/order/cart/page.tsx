@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, CYCLES, money } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { readCart, toApiCart, writeCart, type Cart } from "@/lib/cart";
-import { Alert, Button, Card, Empty, Icon, Input, Loading, toast } from "@/components/ui";
+import { Alert, Button, Card, Empty, Icon, Input, Loading, cx, toast } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
 import { PasswordField, passwordProblem } from "@/components/password-field";
 import { CurrencySwitch, readCurrency, useCurrency } from "@/lib/currency";
@@ -66,7 +66,7 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-10 sm:px-6">
-      <OrderSteps step={3} />
+      <OrderSteps step={cart.items.some((i) => i.domainAction) ? 4 : 3} hosting={cart.items.some((i) => i.domainAction)} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight text-ink">Review your order</h1>
         <CurrencySwitch billing />
@@ -77,8 +77,8 @@ export default function CartPage() {
       {empty ? (
         <Card><Empty icon="shopping_cart" title="Your cart is empty"><Button href="/order" className="mt-4">Browse plans</Button></Empty></Card>
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-          <div className="space-y-4">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0 space-y-4">
             {expired && <Alert tone="warn">An IP reservation in your cart has expired. Remove the item and pick the IP again, or check out and we'll assign the next free address.</Alert>}
             {cart.items.map((i) => {
               const left = i.ipExpiresAt ? Math.max(0, Math.floor((new Date(i.ipExpiresAt).getTime() - Date.now()) / 1000)) : null;
@@ -90,7 +90,14 @@ export default function CartPage() {
                       <div>
                         <div className="font-extrabold text-ink">{i.productName}</div>
                         <div className="text-sm text-mute">{CYCLES[i.cycle]}{i.location ? ` · ${i.location}` : ""}{i.osName ? ` · ${i.osName}` : ""}</div>
-                        {i.hostname && <div className="text-sm text-mute">{i.hostname}</div>}
+                        {i.hostname && !i.domainAction && <div className="text-sm text-mute">{i.hostname}</div>}
+                        {i.domainAction && i.hostname && (
+                          <div className="mt-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-[#faf7ff] px-2.5 py-1 text-[12.5px] ring-1 ring-[#ede4ff]">
+                            <Icon name="language" className="text-[15px] text-primary-dark" />
+                            <span className="break-all font-bold text-ink">{i.hostname}</span>
+                            <span className="text-mute">· {i.domainAction === "register" ? "registering with this order" : i.domainAction === "transfer" ? "transferring with this order" : "your existing domain"}</span>
+                          </div>
+                        )}
                         {i.ipAddress && (
                           <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary-tint px-2.5 py-1 text-xs font-bold text-primary-dark ring-1 ring-[#e9d5ff]">
                             <Icon name="lock" className="text-[15px]" /> {i.ipAddress}
@@ -99,7 +106,18 @@ export default function CartPage() {
                         )}
                       </div>
                     </div>
-                    <button className="text-sm font-bold text-rose-600 hover:underline" onClick={() => { if (i.ipId) api(`/catalog/ips/${i.ipId}/reserve`, { method: "DELETE" }).catch(() => {}); update({ ...cart, items: cart.items.filter((x) => x.key !== i.key) }); }}>Remove</button>
+                    <button
+                      className="text-sm font-bold text-rose-600 hover:underline"
+                      onClick={() => {
+                        if (i.ipId) api(`/catalog/ips/${i.ipId}/reserve`, { method: "DELETE" }).catch(() => {});
+                        // the domain picked for this hosting goes with it
+                        const linked = cart.domains.filter((d) => d.forItem === i.key);
+                        update({ ...cart, items: cart.items.filter((x) => x.key !== i.key), domains: cart.domains.filter((d) => d.forItem !== i.key) });
+                        if (linked.length) toast.info(`${linked.map((d) => d.name).join(", ")} was removed too`);
+                      }}
+                    >
+                      Remove
+                    </button>
                   </div>
                   {i.osTemplateId && (
                     <div className="mt-4 border-t border-line pt-4">
@@ -110,14 +128,38 @@ export default function CartPage() {
                 </Card>
               );
             })}
-            {cart.domains.map((d) => (
-              <Card key={d.name}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary-dark"><Icon name="language" /></span><div><div className="font-extrabold text-ink">{d.name}</div><div className="text-sm capitalize text-mute">{d.action} · {d.years} year</div></div></div>
-                  <button className="text-sm font-bold text-rose-600" onClick={() => update({ ...cart, domains: cart.domains.filter((x) => x.name !== d.name) })}>Remove</button>
-                </div>
-              </Card>
-            ))}
+            {cart.domains.map((d) => {
+              const host = d.forItem ? cart.items.find((x) => x.key === d.forItem) : null;
+              const setDomain = (patch: Partial<typeof d>) => update({ ...cart, domains: cart.domains.map((x) => (x.name === d.name ? { ...x, ...patch } : x)) });
+              return (
+                <Card key={d.name}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary-dark"><Icon name={d.action === "transfer" ? "swap_horiz" : "language"} /></span>
+                      <div className="min-w-0">
+                        <div className="break-all font-extrabold text-ink">{d.name}</div>
+                        <div className="text-sm text-mute">{d.action === "transfer" ? "Domain transfer" : `Domain registration · ${d.years} year${d.years > 1 ? "s" : ""}`}{host ? ` · for ${host.productName}` : ""}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {d.action === "register" && (
+                        <select value={d.years} onChange={(e) => setDomain({ years: Number(e.target.value) })} className="h-9 rounded-lg border border-line bg-white px-2 text-sm font-semibold" aria-label="Years">
+                          {[1, 2, 3, 5].map((y) => <option key={y} value={y}>{y} yr</option>)}
+                        </select>
+                      )}
+                      {!host && <button className="text-sm font-bold text-rose-600 hover:underline" onClick={() => update({ ...cart, domains: cart.domains.filter((x) => x.name !== d.name) })}>Remove</button>}
+                    </div>
+                  </div>
+                  {d.action === "transfer" && (
+                    <div className="mt-4 border-t border-line pt-4">
+                      <div className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-ink"><Icon name="key" className="text-[18px] text-primary-dark" />EPP / authorisation code</div>
+                      <Input value={d.eppCode ?? ""} onChange={(e) => setDomain({ eppCode: e.target.value.trim() || undefined })} placeholder="From your current registrar" />
+                      <p className="mt-1 text-xs text-mute">Optional now — you can send it from your client area later. Unlock the domain at your current registrar too.</p>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
             <Link href="/order" className="inline-flex items-center gap-1 text-sm font-bold text-primary-dark"><Icon name="add" className="text-[18px]" /> Add another service</Link>
           </div>
 
@@ -132,7 +174,7 @@ export default function CartPage() {
               {!quote ? <Loading /> : (
                 <dl className="space-y-2 text-sm">
                   {quote.lines.map((l: any, idx: number) => (
-                    <div key={idx} className="flex justify-between gap-3"><dt className="text-mute">{l.description.split("\n")[0]}</dt><dd className={l.amount < 0 ? "font-semibold text-emerald-600" : "font-semibold"}>{l.amount < 0 ? "−" : ""}{cm(Math.abs(l.amount))}</dd></div>
+                    <div key={idx} className="flex justify-between gap-3"><dt className="min-w-0 break-words text-mute">{l.description.split("\n")[0]}</dt><dd className={cx("shrink-0", l.amount < 0 || l.freeWith ? "font-semibold text-emerald-600" : "font-semibold")}>{l.freeWith && l.amount === 0 ? "FREE" : `${l.amount < 0 ? "−" : ""}${cm(Math.abs(l.amount))}`}</dd></div>
                   ))}
                   {quote.totals.cgst > 0 && <div className="flex justify-between"><dt className="text-mute">CGST 9%</dt><dd className="font-semibold">{cm(quote.totals.cgst)}</dd></div>}
                   {quote.totals.sgst > 0 && <div className="flex justify-between"><dt className="text-mute">SGST 9%</dt><dd className="font-semibold">{cm(quote.totals.sgst)}</dd></div>}

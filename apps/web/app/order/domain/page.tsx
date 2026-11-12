@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, money } from "@/lib/api";
 import { readCart, writeCart } from "@/lib/cart";
@@ -18,9 +18,20 @@ export default function DomainSearch() {
   const [years, setYears] = useState(1);
   const [epp, setEpp] = useState("");
 
+  // links from the website / old WHMCS: ?query=name.com or ?sld=name&tld=.com
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search);
+    const sld = u.get("sld"), tld = u.get("tld");
+    const pre = (u.get("query") ?? (sld ? `${sld}${tld ? (tld.startsWith(".") ? tld : `.${tld}`) : ""}` : "")).trim();
+    if (pre) { setQ(pre); run(pre); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function search(e: React.FormEvent) {
     e.preventDefault();
-    let name = q.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
+    run(q);
+  }
+  async function run(raw: string) {
+    let name = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
     if (name && !name.includes(".")) name += ".in";
     setBusy(true);
     setErr(null);

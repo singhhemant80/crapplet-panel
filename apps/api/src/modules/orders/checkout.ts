@@ -8,6 +8,7 @@ import { attachReservationToOrder } from "../ipam/service";
 import { queueEmail } from "../email/mailer";
 import { enqueueProvision } from "../../jobs/queues";
 import { priceCart, type Cart } from "./pricing";
+import { DOMAIN_RE, HOSTING_TYPES, isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 
 export async function checkout(args: { userId: string; cart: Cart; ip?: string; notes?: string; useCredit?: boolean; resellerId?: string | null; wholesaleDiscountPct?: number | null; extraConfig?: Record<string, unknown> }) {
   const ownerId = args.userId;
@@ -40,15 +41,17 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
           const r = await tx.product.updateMany({ where: { id: p.id, stockQty: { gte: item.quantity } }, data: { stockQty: { decrement: item.quantity } } });
           if (!r.count) throw conflict(`${p.name} is out of stock`);
         }
-        const isVps = p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR";
+        const isVps = isVpsProduct(p);
         if (isVps && !item.osTemplateId && p.osTemplates.length) throw badRequest(`Please choose an operating system for ${p.name}`);
         if (item.ipId && (!p.allowIpSelection || p.provisioner === "VIRTUALIZOR")) throw badRequest(`${p.name} does not support choosing an IP address — IPs are assigned by Virtualizor`);
         if (item.ipId && item.quantity > 1) throw badRequest("A selected IP can only be used for a single server");
-        if (p.provisioner === "CPANEL") {
+        if (isHostingProduct(p)) {
+          // hosting is ordered for a domain (WHMCS: "Choose a domain")
           const d = (item.hostname ?? "").trim().toLowerCase();
-          if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) throw badRequest(`Enter the domain name for ${p.name} (e.g. example.com)`);
+          if (!DOMAIN_RE.test(d)) throw badRequest(`Choose the domain for ${p.name} (e.g. example.com)`);
           if (item.quantity > 1) throw badRequest(`Order ${p.name} once per domain`);
-          const taken = await tx.service.findFirst({ where: { hostname: d, product: { provisioner: "CPANEL" }, status: { in: ["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED"] } }, select: { id: true } });
+          if (args.cart.items.some((x, i) => i !== idx && (x.hostname ?? "").toLowerCase() === d && priced.products[i] && isHostingProduct(priced.products[i]))) throw badRequest(`${d} is in your cart twice — one hosting plan per domain`);
+          const taken = await tx.service.findFirst({ where: { hostname: d, OR: [{ product: { provisioner: "CPANEL" } }, { product: { type: { in: [...HOSTING_TYPES] } } }], status: { in: ["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED"] } }, select: { id: true } });
           if (taken) throw conflict(`${d} already has a hosting account with us`);
         }
 

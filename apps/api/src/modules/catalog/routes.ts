@@ -7,6 +7,7 @@ import { listAvailableIps, releaseIpReservation, reserveIp } from "../ipam/servi
 import { cartSchema, priceCart } from "../orders/pricing";
 import { checkout } from "../orders/checkout";
 import { checkDomain } from "../domains/service";
+import { isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 import { BASE_CURRENCY, jsonPrice, listCurrencies, priceResolver } from "../../lib/currency";
 
 type Resolvers = Awaited<ReturnType<typeof priceResolver>>[];
@@ -61,8 +62,10 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
     imageUrl: p.imageUrl,
     group: p.group ? { name: p.group.name, slug: p.group.slug } : undefined,
     specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4Count: p.ipv4Count, ipv6: p.ipv6Enabled, virtType: p.virtType },
-    isVps: p.provisioner === "PROXMOX" || p.provisioner === "VIRTUALIZOR",
-    isHosting: p.provisioner === "CPANEL",
+    isVps: isVpsProduct(p),
+    // shared / reseller / WordPress plans are ordered with a domain first, whichever way they're set up
+    isHosting: isHostingProduct(p),
+    freeDomain: p.freeDomain === "once" || p.freeDomain === "recurring" ? { type: p.freeDomain, cycles: p.freeDomainCycles, tlds: p.freeDomainTlds } : null,
     allowIpSelection: p.allowIpSelection && p.provisioner !== "VIRTUALIZOR",
     requireHostname: p.requireHostname,
     featured: p.featured,
@@ -101,7 +104,7 @@ catalogRouter.get(
       include: { products: { where: { enabled: true, hidden: false }, orderBy: { sortOrder: "asc" }, include: { ...productInclude, group: true } } },
     });
     const rs = await resolvers();
-    res.json({ groups: groups.map((g) => ({ id: g.id, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map((p) => publicProduct(p, rs)) })) });
+    res.json({ groups: groups.map((g) => ({ id: g.id, legacyGid: g.legacyGid, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map((p) => publicProduct(p, rs)) })) });
   }),
 );
 
@@ -173,6 +176,37 @@ catalogRouter.get(
     const row = await prisma.domainPricing.findUnique({ where: { tld: r.tld } });
     const rs = await resolvers();
     res.json({ ...r, prices: { register: perCurrency(rs, r.pricing.register, row?.prices, "register"), transfer: perCurrency(rs, r.pricing.transfer, row?.prices, "transfer"), renew: perCurrency(rs, r.pricing.renew, row?.prices, "renew") } });
+  }),
+);
+
+/**
+ * Domain search for the hosting order step: the name asked for plus the same name on other TLDs we sell
+ * (like WHMCS's "suggestions"). `name` may be a bare word ("mybrand") or a full domain.
+ */
+catalogRouter.get(
+  "/domains/search",
+  ah(async (req, res) => {
+    const { name } = parse(z.object({ name: z.string().trim().toLowerCase().max(80) }), req.query);
+    const clean = name.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+    const sld = clean.split(".")[0];
+    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(sld)) throw badRequest("Use letters, numbers and hyphens only, like mybusiness");
+    const tlds = await prisma.domainPricing.findMany({ where: { enabled: true }, orderBy: [{ register: "asc" }] });
+    if (!tlds.length) throw badRequest("Domain registration isn't available yet");
+    const asked = clean.includes(".") ? clean : `${sld}${tlds[0].tld}`;
+    const askedTld = "." + asked.split(".").slice(1).join(".");
+    const names = [asked, ...tlds.filter((t) => t.tld !== askedTld).slice(0, 7).map((t) => `${sld}${t.tld}`)];
+    const rs = await resolvers();
+    const results = await Promise.all(
+      names.map(async (n) => {
+        const r = await checkDomain(n).catch(() => ({ name: n, tld: "." + n.split(".").slice(1).join("."), available: null as boolean | null, pricing: null }));
+        const row = tlds.find((t) => t.tld === r.tld);
+        return {
+          ...r,
+          prices: row ? { register: perCurrency(rs, row.register, row.prices, "register"), transfer: perCurrency(rs, row.transfer, row.prices, "transfer"), renew: perCurrency(rs, row.renew, row.prices, "renew") } : null,
+        };
+      }),
+    );
+    res.json({ query: asked, result: results[0], suggestions: results.slice(1).filter((r) => r.pricing && r.available !== false) });
   }),
 );
 
