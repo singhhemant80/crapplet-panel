@@ -62,7 +62,7 @@
       ['Tally on Cloud', 'Access Tally securely from anywhere', '/tally-on-cloud.html', 'calculate', 'tally accounting erp gst'],
       ['Dedicated Servers', 'Bare-metal servers, fully yours', '/dedicated-hosting.html', 'dns', 'dedicated bare metal server'],
       ['GPU Servers', 'NVIDIA H100, A100, L40S & RTX GPUs', '/gpu-server.html', 'memory', 'gpu ai ml nvidia h100 a100 deep learning'],
-      ['Colocation', 'Tier III data centre in Gwalior', '/colocation.html', 'hub', 'colo rack data centre datacenter'],
+      ['Colocation', 'Tier III data centre in Noida', '/colocation.html', 'hub', 'colo rack data centre datacenter'],
       ['DDoS Protection', 'Always-on protection for your services', '/ddos-protection.html', 'security', 'ddos attack firewall protection'],
       ['Domain Names', 'Register and transfer domains', '/domain.html', 'language', 'domain register transfer dns'],
       ['Contact & Support', 'Talk to our team, 24/7', '/contact.html', 'headset_mic', 'support help contact sales ticket'],

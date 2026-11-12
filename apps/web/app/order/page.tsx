@@ -199,7 +199,7 @@ function Catalog() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">Choose your plan</h1>
-          <p className="mt-2 max-w-2xl text-mute">Deployed automatically after payment on our Tier III network in Gwalior, India. {currency === "INR" ? "Prices exclude 18% GST — you get a GST invoice with your GSTIN." : "Prices in US dollars, no Indian GST for customers outside India."}</p>
+          <p className="mt-2 max-w-2xl text-mute">Deployed automatically after payment from our Tier III data centre in Noida, India (Mumbai coming soon). {currency === "INR" ? "Prices exclude 18% GST — you get a GST invoice with your GSTIN." : "Prices in US dollars, no Indian GST for customers outside India."}</p>
         </div>
         <CurrencySwitch />
       </div>

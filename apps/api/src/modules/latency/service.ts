@@ -20,8 +20,15 @@ const CFG = "brokerLatency";
 const RES = "brokerLatencyResults";
 const HISTORY = 60; // one hour at one sample a minute
 
-// Vantage is listed from the start; it is measured (and shown) once staff enter its trade server address
-const DEFAULTS: LatencyConfig = { enabled: true, measuredFrom: "our Gwalior data centre", brokers: [{ id: "vantage", name: "Vantage", host: "", port: 443, enabled: true }] };
+// The major brokers are listed from the start. Each is measured (and shown on the website) once staff
+// add its trade server address — brokers don't publish these, so they come from a logged-in MT4/MT5
+// terminal (the admin page has a script that reads them off a Windows VPS).
+const MAJOR = ["Vantage", "Exness", "IC Markets", "XM", "Pepperstone", "FXTM", "OANDA", "FBS"];
+const DEFAULTS: LatencyConfig = {
+  enabled: true,
+  measuredFrom: "our Noida data centre",
+  brokers: MAJOR.map((name) => ({ id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, host: "", port: 443, enabled: true })),
+};
 
 export async function getLatencyConfig(): Promise<LatencyConfig> {
   const row = await prisma.setting.findUnique({ where: { key: CFG } });

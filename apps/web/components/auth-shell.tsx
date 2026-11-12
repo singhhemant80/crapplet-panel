@@ -27,7 +27,7 @@ export function AuthShell({ title, subtitle, children, wide, eyebrow = "Client a
             <h2 className="mt-6 text-[30px] font-extrabold leading-tight tracking-tight">
               Cloud servers from
               <br />
-              <span className="bg-gradient-to-r from-white to-violet-200 bg-clip-text text-transparent">Gwalior to the world.</span>
+              <span className="bg-gradient-to-r from-white to-violet-200 bg-clip-text text-transparent">Noida to the world.</span>
             </h2>
             <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-violet-100/85">One account for your VPS, hosting, domains, invoices and 24/7 support.</p>
           </div>

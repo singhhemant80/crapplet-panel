@@ -116,7 +116,7 @@ const GROUPS: { name: string; slug: string; headline: string; type: ProductType;
   { name: "Dedicated Servers", slug: "dedicated-servers", headline: "Bare-metal servers, fully yours", type: "DEDICATED", provisioner: "MANUAL", os: "none", plans: [] },
   { name: "GPU Cloud Servers", slug: "gpu-servers", headline: "NVIDIA H100, A100, L40S & RTX GPUs", type: "GPU", provisioner: "MANUAL", os: "none", plans: [] },
   {
-    name: "Colocation", slug: "colocation", headline: "Tier III data centre in Gwalior", type: "COLOCATION", provisioner: "MANUAL", os: "none",
+    name: "Colocation", slug: "colocation", headline: "Tier III data centre in Noida", type: "COLOCATION", provisioner: "MANUAL", os: "none",
     plans: [
       { pid: 40, name: "Colocation Single U", slug: "colo-1u", tagline: "Perfect for single servers — 1U, 1 TB bandwidth, 5 IPs", monthly: 5500 },
       { pid: 42, name: "Colocation Half Rack", slug: "colo-half-rack", tagline: "20U rack space, 5 TB bandwidth, 16 IPs", monthly: 25000 },
@@ -176,7 +176,7 @@ async function main() {
   }
 
   // location
-  const gwl = await prisma.location.upsert({ where: { code: "GWL" }, update: {}, create: { name: "Gwalior, India", code: "GWL", country: "IN" } });
+  const gwl = await prisma.location.upsert({ where: { code: "NOI" }, update: {}, create: { name: "Noida, India", code: "NOI", country: "IN" } });
 
   // catalogue
   for (const [gi, g] of GROUPS.entries()) {
@@ -238,10 +238,10 @@ async function main() {
 
   if (demo) {
     console.log("  Adding demo data (dry-run Proxmox server, test subnet, demo client)…");
-    let server = await prisma.server.findFirst({ where: { name: "PVE Gwalior 1 (demo)" } });
+    let server = await prisma.server.findFirst({ where: { name: { in: ["PVE Noida 1 (demo)", "PVE Gwalior 1 (demo)"] } } });
     if (!server)
       server = await prisma.server.create({
-        data: { name: "PVE Gwalior 1 (demo)", type: "PROXMOX", locationId: gwl.id, hostname: "pve1.example.invalid", port: 8006, apiUser: "billing@pve!crapplet", apiSecretEnc: encrypt("00000000-0000-0000-0000-000000000000"), verifyTls: false, storage: "local-lvm", bridge: "vmbr0" },
+        data: { name: "PVE Noida 1 (demo)", type: "PROXMOX", locationId: gwl.id, hostname: "pve1.example.invalid", port: 8006, apiUser: "billing@pve!crapplet", apiSecretEnc: encrypt("00000000-0000-0000-0000-000000000000"), verifyTls: false, storage: "local-lvm", bridge: "vmbr0" },
       });
     const vpsProducts = await prisma.product.findMany({ where: { provisioner: "PROXMOX" } });
     await prisma.productServer.createMany({ data: vpsProducts.map((p) => ({ productId: p.id, serverId: server!.id })), skipDuplicates: true });

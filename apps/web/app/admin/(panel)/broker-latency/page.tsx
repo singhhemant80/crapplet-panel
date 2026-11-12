@@ -7,6 +7,45 @@ import { Ago } from "@/components/admin/list-kit";
 const SUGGEST = ["IC Markets", "Exness", "XM", "Pepperstone", "FXTM", "OANDA", "FBS", "Vantage", "Deriv", "AvaTrade", "Tickmill", "RoboForex"];
 type Row = { id?: string; name: string; host: string; port: number | string; region?: string; enabled: boolean; result?: any };
 
+const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Runs on a Windows VPS with MT4/MT5 logged in: prints each terminal's broker server and the IP:port it trades through. */
+const SCRIPT = "# Crapplet - find broker trade servers. Run in PowerShell on a Windows VPS\n# with MT4/MT5 open and logged in to each broker (demo accounts are fine).\n$found = @()\nforeach ($p in Get-Process terminal, terminal64 -ErrorAction SilentlyContinue) {\n  $server = ($p.MainWindowTitle -split '\\s+-\\s+|:\\s+') | Where-Object { $_ -match '^[A-Za-z][\\w.]*-[\\w.\\- ]+$' } | Select-Object -First 1\n  if (-not $server) { continue }\n  Get-NetTCPConnection -OwningProcess $p.Id -State Established -ErrorAction SilentlyContinue |\n    Where-Object { $_.RemoteAddress -notmatch '^(127\\.|::1|0\\.|10\\.|192\\.168\\.)' } |\n    ForEach-Object {\n      $ptr = (Resolve-DnsName $_.RemoteAddress -Type PTR -ErrorAction SilentlyContinue | Select-Object -First 1).NameHost\n      if ($ptr -notmatch 'mql5|metaquotes') { $found += \"$server`t$($_.RemoteAddress)`t$($_.RemotePort)\" }\n    }\n}\nif ($found) { $found | Sort-Object -Unique } else { \"No logged-in MT4/MT5 terminals found - open them and log in first.\" }";
+
+function FinderCard({ onImport }: { onImport: (found: { server: string; ip: string; port: number }[]) => void }) {
+  const [text, setText] = useState("");
+  const parse = () => {
+    const seen = new Set<string>();
+    const out: { server: string; ip: string; port: number }[] = [];
+    for (const line of text.split(/\r?\n/)) {
+      const [server, ip, port] = line.split(/\t|\s*\|\s*|\s*,\s*/).map((x) => x?.trim());
+      if (!server || !ip || !/^[\d.]+$|^[0-9a-f:]+$/i.test(ip)) continue;
+      if (seen.has(server)) continue; // one address per broker server
+      seen.add(server);
+      out.push({ server, ip, port: Number(port) || 443 });
+    }
+    if (!out.length) return toast.error("Nothing found — paste the lines the script printed");
+    onImport(out);
+    setText("");
+  };
+  return (
+    <Card title="Find brokers' trade servers">
+      <ol className="list-decimal space-y-2 pl-5 text-[13px] leading-5 text-slate-600">
+        <li>On a Windows VPS <b>in your data centre</b>, open MT4/MT5 and log in to each broker (free demo accounts work).</li>
+        <li>Open <b>PowerShell</b>, paste this script and press Enter:</li>
+      </ol>
+      <div className="relative mt-2">
+        <pre className="max-h-40 overflow-auto rounded-xl bg-slate-900 p-3 pr-10 text-[10.5px] leading-relaxed text-slate-100">{SCRIPT}</pre>
+        <button onClick={() => navigator.clipboard?.writeText(SCRIPT).then(() => toast.success("Script copied"))} aria-label="Copy script" className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md bg-white/10 text-white hover:bg-white/20"><Icon name="content_copy" className="text-[16px]" /></button>
+      </div>
+      <p className="mt-3 text-[13px] text-slate-600">3. Paste what it prints here:</p>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder={"ICMarketsSC-MT5-6\t203.0.113.10\t443\nExness-MT5Real8\t198.51.100.7\t443"} className="mt-1 w-full rounded-xl border border-line bg-white p-2.5 font-mono text-[11.5px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/15" />
+      <Button size="sm" variant="secondary" icon="download" className="mt-2" disabled={!text.trim()} onClick={parse}>Fill in addresses</Button>
+      <p className="mt-3 text-[11.5px] leading-4 text-mute">Brokers don't publish these addresses and website addresses (broker.com) are CDNs, not trade servers — so they're read from a logged-in terminal. Times shown are TCP connection times (what MT4/MT5 shows as ping), every 60 s, median of 3.</p>
+    </Card>
+  );
+}
+
 const tone = (ms: number | null | undefined) => (ms == null ? "text-slate-400" : ms < 30 ? "text-emerald-600" : ms < 120 ? "text-amber-600" : "text-rose-600");
 
 /** Tiny line chart of the last hour. */
@@ -148,21 +187,24 @@ export default function BrokerLatency() {
           <Card title="Website">
             <div className="space-y-4">
               <Toggle checked={enabled} onChange={setEnabled} label="Show live latency on the Forex VPS page" />
-              <Field label="Measured from" hint="Shown under the numbers, e.g. “Measured live from our Gwalior data centre”">
-                <Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="our Gwalior data centre" />
+              <Field label="Measured from" hint="Shown under the numbers, e.g. “Measured live from our Noida data centre”">
+                <Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="our Noida data centre" />
               </Field>
               <Alert tone="info">Measured from <b>this panel server</b>. If your VPS nodes are in another data centre, run the panel there or say where the numbers come from above.</Alert>
             </div>
           </Card>
-          <Card title="Finding a broker's trade server">
-            <ol className="list-decimal space-y-2 pl-5 text-[13px] leading-5 text-slate-600">
-              <li>On any Windows VPS, open MT4/MT5 and log in to the broker (a demo account is fine).</li>
-              <li>Open Command Prompt and run <code className="rounded bg-slate-100 px-1">netstat -n | findstr ESTABLISHED</code>.</li>
-              <li>The terminal's connection is the remote address on port <b>443</b> (MT5) or <b>443 / 1950</b> (MT4). Enter that IP and port here.</li>
-              <li>Click <b>Test</b> — a number means the server answers from here.</li>
-            </ol>
-            <p className="mt-3 text-[12px] text-mute">Website addresses like broker.com don't work — they're served from a CDN, not the trading server. Times are TCP connection times (what MT4/MT5 shows as ping), taken every 60 seconds; the page shows the median of 3 tries.</p>
-          </Card>
+          <FinderCard onImport={(found) => {
+            // fill in matching brokers (by name, e.g. "IC Markets" ↔ "ICMarketsSC-MT5-6"), add the rest
+            const next = [...rows];
+            let filled = 0, added = 0;
+            for (const f of found) {
+              const i = next.findIndex((r) => r.name && norm(f.server).includes(norm(r.name)));
+              if (i >= 0) { if (next[i].host !== f.ip || Number(next[i].port) !== f.port) { next[i] = { ...next[i], host: f.ip, port: f.port }; filled++; } }
+              else { next.push({ name: f.server.split("-")[0].replace(/([a-z])([A-Z])/g, "$1 $2"), host: f.ip, port: f.port, enabled: true }); added++; }
+            }
+            setRows(next);
+            toast.success(`${filled} filled in, ${added} added — check them, then Save & measure`);
+          }} />
         </div>
       </div>
     </>
