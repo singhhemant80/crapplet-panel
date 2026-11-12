@@ -701,7 +701,7 @@ tailwind.config = {
       <p class="text-slate-600 max-w-2xl mx-auto">Every plan includes NVMe Gen4 SSD, DDoS protection, daily backups, dedicated IPv4 + IPv6, and Gold Priority Support.</p>
     </div>
 
-    <div id="plans-linux" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div id="plans-linux" class="grid grid-cols-1 md:grid-cols-3 gap-8" data-plans="VPS_GOLD">
       <!-- Gold S -->
       <div class="plan-card visible flex flex-col p-8 rounded-2xl">
         <div class="mb-3">
@@ -1098,5 +1098,6 @@ document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
 </script>
 <script src="/header.js"></script>
 <script src="/currency.js"></script>
+<script src="/plans.js" defer></script>
 </body>
 </html>

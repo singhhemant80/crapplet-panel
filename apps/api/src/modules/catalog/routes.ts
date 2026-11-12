@@ -69,7 +69,7 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
     allowIpSelection: p.allowIpSelection && p.provisioner !== "VIRTUALIZOR",
     requireHostname: p.requireHostname,
     featured: p.featured,
-    outOfStock: p.stockControl && p.stockQty <= 0,
+    outOfStock: p.outOfStock || (p.stockControl && p.stockQty <= 0),
     pricing,
     configOptions: p.configOptions.map((o) => ({
       key: o.key,
@@ -105,6 +105,71 @@ catalogRouter.get(
     });
     const rs = await resolvers();
     res.json({ groups: groups.map((g) => ({ id: g.id, legacyGid: g.legacyGid, name: g.name, slug: g.slug, headline: g.headline, description: g.description, products: g.products.map((p) => publicProduct(p, rs)) })) });
+  }),
+);
+
+/**
+ * Plans for the public website's product pages (shared-hosting.html, forex-vps-hosting.html …).
+ * ?types=SHARED,WORDPRESS — every enabled, visible plan of those types, in order-page order, so a plan
+ * created / hidden / marked out of stock in the admin panel shows up (or goes) on the website by itself.
+ */
+const MONTHS: Record<string, number> = { MONTHLY: 1, QUARTERLY: 3, SEMIANNUAL: 6, ANNUAL: 12, BIENNIAL: 24, TRIENNIAL: 36 };
+let plansCache = new Map<string, { at: number; body: unknown }>();
+/** Staff changed a plan — the website shows it on its next load instead of after the 30 s cache. */
+export function clearPlansCache() {
+  plansCache.clear();
+}
+catalogRouter.get(
+  "/plans",
+  ah(async (req, res) => {
+    const types = String(req.query.types ?? "").split(",").map((t) => t.trim().toUpperCase()).filter((t) => /^[A-Z_]{2,30}$/.test(t)).slice(0, 10);
+    if (!types.length) throw badRequest("Pass ?types=SHARED (comma-separated plan types)");
+    const key = types.sort().join(",");
+    const hit = plansCache.get(key);
+    res.setHeader("cache-control", "public, max-age=30");
+    if (hit && Date.now() - hit.at < 30_000) return res.json(hit.body);
+    const rows = await prisma.product.findMany({
+      where: { enabled: true, hidden: false, type: { in: types as never }, group: { hidden: false } },
+      orderBy: [{ group: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
+      include: { ...productInclude, group: true },
+    });
+    // types the panel manages (it has at least one plan of that type, even hidden) — the website keeps its
+    // own hand-made section for types that have no plans in the panel yet
+    const managed = await prisma.product.groupBy({ by: ["type"], where: { type: { in: types as never } } });
+    const rs = await resolvers();
+    // the price a card shows: monthly if sold monthly, otherwise the cheapest cycle per month
+    const display = (pricing: { cycle: string; currency: string; price: number }[], code: string) => {
+      const mine = pricing.filter((x) => x.currency === code);
+      const m = mine.find((x) => x.cycle === "MONTHLY");
+      if (m) return { amount: m.price / 100, per: "mo", cycle: "MONTHLY" };
+      const recurring = mine.filter((x) => MONTHS[x.cycle]).sort((a, b) => a.price / MONTHS[a.cycle] - b.price / MONTHS[b.cycle]);
+      if (recurring[0]) return { amount: Math.round(recurring[0].price / MONTHS[recurring[0].cycle]) / 100, per: "mo", cycle: recurring[0].cycle };
+      const once = mine.find((x) => x.cycle === "ONETIME");
+      return once ? { amount: once.price / 100, per: "one-time", cycle: "ONETIME" } : null;
+    };
+    const body = {
+      managedTypes: managed.map((m) => m.type),
+      plans: rows.map((row) => {
+        const p = publicProduct(row, rs)!;
+        return {
+          slug: p.slug,
+          name: p.name,
+          tagline: p.tagline,
+          type: p.type,
+          group: p.group,
+          featured: p.featured,
+          outOfStock: p.outOfStock,
+          features: p.features.slice(0, 12),
+          specs: p.specs,
+          freeDomain: p.freeDomain,
+          price: { INR: display(p.pricing, "INR"), USD: p.pricing.some((x) => x.currency === "USD" && !x.converted) ? display(p.pricing, "USD") : null },
+          orderUrl: `/order/configure?product=${encodeURIComponent(p.slug)}`,
+        };
+      }),
+    };
+    if (plansCache.size > 50) plansCache = new Map();
+    plansCache.set(key, { at: Date.now(), body });
+    res.json(body);
   }),
 );
 

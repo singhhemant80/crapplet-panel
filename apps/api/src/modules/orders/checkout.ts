@@ -10,7 +10,7 @@ import { enqueueProvision } from "../../jobs/queues";
 import { priceCart, type Cart } from "./pricing";
 import { DOMAIN_RE, HOSTING_TYPES, isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 
-export async function checkout(args: { userId: string; cart: Cart; ip?: string; notes?: string; useCredit?: boolean; resellerId?: string | null; wholesaleDiscountPct?: number | null; extraConfig?: Record<string, unknown> }) {
+export async function checkout(args: { userId: string; cart: Cart; ip?: string; notes?: string; useCredit?: boolean; resellerId?: string | null; wholesaleDiscountPct?: number | null; extraConfig?: Record<string, unknown>; staff?: boolean }) {
   const ownerId = args.userId;
   if (!args.cart.items.length && !args.cart.domains.length) throw badRequest("Your cart is empty");
 
@@ -37,6 +37,8 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
       for (const [idx, item] of args.cart.items.entries()) {
         const p = priced.products[idx];
         const productLine = priced.lines.find((l) => l.kind === "product" && l.itemIndex === idx)!;
+        // staff can still place an order for a plan marked out of stock (e.g. a reserved server)
+        if (p.outOfStock && !args.staff) throw conflict(`${p.name} is out of stock right now`);
         if (p.stockControl) {
           const r = await tx.product.updateMany({ where: { id: p.id, stockQty: { gte: item.quantity } }, data: { stockQty: { decrement: item.quantity } } });
           if (!r.count) throw conflict(`${p.name} is out of stock`);

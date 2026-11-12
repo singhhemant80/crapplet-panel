@@ -12,6 +12,7 @@ import { GATEWAYS, GATEWAY_FIELDS, gatewayCurrencies } from "../payments/gateway
 import { DEFAULT_TEMPLATES } from "../email/templates";
 import { render, sendTemplatedEmail } from "../email/mailer";
 import { crud } from "./crud";
+import { clearPlansCache } from "../catalog/routes";
 
 /** { USD: 499 } style maps; keys are 3-letter currency codes, values minor units */
 const curMap = z.record(z.string().length(3), z.number().int().min(0)).default({});
@@ -47,6 +48,7 @@ const productSchema = z.object({
   ipv6Enabled: z.boolean().default(false),
   allowIpSelection: z.boolean().default(false),
   requireHostname: z.boolean().default(false),
+  outOfStock: z.boolean().default(false),
   freeDomain: z.enum(["none", "once", "recurring"]).default("none"),
   freeDomainCycles: z.array(z.nativeEnum(BillingCycle)).default([]),
   freeDomainTlds: z.array(z.string().trim().toLowerCase().regex(/^\.?[a-z0-9-]+(\.[a-z0-9-]+)*$/, "TLDs look like .com or .co.in").transform((t) => (t.startsWith(".") ? t : `.${t}`))).default([]),
@@ -150,6 +152,7 @@ adminCatalog.post(
       await saveProductRelations(tx, p.id, { pricing, wholesale, serverIds, osTemplateIds, addonIds, configOptions });
       return p;
     });
+    clearPlansCache();
     await audit({ actorId: req.user!.id, action: "product.created", entity: "product", entityId: p.id });
     res.status(201).json({ id: p.id });
   }),
@@ -165,8 +168,33 @@ adminCatalog.put(
       await tx.product.update({ where: { id: req.params.id }, data: { ...data, ...(moduleConfig ? { moduleConfig: moduleConfig as Prisma.InputJsonValue } : {}) } });
       await saveProductRelations(tx, req.params.id, { pricing, wholesale, serverIds, osTemplateIds, addonIds, configOptions });
     });
+    clearPlansCache();
     await audit({ actorId: req.user!.id, action: "product.updated", entity: "product", entityId: req.params.id });
     res.json({ ok: true });
+  }),
+);
+
+/**
+ * Quick changes to one or many plans from the Products list: show / hide on the website and order page,
+ * mark out of stock / back in stock, enable / disable.
+ */
+const BULK: Record<string, Prisma.ProductUpdateManyMutationInput> = {
+  show: { hidden: false, enabled: true },
+  hide: { hidden: true },
+  out_of_stock: { outOfStock: true },
+  in_stock: { outOfStock: false },
+  enable: { enabled: true },
+  disable: { enabled: false },
+};
+adminCatalog.post(
+  "/products/bulk",
+  requireStaff("products.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ ids: z.array(z.string().max(40)).min(1).max(500), action: z.enum(Object.keys(BULK) as [string, ...string[]]) }), req.body);
+    const r = await prisma.product.updateMany({ where: { id: { in: b.ids } }, data: BULK[b.action] });
+    clearPlansCache();
+    await audit({ actorId: req.user!.id, action: `product.bulk_${b.action}`, entity: "product", entityId: b.ids.length === 1 ? b.ids[0] : "bulk", details: { ids: b.ids, count: r.count } });
+    res.json({ updated: r.count });
   }),
 );
 
@@ -177,6 +205,7 @@ adminCatalog.delete(
     const used = await prisma.service.count({ where: { productId: req.params.id } });
     if (used) throw conflict(`This product has ${used} services. Disable it instead of deleting.`);
     await prisma.product.delete({ where: { id: req.params.id } });
+    clearPlansCache();
     res.json({ ok: true });
   }),
 );

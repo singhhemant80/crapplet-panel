@@ -649,7 +649,7 @@ body.nav-open{overflow:hidden;}
       <h2 class="text-3xl font-bold tracking-tight text-slate-900">n8n VPS <span class="shimmer-n8n">Hosting Plans</span></h2>
       <p class="text-slate-500 max-w-2xl mx-auto mt-3">All plans include n8n pre-installed, Docker, SSL certificate, and root access. Scale freely as your workflows grow.</p>
     </div>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8" data-plans="VPS_N8N">
 
   <!-- Starter -->
   <div class="plan-card visible flex flex-col p-8 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -1296,5 +1296,6 @@ document.querySelectorAll('[id^="acc-"]').forEach(trigger => {
 </script>
 <script src="/header.js"></script>
 <script src="/currency.js"></script>
+<script src="/plans.js" defer></script>
 </body>
 </html>

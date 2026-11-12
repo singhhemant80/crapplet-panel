@@ -37,7 +37,7 @@ export default function ProductEditor() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, freeDomain: "none", freeDomainCycles: [], freeDomainTlds: "", moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, pricingUsd: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
+    if (isNew) setP({ name: "", slug: "", type: "VPS_LINUX", groupId: "", provisioner: "PROXMOX", virtType: "KVM", features: "", ipv4Count: 1, allowIpSelection: true, requireHostname: true, ipv6Enabled: false, hsnSac: "998315", taxable: true, enabled: true, hidden: false, featured: false, autoSetup: "ON_PAYMENT", sortOrder: 0, resellerEnabled: false, stockControl: false, stockQty: 0, outOfStock: false, freeDomain: "none", freeDomainCycles: [], freeDomainTlds: "", moduleConfig: { proxmox: { storage: "", bridge: "", disk: "scsi0", cpuType: "host" }, virtualizor: { planId: "", virt: "kvm" } }, pricing: {}, pricingUsd: {}, wholesale: {}, serverIds: [], osTemplateIds: [], addonIds: [], configOptions: [] });
     else if (prod.data) {
       const x = prod.data.product;
       setP({
@@ -85,7 +85,7 @@ export default function ProductEditor() {
       ipv4Count: Number(p.ipv4Count) || 0, ipv6Enabled: p.ipv6Enabled, allowIpSelection: p.allowIpSelection, requireHostname: p.requireHostname,
       freeDomain: p.freeDomain ?? "none", freeDomainCycles: p.freeDomainCycles ?? [], freeDomainTlds: String(p.freeDomainTlds ?? "").split(/[\s,]+/).map((t: string) => t.trim()).filter(Boolean),
       hsnSac: p.hsnSac, taxable: p.taxable,
-      stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
+      stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, outOfStock: !!p.outOfStock, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
       resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) }, cpanel: { ...p.moduleConfig.cpanel, accountLimit: num(p.moduleConfig.cpanel?.accountLimit), diskMb: num(p.moduleConfig.cpanel?.diskMb), bandwidthMb: num(p.moduleConfig.cpanel?.bandwidthMb) } },
       pricing: [
         ...Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
@@ -138,7 +138,8 @@ export default function ProductEditor() {
             <Field label="Image URL" className="sm:col-span-2"><Input value={p.imageUrl ?? ""} onChange={(e) => set({ imageUrl: e.target.value })} placeholder="/Vps-Hosting-banner.jpg" /></Field>
             <div className="flex flex-wrap gap-5 sm:col-span-2">
               <Toggle checked={p.enabled} onChange={(v) => set({ enabled: v })} label="Enabled" />
-              <Toggle checked={p.hidden} onChange={(v) => set({ hidden: v })} label="Hidden from order page" />
+              <Toggle checked={!p.hidden} onChange={(v) => set({ hidden: !v })} label="Show on website & order page" />
+              <Toggle checked={!!p.outOfStock} onChange={(v) => set({ outOfStock: v })} label="Out of stock" />
               <Toggle checked={p.featured} onChange={(v) => set({ featured: v })} label="Featured" />
               <Toggle checked={p.resellerEnabled} onChange={(v) => set({ resellerEnabled: v })} label="Available to resellers" />
             </div>

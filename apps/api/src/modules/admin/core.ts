@@ -594,7 +594,7 @@ adminCore.post(
     const u = await prisma.user.findUnique({ where: { id: b.userId } });
     if (!u) throw notFound("Customer not found");
     const { checkout } = await import("../orders/checkout");
-    const r = await checkout({ userId: u.id, cart: b, ip: req.ip, notes: b.notes ?? `Placed by staff`, useCredit: false });
+    const r = await checkout({ userId: u.id, cart: b, ip: req.ip, notes: b.notes ?? `Placed by staff`, useCredit: false, staff: true });
     let paid = r.paid;
     if (b.markPaid && !paid && r.total > 0) {
       const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: r.invoiceId } });

@@ -186,6 +186,7 @@ function Configure() {
   }
 
   function addToCart() {
+    if (p.outOfStock) return toast.error(`${p.name} is out of stock right now`);
     if (p.isVps && p.osTemplates.length && !os) return toast.error("Choose an operating system");
     if (p.isHosting && !dom) { setPickingDomain(true); return toast.error("Choose a domain for your hosting first"); }
     if (!p.isHosting && p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
@@ -231,6 +232,17 @@ function Configure() {
   return (
     <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6">
       <OrderSteps step={p.isHosting ? (domainStep ? 2 : 3) : 2} hosting={p.isHosting} />
+      {p.outOfStock && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-5 py-4 text-amber-900 ring-1 ring-amber-200">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700"><Icon name="inventory_2" /></span>
+          <div className="min-w-0 flex-1">
+            <div className="font-extrabold">{p.name} is out of stock right now</div>
+            <div className="text-sm">New orders open again as soon as capacity is added. Choose another plan or ask us to hold one for you.</div>
+          </div>
+          <Button size="sm" variant="outline" icon="grid_view" href="/order">See other plans</Button>
+          <Button size="sm" variant="ghost" icon="support_agent" href="/contact.html">Contact sales</Button>
+        </div>
+      )}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
           <div className="rounded-2xl border border-line bg-white p-6 shadow-card">
@@ -400,7 +412,9 @@ function Configure() {
                 <div className="text-2xl font-extrabold tracking-tight text-primary-dark">{cm(total + gst)}</div>
               </div>
               {reservation && countdown && <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><Icon name="timer" className="text-[16px]" />{reservation.address} held for {countdown.label}</div>}
-              {domainStep ? (
+              {p.outOfStock ? (
+                <Button size="lg" className="mt-4 w-full" icon="inventory_2" variant="secondary" disabled>Out of stock</Button>
+              ) : domainStep ? (
                 <Button size="lg" className="mt-4 w-full" icon="language" variant="secondary" disabled>Choose a domain first</Button>
               ) : (
                 <Button size="lg" className="mt-4 w-full" icon="shopping_cart_checkout" onClick={addToCart}>Continue to checkout</Button>

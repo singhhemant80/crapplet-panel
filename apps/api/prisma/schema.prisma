@@ -318,6 +318,8 @@ model Product {
   ipv6Enabled      Boolean       @default(false)
   allowIpSelection Boolean       @default(false)
   requireHostname  Boolean       @default(false)
+  /// staff switch: shown on the website / order page as "Out of stock" and can't be ordered
+  outOfStock       Boolean       @default(false)
   /// WHMCS-style free domain with hosting: none | once (first year) | recurring (free while the plan is kept)
   freeDomain       String        @default("none")
   /// billing cycles that qualify for the free domain (empty = any)

@@ -489,7 +489,7 @@ body.nav-open{overflow:hidden;}
     </div>
 
     <!-- Billing toggle -->
-    <div class="flex justify-center items-center gap-3 mb-12 reveal rv2">
+    <div id="gpu-billing-toggle" class="flex justify-center items-center gap-3 mb-12 reveal rv2">
       <span id="lbl-hourly" class="text-sm font-bold text-slate-900">Hourly</span>
       <button id="billing-toggle" onclick="toggleBilling()" class="relative w-12 h-6 rounded-full bg-primary transition-all" style="box-shadow:0 2px 8px rgba(163,101,254,.4)">
         <span id="toggle-knob" class="toggle-pill absolute top-0.5 w-5 h-5 bg-white rounded-full shadow left-0.5"></span>
@@ -498,7 +498,7 @@ body.nav-open{overflow:hidden;}
     </div>
 
     <!-- GPU Plan Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-plans="GPU" data-plans-hide="#gpu-billing-toggle">
 
       <!-- RTX 4090 -->
       <div class="plan-card reveal rv1 flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1201,5 +1201,6 @@ document.querySelectorAll('[id^="acc-"]').forEach(t => {
 </script>
 <script src="/header.js"></script>
 <script src="/currency.js"></script>
+<script src="/plans.js" defer></script>
 </body>
 </html>

@@ -1238,7 +1238,7 @@ tailwind.config = {
       <h2 class="font-pixel text-xl text-slate-900 mb-4" style="font-size:16px">Your Server in <span class="shimmer-mc">4 Steps</span></h2>
       <p class="text-slate-600 max-w-xl mx-auto">From checkout to playing with your friends in under 5 minutes. No command-line knowledge needed.</p>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative" data-plans="VPS_MINECRAFT" data-plans-theme="dark">
       <div class="hidden md:block absolute top-14 left-[12.5%] right-[12.5%] h-0.5" style="background:linear-gradient(to right,rgba(163,101,254,.1),rgba(163,101,254,.6),rgba(163,101,254,.1));z-index:0;"></div>
       <div class="reveal rv1 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.2);box-shadow:0 4px 20px rgba(163,101,254,.08)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(163,101,254,.12);border:2px solid rgba(163,101,254,.3)">🛒</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">01</div><h3 class="font-bold text-slate-900 mb-2">Choose Realm</h3><p class="text-sm text-slate-600">Pick Vanilla, Modded, or Network plan based on your player count and needs.</p></div>
       <div class="reveal rv2 relative z-10 rounded-xl p-6 text-center hover:-translate-y-2 transition-all" style="background:#ffffff;border:2px solid rgba(163,101,254,.15);box-shadow:0 4px 20px rgba(163,101,254,.06)"><div class="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl" style="background:rgba(59,130,246,.1);border:2px solid rgba(59,130,246,.2)">💳</div><div class="font-pixel text-lg mb-2" style="color:#a365fe;font-size:14px">02</div><h3 class="font-bold text-slate-900 mb-2">Quick Checkout</h3><p class="text-sm text-slate-600">Pay via UPI, card or net banking. Server deploys automatically in 60 seconds.</p></div>
@@ -1550,5 +1550,6 @@ document.querySelectorAll('.faq-trigger').forEach(btn => {
 </script>
 <script src="/header.js"></script>
 <script src="/currency.js"></script>
+<script src="/plans.js" defer></script>
 </body>
 </html>
