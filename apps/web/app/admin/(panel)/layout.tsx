@@ -17,6 +17,7 @@ const NAV: { group: string; items: Item[] }[] = [
       { href: "/admin/orders", label: "Orders", icon: "shopping_bag", perm: "orders.view" },
       { href: "/admin/resellers", label: "Resellers", icon: "storefront", perm: "resellers.manage" },
       { href: "/admin/affiliates", label: "Affiliates", icon: "handshake", perm: "clients.view" },
+      { href: "/admin/campaigns", label: "Email Campaigns", icon: "outgoing_mail", perm: "campaigns.manage" },
     ],
   },
   {

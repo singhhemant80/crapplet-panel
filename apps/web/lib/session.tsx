@@ -11,6 +11,8 @@ export interface Me {
   phone: string | null;
   emailVerified: boolean;
   totpEnabled: boolean;
+  /** offers & news emails (campaigns) */
+  marketingEmails?: boolean;
   role: { name: string; permissions: string[] } | null;
   profile: any;
   reseller: { id: string; status: string; brandName: string } | null;

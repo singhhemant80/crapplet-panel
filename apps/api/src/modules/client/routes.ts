@@ -5,6 +5,7 @@ import { z } from "zod";
 import { hostingPasswordSchema, rootPasswordSchema } from "../orders/pricing";
 import { prisma, TicketPriority } from "../../db";
 import { ah, badRequest, conflict, forbidden, notFound, pageParams, parse } from "../../lib/http";
+import { audit } from "../../lib/audit";
 import { decrypt, encrypt, randomToken } from "../../lib/crypto";
 import { requireClient } from "../../middleware/auth";
 import { enqueueProvision } from "../../jobs/queues";
@@ -140,6 +141,18 @@ clientRouter.get(
       creditBalance: profile?.creditBalance ?? 0,
       currency: profile?.currency ?? "INR",
     });
+  }),
+);
+
+// ───── Email preferences ─────
+/** Offers & news (Email Campaigns). Service and billing emails are always sent. */
+clientRouter.put(
+  "/email-preferences",
+  ah(async (req, res) => {
+    const b = parse(z.object({ marketing: z.boolean() }), req.body);
+    await prisma.user.update({ where: { id: req.user!.id }, data: { marketingEmails: b.marketing, marketingOptOutAt: b.marketing ? null : new Date() } });
+    await audit({ actorId: req.user!.id, userId: req.user!.id, action: b.marketing ? "client.marketing_opt_in" : "client.marketing_opt_out" });
+    res.json({ marketing: b.marketing });
   }),
 );
 

@@ -34,7 +34,7 @@ export function transportOptions(c: MailConfig) {
   };
 }
 
-function getTransport(c: MailConfig): Transporter | null {
+export function getTransport(c: MailConfig): Transporter | null {
   if (!c.enabled || !c.host) return null;
   const sig = JSON.stringify(transportOptions(c));
   if (transport?.sig !== sig) {
@@ -50,7 +50,7 @@ export function makeTransport(c: MailConfig) {
   return nodemailer.createTransport(single);
 }
 
-const esc = (v: unknown) =>
+export const esc = (v: unknown) =>
   String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** {{var}} is HTML-escaped; {{{var}}} is inserted raw (used for pre-built HTML blocks). */
@@ -89,7 +89,7 @@ export function htmlToText(html: string) {
 
 type Company = Awaited<ReturnType<typeof getSettings>>["company"];
 
-export function layout(body: string, company: Company, preheader = "") {
+export function layout(body: string, company: Company, preheader = "", footer?: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(company.brand)}</title></head>
 <body style="margin:0;background:#f6f0ff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}</div>
@@ -99,7 +99,7 @@ export function layout(body: string, company: Company, preheader = "") {
 <tr><td style="padding:28px;font-size:15px;line-height:1.6">${body}</td></tr>
 <tr><td style="padding:18px 28px;background:#faf7ff;color:#64748b;font-size:12px;line-height:1.6">
 ${esc(company.legalName)} · ${esc(company.address)}<br>
-You're receiving this because you have an account with ${esc(company.brand)}. Questions? Reply to this email or write to <a href="mailto:${esc(company.email)}" style="color:#7c3aed">${esc(company.email)}</a>.<br>
+${footer ?? `You're receiving this because you have an account with ${esc(company.brand)}.`} Questions? Reply to this email or write to <a href="mailto:${esc(company.email)}" style="color:#7c3aed">${esc(company.email)}</a>.<br>
 <a href="${esc(company.website)}" style="color:#7c3aed">${esc(company.website)}</a></td></tr>
 </table></td></tr></table></body></html>`;
 }

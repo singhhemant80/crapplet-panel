@@ -65,6 +65,9 @@ export const RULES: Rule[] = [
   { methods: ["POST"], path: /^\/payment-reviews\/[^/]+$/, label: "Approve a payment" },
   { methods: ["POST"], path: /^\/referrals\/[^/]+\/approve$/, label: "Affiliate payout" },
 
+  // bulk email to customers
+  { methods: ["POST"], path: /^\/campaigns\/[^/]+\/send$/, label: "Send an email campaign" },
+
   // other people's accounts
   { methods: ["PUT"], path: /^\/domains\/[^/]+$/, label: "Domain change" },
   { methods: ["PUT"], path: /^\/resellers\/[^/]+$/, label: "Reseller change" },

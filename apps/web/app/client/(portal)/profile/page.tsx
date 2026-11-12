@@ -30,6 +30,7 @@ export default function Profile() {
           <Button type="submit" className="mt-6" loading={busy} icon="save">Save changes</Button>
         </form>
       </Card>
+      <OffersPref on={me?.marketingEmails !== false} onChanged={reload} />
       <WhatsAppPref />
     </>
   );
@@ -48,6 +49,22 @@ function WhatsAppPref() {
           <div className="text-[13px] text-mute">Invoices, payment reminders and service updates on WhatsApp, to the mobile number above. Emails are always sent.</div>
         </div>
         <Toggle checked={data.enabled} onChange={(v) => api("/client/whatsapp", { method: "PUT", body: { enabled: v } }).then(() => { toast.success(v ? "WhatsApp notifications on" : "WhatsApp notifications off"); reload(); }).catch((e) => toast.error(e.message))} />
+      </div>
+    </Card>
+  );
+}
+
+/** Offers & news emails (campaigns). Service and billing emails can't be turned off here. */
+function OffersPref({ on, onChanged }: { on: boolean; onChanged: () => Promise<void> }) {
+  return (
+    <Card className="mt-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-fuchsia-50 text-fuchsia-600"><Icon name="sell" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold text-ink">Offers &amp; news by email</div>
+          <div className="text-[13px] text-mute">Discounts, new products and locations — a few emails a month at most. Emails about your services and invoices are always sent.</div>
+        </div>
+        <Toggle checked={on} onChange={(v) => api("/client/email-preferences", { method: "PUT", body: { marketing: v } }).then(async () => { await onChanged(); toast.success(v ? "You'll get our offers and news" : "No more offers and news emails"); }).catch((e) => toast.error(e.message))} />
       </div>
     </Card>
   );

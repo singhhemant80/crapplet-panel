@@ -37,6 +37,9 @@ model User {
   emailVerifiedAt DateTime?
   totpSecretEnc   String?
   totpEnabled     Boolean     @default(false)
+  /** offers & news emails (Email Campaigns of the "Offer" kind); unticked by the customer or an unsubscribe link */
+  marketingEmails   Boolean   @default(true)
+  marketingOptOutAt DateTime?
   roleId          String?
   role            Role?       @relation(fields: [roleId], references: [id])
   // a client created by a reseller belongs to that reseller
@@ -1338,4 +1341,51 @@ model BackupRun {
   deletedAt    DateTime? // local file removed by retention
 
   @@index([startedAt])
+}
+
+/** Admin → Email Campaigns: offers and information emails to customers */
+model EmailCampaign {
+  id          String    @id @default(cuid())
+  name        String
+  kind        String    @default("OFFER") // OFFER: marketing — only customers who accept offers, with unsubscribe | INFO: service information
+  subject     String
+  preheader   String?
+  body        String    // HTML, with {{firstName}} etc.
+  audience    Json      @default("{}")
+  status      String    @default("DRAFT") // DRAFT | SCHEDULED | SENDING | PAUSED | SENT | CANCELLED
+  perMinute   Int       @default(60)
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  total       Int       @default(0)
+  sent        Int       @default(0)
+  failed      Int       @default(0)
+  skipped     Int       @default(0)
+  opened      Int       @default(0)
+  unsubscribed Int      @default(0)
+  lastError   String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  recipients  EmailCampaignRecipient[]
+
+  @@index([status])
+}
+
+model EmailCampaignRecipient {
+  id         String        @id @default(cuid())
+  campaignId String
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String?
+  email      String
+  name       String?
+  status     String        @default("QUEUED") // QUEUED | SENT | FAILED | SKIPPED
+  error      String?
+  token      String        @unique // open pixel + unsubscribe link
+  sentAt     DateTime?
+  openedAt   DateTime?
+  unsubscribedAt DateTime?
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
 }

@@ -3,7 +3,7 @@
  * Queues: provisioning, email, maintenance (IP reservation expiry, server health, daily billing).
  */
 import { Worker, type Job } from "bullmq";
-import { bullConnection, maintenanceQueue, backupQueue, latencyQueue, closeQueues, type EmailJob, type ProvisionJob } from "./jobs/queues";
+import { bullConnection, maintenanceQueue, backupQueue, latencyQueue, campaignQueue, closeQueues, type EmailJob, type ProvisionJob } from "./jobs/queues";
 import { runProvisionAction, markCreateFailed } from "./modules/provisioning/provisioner";
 import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
@@ -11,6 +11,7 @@ import { maybeRunScheduled } from "./jobs/billing";
 import { deliverWhatsapp } from "./modules/whatsapp/service";
 import { createBackup, maybeBackup } from "./modules/backup/service";
 import { runRestore } from "./modules/backup/restore";
+import { campaignTick } from "./modules/campaigns/service";
 import { measureAll } from "./modules/latency/service";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
@@ -103,6 +104,9 @@ backup.on("failed", (job, err) => console.error(`[backup] ${job?.name} failed:`,
 
 // broker latency for the Forex VPS page: its own queue so slow jobs never delay the once-a-minute sample
 const latency = new Worker("latency", async () => measureAll(), { connection, concurrency: 1 });
+// email campaigns: one slice per minute per campaign (each campaign's "per minute" limit)
+const campaign = new Worker("campaign", async () => campaignTick(), { connection, concurrency: 1, lockDuration: 10 * 60_000 });
+campaign.on("failed", (job, err) => console.error(`[campaign] ${job?.name} failed:`, err.message));
 latency.on("failed", (job, err) => console.error(`[latency] failed:`, err.message));
 
 // one import at a time; a large WHMCS can take a while
@@ -126,6 +130,7 @@ async function schedule() {
   // automatic database backups: checked every 5 minutes against Settings → Backups
   await latencyQueue().upsertJobScheduler("broker-latency", { every: 60_000 }, { name: "broker-latency" });
   await backupQueue().upsertJobScheduler("backup-tick", { every: 5 * 60_000 }, { name: "backup-tick" });
+  await campaignQueue().upsertJobScheduler("campaign-tick", { every: 60_000 }, { name: "campaign-tick" });
   console.log("[worker] schedules registered: IP expiry (1m), server health (5m), automation (daily, checked every 5m)");
 }
 
@@ -149,7 +154,7 @@ schedule().catch((e) => {
 
 async function shutdown() {
   console.log("[worker] shutting down");
-  await Promise.all([provisioning.close(), email.close(), whatsapp.close(), backup.close(), latency.close(), maintenance.close(), migration.close()]);
+  await Promise.all([provisioning.close(), email.close(), whatsapp.close(), backup.close(), latency.close(), campaign.close(), maintenance.close(), migration.close()]);
   await closeQueues();
   await prisma.$disconnect();
   process.exit(0);

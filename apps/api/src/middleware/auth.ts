@@ -40,6 +40,7 @@ export const PERMISSIONS = [
   "resellers.manage",
   "content.manage",
   "reports.view",
+  "campaigns.manage",
   "settings.manage",
   "staff.manage",
 ] as const;
@@ -104,6 +105,8 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 export function csrfGuard(req: Request, _res: Response, next: NextFunction) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
   if (req.path.startsWith("/webhooks") || req.path.startsWith("/payments/callback")) return next();
+  // email unsubscribe (a form in the email's landing page, and Gmail/Yahoo one-click) — token-protected, no cookies needed
+  if (/^(\/api)?\/e\/u\/[A-Za-z0-9_-]+$/.test(req.path)) return next();
   const usesCookie = !req.headers.authorization && req.cookies?.cc_at;
   if (usesCookie && req.headers["x-requested-with"] !== "crapplet") return next(new HttpError(403, "CSRF check failed"));
   next();

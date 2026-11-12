@@ -108,6 +108,7 @@ export async function publicUser(userId: string) {
     phone: u.phone,
     emailVerified: !!u.emailVerifiedAt,
     totpEnabled: u.totpEnabled,
+    marketingEmails: u.marketingEmails,
     role: u.role ? { name: u.role.name, permissions: u.role.permissions } : null,
     profile: u.profile ? { ...u.profile } : null,
     reseller: u.reseller ? { id: u.reseller.id, status: u.reseller.status, brandName: u.reseller.brandName } : null,

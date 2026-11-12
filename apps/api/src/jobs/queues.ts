@@ -62,6 +62,7 @@ export const migrationQueue = () => q<{ runId: string }>("migration");
 export const latencyQueue = () => q<Record<string, never>>("latency");
 export const backupQueue = () => q<{ runId?: string }>("backup");
 export const maintenanceQueue = () => q<Record<string, unknown>>("maintenance");
+export const campaignQueue = () => q<Record<string, never>>("campaign");
 
 export async function enqueueProvision(job: ProvisionJob) {
   // jobId de-duplicates repeated "create" requests for the same service
