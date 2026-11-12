@@ -132,6 +132,11 @@ log "Database backups are scheduled in the panel (Admin → Setup → Database B
 rm -f /etc/cron.d/crapplet-backup
 install -m 750 "$ROOT/deploy/backup.sh" /usr/local/bin/crapplet-backup   # still there for a manual command-line backup
 
+if [ "$FIRST_INSTALL" = "0" ] && [ "${SKIP_VIRTUALIZOR_SYNC:-0}" != "1" ]; then
+  log "Syncing Virtualizor (services, IP pools, OS templates)"
+  sudo -u "$APP_USER" bash -lc "cd '$ROOT/apps/api' && NODE_ENV=production timeout 660 node dist/scripts/post-update.js" || echo "    Virtualizor sync didn't finish — run it from Admin → VPS & Services → Sync all"
+fi
+
 log "Done"
 echo "Website:      https://${DOMAIN}/"
 echo "Client area:  https://${DOMAIN}/client"

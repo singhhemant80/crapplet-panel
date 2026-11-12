@@ -17,7 +17,20 @@ async function refresh(): Promise<boolean> {
   return refreshing;
 }
 
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData; retry?: boolean } = {}): Promise<T> {
+// Staff password re-confirmation: the admin layout registers a handler that asks for the password.
+// A request refused with REAUTH_REQUIRED waits for it and is sent again once — the action just carries on.
+type ReauthHandler = (label?: string) => Promise<boolean>;
+let reauthHandler: ReauthHandler | null = null;
+export function setReauthHandler(h: ReauthHandler | null) {
+  reauthHandler = h;
+}
+/** Ask for the password now (used by code that calls fetch directly). Resolves false if cancelled. */
+export function confirmPassword(label?: string) {
+  return reauthHandler ? reauthHandler(label) : Promise.resolve(false);
+}
+export const isReauth = (status: number, data: any) => status === 403 && data?.code === "REAUTH_REQUIRED";
+
+export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData; retry?: boolean; reauthed?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = { "X-Requested-With": "crapplet" };
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form;
@@ -35,6 +48,10 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     data = text ? JSON.parse(text) : null;
   } catch {
     data = text;
+  }
+  if (isReauth(res.status, data) && !opts.reauthed && reauthHandler) {
+    if (await reauthHandler(data?.details?.label)) return api<T>(path, { ...opts, reauthed: true });
+    throw new ApiError(res.status, "Cancelled — your password is needed for this", data);
   }
   if (!res.ok) {
     let msg = data?.error ?? `Request failed (${res.status})`;

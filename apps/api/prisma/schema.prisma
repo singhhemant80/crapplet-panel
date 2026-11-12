@@ -171,6 +171,9 @@ model Session {
   revokedAt        DateTime?
   /** staff user who opened this client session with "Login as client" */
   impersonatedById String?
+  /** staff "confirm your password" window — Products, Servers, Setup and critical actions work until then */
+  sudoUntil        DateTime?
+  sudoFailures     Int       @default(0)
 
   @@index([userId])
 }

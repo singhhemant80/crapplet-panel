@@ -15,6 +15,7 @@ import { requireAuth, requireStaff, signAccessToken } from "../../middleware/aut
 import { queueEmail } from "../email/mailer";
 import { resolveStateCode } from "./states";
 import { verifyPassword } from "../../lib/passwords";
+import { requireReauth } from "../admin/reauth";
 export { INDIAN_STATES, resolveStateCode } from "./states";
 
 export const authRouter = Router();
@@ -270,6 +271,7 @@ authRouter.post(
   "/impersonate",
   requireAuth,
   requireStaff("clients.manage"),
+  requireReauth("Log in as customer"),
   ah(async (req, res) => {
     const { userId } = parse(z.object({ userId: z.string() }), req.body);
     const target = await prisma.user.findUnique({ where: { id: userId } });

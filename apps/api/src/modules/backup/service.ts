@@ -18,7 +18,7 @@ import { decrypt, encrypt } from "../../lib/crypto";
 import { istDayStart } from "../../lib/money";
 
 export const BACKUP_DIR = process.env.BACKUP_DIR ?? (fs.existsSync("/var/backups/crapplet") ? "/var/backups/crapplet" : path.resolve(config.uploadDir, "..", "backups"));
-const FILE_RE = /^crapplet-backup-\d{8}-\d{4,6}\.tar$/;
+export const FILE_RE = /^crapplet-backup-\d{8}-\d{4,6}\.tar$/;
 
 export type DestType = "none" | "s3" | "sftp" | "ftp";
 export interface BackupConfig {
@@ -93,7 +93,7 @@ export function redactBackup(c: BackupConfig) {
 
 // ───────────────────────── making a backup ─────────────────────────
 
-function run(cmd: string, args: string[], opts: { env?: NodeJS.ProcessEnv; cwd?: string } = {}) {
+export function run(cmd: string, args: string[], opts: { env?: NodeJS.ProcessEnv; cwd?: string } = {}) {
   return new Promise<void>((resolve, reject) => {
     const p = spawn(cmd, args, { env: opts.env ?? process.env, cwd: opts.cwd, stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
@@ -104,7 +104,7 @@ function run(cmd: string, args: string[], opts: { env?: NodeJS.ProcessEnv; cwd?:
 }
 
 /** postgres://user:pass@host:port/db?schema=… → pieces pg_dump understands (password via env, not argv) */
-function pgArgs(url: string) {
+export function pgArgs(url: string) {
   const u = new URL(url);
   const args = ["--format=custom", "--no-owner", "--no-privileges", "-h", u.hostname || "localhost", "-p", u.port || "5432", "-U", decodeURIComponent(u.username), "-d", decodeURIComponent(u.pathname.replace(/^\//, ""))];
   const schema = u.searchParams.get("schema");
@@ -112,12 +112,12 @@ function pgArgs(url: string) {
   return { args, env: { ...process.env, PGPASSWORD: decodeURIComponent(u.password), PGSSLMODE: u.searchParams.get("sslmode") ?? process.env.PGSSLMODE ?? "prefer" } };
 }
 
-const stamp = (d = new Date()) => {
+export const stamp = (d = new Date()) => {
   const x = new Date(d.getTime() + 330 * 60_000).toISOString();
   return `${x.slice(0, 10).replace(/-/g, "")}-${x.slice(11, 19).replace(/:/g, "")}`;
 };
 
-export async function createBackup(opts: { trigger: "schedule" | "manual"; actorId?: string; runId?: string }) {
+export async function createBackup(opts: { trigger: "schedule" | "manual" | "pre-restore"; actorId?: string; runId?: string }) {
   const cfg = await getBackupConfig();
   const runRow = opts.runId
     ? await prisma.backupRun.update({ where: { id: opts.runId }, data: { status: "RUNNING" } })
@@ -125,7 +125,9 @@ export async function createBackup(opts: { trigger: "schedule" | "manual"; actor
   const work = await fs.promises.mkdtemp(path.join(os.tmpdir(), "crapplet-backup-"));
   try {
     await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
-    const name = `crapplet-backup-${stamp()}.tar`;
+    // never reuse a name — two backups in the same second (e.g. the safety copy before a restore) would overwrite
+    let name = `crapplet-backup-${stamp()}.tar`;
+    for (let i = 1; fs.existsSync(path.join(BACKUP_DIR, name)) || fs.existsSync(path.join(BACKUP_DIR, `.${name}.part`)); i++) name = `crapplet-backup-${stamp(new Date(Date.now() + i * 1000))}.tar`;
     // 1. database
     const pg = pgArgs(config.databaseUrl);
     await run("pg_dump", [...pg.args, "-f", path.join(work, "db.dump")], { env: pg.env });
@@ -346,6 +348,8 @@ export async function maybeBackup() {
   if (!due || due > new Date()) return { skipped: "not due" };
   const running = await prisma.backupRun.count({ where: { status: "RUNNING", startedAt: { gt: new Date(Date.now() - 3 * 3600_000) } } });
   if (running) return { skipped: "a backup is running" };
+  const { readRestore, restoreRunning } = await import("./restore");
+  if (restoreRunning(await readRestore())) return { skipped: "a restore is running" };
   const r = await createBackup({ trigger: "schedule" });
   return { id: r.id, file: r.fileName };
 }

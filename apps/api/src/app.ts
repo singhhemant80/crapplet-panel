@@ -23,8 +23,9 @@ import { migrationRouter } from "./modules/migration/routes";
 import { adminAutomation } from "./modules/admin/automation";
 import { adminDashboard } from "./modules/admin/dashboard";
 import { adminWhatsapp, clientWhatsapp } from "./modules/whatsapp/routes";
-import { adminBackups } from "./modules/backup/routes";
+import { adminBackups, publicRestore } from "./modules/backup/routes";
 import { adminLatency, publicLatency } from "./modules/latency/routes";
+import { reauthGuard, reauthRouter } from "./modules/admin/reauth";
 import { replyTicket } from "./modules/tickets/service";
 import { openTicket } from "./modules/tickets/service";
 
@@ -48,15 +49,16 @@ export function createApp() {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ ok: true, time: new Date().toISOString() });
   }));
-  api.use("/auth", authRouter);
+  api.use("/auth", authRouter, reauthRouter);
   api.use("/catalog", catalogRouter);
   api.use(publicLatency);
+  api.use(publicRestore);
   api.use("/client", clientRouter, clientWhatsapp);
   api.use("/payments", paymentsRouter);
   api.use("/webhooks", webhooksRouter);
   api.use("/reseller", resellerRouter);
   api.use("/v1/reseller", resellerRouter); // API-key access for resellers
-  api.use("/admin", adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency);
+  api.use("/admin", reauthGuard, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency);
 
   // public content
   api.get("/content/announcements", ah(async (_req, res) => {

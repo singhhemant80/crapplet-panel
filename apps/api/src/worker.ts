@@ -10,6 +10,7 @@ import { expireReservations } from "./modules/ipam/service";
 import { maybeRunScheduled } from "./jobs/billing";
 import { deliverWhatsapp } from "./modules/whatsapp/service";
 import { createBackup, maybeBackup } from "./modules/backup/service";
+import { runRestore } from "./modules/backup/restore";
 import { measureAll } from "./modules/latency/service";
 import { checkAllServers } from "./jobs/health";
 import { refreshExchangeRates } from "./lib/currency";
@@ -90,7 +91,12 @@ maintenance.on("failed", (job, err) => console.error(`[maintenance] ${job?.name}
 // database backups on their own queue so a long dump never holds up IP expiry / health checks
 const backup = new Worker<{ runId?: string }>(
   "backup",
-  async (job) => (job.name === "backup-now" && job.data.runId ? createBackup({ trigger: "manual", runId: job.data.runId }).then((r) => ({ id: r.id, file: r.fileName })) : maybeBackup()),
+  async (job) =>
+    job.name === "restore"
+      ? runRestore().then((r) => ({ status: r?.status, file: r?.fileName }))
+      : job.name === "backup-now" && job.data.runId
+        ? createBackup({ trigger: "manual", runId: job.data.runId }).then((r) => ({ id: r.id, file: r.fileName }))
+        : maybeBackup(),
   { connection, concurrency: 1, lockDuration: 60 * 60_000 },
 );
 backup.on("failed", (job, err) => console.error(`[backup] ${job?.name} failed:`, err.message));

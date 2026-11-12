@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, date } from "@/lib/api";
+import { api, confirmPassword, date, isReauth } from "@/lib/api";
 import { Alert, Button, Icon, cx, toast } from "@/components/ui";
 
 export type DumpState = {
@@ -76,6 +76,10 @@ export function DumpUpload({ value, onChange }: { value: DumpState | null; onCha
           continue;
         }
         const body = await res.json().catch(() => ({}));
+        if (isReauth(res.status, body)) {
+          if (!(await confirmPassword(body.details?.label))) throw new Error("Upload stopped — your password is needed to continue");
+          continue;
+        }
         if (res.status === 409 && typeof body.received === "number") {
           offset = body.received; // server already has more (or less) — continue from there
           continue;

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { can, useSession } from "@/lib/session";
 import { Icon, Loading, cx } from "@/components/ui";
+import { AreaGate, ReauthPill, ReauthProvider, lockedArea, useReauth } from "@/components/admin/reauth";
 
 type Item = { href: string; label: string; icon: string; perm?: string };
 const NAV: { group: string; items: Item[] }[] = [
@@ -81,15 +82,28 @@ const NAV: { group: string; items: Item[] }[] = [
 ];
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
-  const { me, loading, logout } = useSession();
+  const { me, loading } = useSession();
   const router = useRouter();
   const path = usePathname();
-  const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!loading && (!me || me.type !== "STAFF")) router.replace(`/admin/login?next=${encodeURIComponent(path)}`);
   }, [loading, me, path, router]);
-  useEffect(() => setOpen(false), [path]);
   if (loading || !me || me.type !== "STAFF") return <Loading />;
+  return (
+    <ReauthProvider>
+      <Panel>{children}</Panel>
+    </ReauthProvider>
+  );
+}
+
+function Panel({ children }: { children: React.ReactNode }) {
+  const { me: maybeMe, logout } = useSession();
+  const me = maybeMe!;
+  const { active: unlocked } = useReauth();
+  const router = useRouter();
+  const path = usePathname();
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [path]);
 
   const active = (h: string) => (h === "/admin" ? path === h : path === h || path.startsWith(h + "/"));
   const nav = (
@@ -104,6 +118,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
               <Link key={i.href} href={i.href} className={cx("flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-semibold transition", active(i.href) ? "bg-white/10 text-white shadow-[inset_3px_0_0_#a365fe]" : "text-violet-100/75 hover:bg-white/5 hover:text-white")}>
                 <Icon name={i.icon} className="text-[19px]" fill={active(i.href)} />
                 {i.label}
+                {!unlocked && lockedArea(i.href) && <Icon name="lock" className="ml-auto text-[14px] text-violet-300/45" />}
               </Link>
             ))}
           </div>
@@ -128,6 +143,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           <GlobalSearch />
           <Link href="/admin/search" className="grid h-10 w-10 place-items-center rounded-xl border border-line text-slate-500 sm:hidden" aria-label="Search"><Icon name="search" /></Link>
           <div className="ml-auto flex items-center gap-3">
+            <ReauthPill />
             <a href="/" target="_blank" className="hidden text-sm font-bold text-mute hover:text-primary-dark md:inline">View website ↗</a>
             <div className="text-right">
               <div className="text-sm font-extrabold text-ink">{me.firstName} {me.lastName}</div>
@@ -136,7 +152,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             <button onClick={async () => { await logout(); router.replace("/admin/login"); }} className="grid h-10 w-10 place-items-center rounded-xl border border-line text-slate-500 hover:text-rose-600" title="Sign out"><Icon name="logout" /></button>
           </div>
         </header>
-        <main className="mx-auto max-w-[1440px] overflow-x-clip p-4 sm:p-6 lg:p-8 fade-up">{children}</main>
+        <main className="mx-auto max-w-[1440px] overflow-x-clip p-4 sm:p-6 lg:p-8 fade-up"><AreaGate path={path}>{children}</AreaGate></main>
       </div>
     </div>
   );
