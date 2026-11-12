@@ -1,6 +1,7 @@
 import { readSyncAll, startSyncAll } from "../provisioning/virtualizor-sync-all";
 import { getSettings } from "../../lib/settings";
 import { inrPerUnit, listCurrencies, requireCurrency } from "../../lib/currency";
+import { istDayStart, addDays } from "../../lib/money";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -93,22 +94,61 @@ adminCore.get(
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const where: Prisma.UserWhereInput = {
-      type: "CLIENT",
-      ...(req.query.status ? { status: req.query.status as "ACTIVE" } : {}),
-      ...(q ? clientWhere(q) : {}),
+    const segment = typeof req.query.segment === "string" ? req.query.segment : "";
+    const monthAgo = addDays(new Date(), -30);
+    // segments: the tabs above the customer list
+    const SEGMENTS: Record<string, Prisma.UserWhereInput> = {
+      active: { status: "ACTIVE", services: { some: { status: { in: ["ACTIVE", "SUSPENDED"] } } } },
+      unpaid: { invoices: { some: { status: "UNPAID", isWalletTopup: false } } },
+      overdue: { invoices: { some: { status: "UNPAID", isWalletTopup: false, dueDate: { lt: istDayStart() } } } },
+      new: { createdAt: { gte: monthAgo } },
+      noservices: { services: { none: {} } },
+      inactive: { status: { in: ["INACTIVE", "CLOSED"] } },
     };
-    const [rows, total] = await Promise.all([
+    const base: Prisma.UserWhereInput = { type: "CLIENT", ...(q ? clientWhere(q) : {}) };
+    const where: Prisma.UserWhereInput = {
+      ...base,
+      ...(req.query.status ? { status: req.query.status as "ACTIVE" } : {}),
+      ...(SEGMENTS[segment] ? { AND: [SEGMENTS[segment]] } : {}),
+    };
+    const [rows, total, ...segCounts] = await Promise.all([
       prisma.user.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take,
-        select: { id: true, email: true, firstName: true, lastName: true, phone: true, status: true, createdAt: true, emailVerifiedAt: true, ownerResellerId: true, profile: { select: { companyName: true, gstin: true, city: true, state: true, country: true, creditBalance: true } }, _count: { select: { services: true } } },
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true, status: true, createdAt: true, emailVerifiedAt: true, ownerResellerId: true, profile: { select: { companyName: true, gstin: true, city: true, state: true, country: true, creditBalance: true, currency: true } }, _count: { select: { services: true, tickets: { where: { status: { not: "CLOSED" } } } } } },
       }),
       prisma.user.count({ where }),
+      prisma.user.count({ where: base }),
+      ...Object.values(SEGMENTS).map((w) => prisma.user.count({ where: { ...base, AND: [w] } })),
     ]);
-    res.json({ clients: rows, total, page, pageSize });
+    const counts = Object.fromEntries([["all", segCounts[0]], ...Object.keys(SEGMENTS).map((k, i) => [k, segCounts[i + 1]])]);
+    // per-row money: what each customer owes, has paid, and how many services are live
+    const ids = rows.map((r) => r.id);
+    const [due, paid, live, lastLogin, cur] = await Promise.all([
+      prisma.invoice.groupBy({ by: ["userId", "currency"], where: { userId: { in: ids }, status: "UNPAID", isWalletTopup: false }, _sum: { total: true, amountPaid: true }, _min: { dueDate: true } }),
+      prisma.invoice.groupBy({ by: ["userId", "currency"], where: { userId: { in: ids }, status: "PAID", isWalletTopup: false }, _sum: { total: true } }),
+      prisma.service.groupBy({ by: ["userId"], where: { userId: { in: ids }, status: { in: ["ACTIVE", "SUSPENDED"] } }, _count: { _all: true } }),
+      prisma.loginHistory.findMany({ where: { userId: { in: ids }, success: true }, orderBy: { createdAt: "desc" }, distinct: ["userId"], select: { userId: true, createdAt: true } }),
+      listCurrencies(),
+    ]);
+    const inr = (amount: number, code: string) => Math.round(amount * inrPerUnit(cur.find((c) => c.code === code) ?? { code, rate: 1 }));
+    const today = istDayStart();
+    const clients = rows.map((r) => {
+      const d = due.filter((x) => x.userId === r.id);
+      return {
+        ...r,
+        stats: {
+          dueInr: d.reduce((a, x) => a + inr((x._sum.total ?? 0) - (x._sum.amountPaid ?? 0), x.currency), 0),
+          overdue: d.some((x) => x._min.dueDate && x._min.dueDate < today),
+          paidInr: paid.filter((x) => x.userId === r.id).reduce((a, x) => a + inr(x._sum.total ?? 0, x.currency), 0),
+          liveServices: live.find((x) => x.userId === r.id)?._count._all ?? 0,
+          lastLoginAt: lastLogin.find((x) => x.userId === r.id)?.createdAt ?? null,
+        },
+      };
+    });
+    res.json({ clients, total, page, pageSize, counts });
   }),
 );
 
@@ -119,7 +159,7 @@ adminCore.get(
     const user = await publicUser(req.params.id).catch(() => null);
     if (!user || user.type !== "CLIENT") throw notFound("Client not found");
     const [services, invoices, tickets, domains, transactions, logins, ledger, notesUser, orders] = await Promise.all([
-      prisma.service.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, include: { product: { select: { name: true } }, ips: { select: { address: true } } } }),
+      prisma.service.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, include: { product: { select: { name: true, type: true, provisioner: true } }, ips: { select: { address: true } } } }),
       prisma.invoice.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 50 }),
       prisma.ticket.findMany({ where: { userId: req.params.id }, orderBy: { lastReplyAt: "desc" }, take: 20, include: { department: true } }),
       prisma.domain.findMany({ where: { userId: req.params.id } }),
@@ -239,15 +279,60 @@ adminCore.get(
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const where: Prisma.OrderWhereInput = {
-      ...(req.query.status ? { status: req.query.status as OrderStatus } : {}),
+    const period = typeof req.query.period === "string" ? req.query.period : "";
+    const payment = typeof req.query.payment === "string" ? req.query.payment : "";
+    const since = period === "today" ? istDayStart() : period === "7d" ? addDays(istDayStart(), -6) : period === "30d" ? addDays(istDayStart(), -29) : null;
+    // filters other than status (the status tabs show counts within them)
+    const base: Prisma.OrderWhereInput = {
       ...(q ? orderWhere(q) : {}),
+      ...(since ? { createdAt: { gte: since } } : {}),
+      ...(payment === "paid" ? { invoice: { status: "PAID" } } : payment === "unpaid" ? { invoice: { status: "UNPAID" } } : {}),
+      ...(typeof req.query.userId === "string" ? { userId: req.query.userId } : {}),
     };
-    const [rows, total] = await Promise.all([
-      prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, firstName: true, lastName: true, email: true } }, invoice: { select: { id: true, status: true, total: true } }, services: { select: { id: true, hostname: true, status: true, product: { select: { name: true } } } }, domains: { select: { name: true } } } }),
+    const where: Prisma.OrderWhereInput = { ...base, ...(req.query.status ? { status: req.query.status as OrderStatus } : {}) };
+    const today = istDayStart();
+    const monthStart = new Date(today.getTime() - (new Date(today.getTime() + 330 * 60_000).getUTCDate() - 1) * 86400_000);
+    const [rows, total, byStatus, cur, todayOrders, monthOrders, awaitingPayment, toAccept] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, profile: { select: { companyName: true } } } },
+          invoice: { select: { id: true, status: true, total: true, amountPaid: true, dueDate: true, paidAt: true } },
+          services: { select: { id: true, hostname: true, status: true, billingCycle: true, product: { select: { name: true, type: true, provisioner: true } }, ips: { select: { address: true }, take: 1 } } },
+          domains: { select: { id: true, name: true, action: true, status: true } },
+        },
+      }),
       prisma.order.count({ where }),
+      prisma.order.groupBy({ by: ["status"], where: base, _count: { _all: true } }),
+      listCurrencies(),
+      prisma.order.findMany({ where: { createdAt: { gte: today }, status: { notIn: ["CANCELLED", "FRAUD"] } }, select: { total: true, currency: true } }),
+      prisma.order.findMany({ where: { createdAt: { gte: monthStart }, status: { notIn: ["CANCELLED", "FRAUD"] }, invoice: { status: "PAID" } }, select: { total: true, currency: true } }),
+      prisma.order.count({ where: { status: "PENDING", invoice: { status: "UNPAID" } } }),
+      prisma.order.count({ where: { status: "PENDING", invoice: { status: "PAID" } } }),
     ]);
-    res.json({ orders: rows, total, page, pageSize });
+    const inr = (amount: number, code: string) => Math.round(amount * inrPerUnit(cur.find((c) => c.code === code) ?? { code, rate: 1 }));
+    const resellerIds = [...new Set(rows.map((o) => o.resellerId).filter(Boolean))] as string[];
+    const brands = resellerIds.length ? await prisma.reseller.findMany({ where: { id: { in: resellerIds } }, select: { id: true, brandName: true } }) : [];
+    const counts: Record<string, number> = { all: byStatus.reduce((a, x) => a + x._count._all, 0) };
+    for (const x of byStatus) counts[x.status] = x._count._all;
+    res.json({
+      orders: rows.map((o) => ({ ...o, resellerBrand: brands.find((b) => b.id === o.resellerId)?.brandName ?? null })),
+      total,
+      page,
+      pageSize,
+      counts,
+      summary: {
+        todayCount: todayOrders.length,
+        todayInr: todayOrders.reduce((a, o) => a + inr(o.total, o.currency), 0),
+        monthPaidInr: monthOrders.reduce((a, o) => a + inr(o.total, o.currency), 0),
+        monthPaidCount: monthOrders.length,
+        awaitingPayment,
+        toAccept,
+      },
+    });
   }),
 );
 
@@ -396,7 +481,23 @@ adminCore.get(
     });
     if (!o) throw notFound("Order not found");
     const reseller = o.resellerId ? await prisma.reseller.findUnique({ where: { id: o.resellerId }, select: { brandName: true } }) : null;
+    // what staff and the system did to this order, its invoice and its services (for the timeline)
+    const ids = [o.id, ...(o.invoiceId ? [o.invoiceId] : []), ...o.services.map((x) => x.id)];
+    const [acts, provLogs] = await Promise.all([
+      prisma.activityLog.findMany({ where: { entityId: { in: ids } }, orderBy: { createdAt: "desc" }, take: 40, select: { id: true, actorId: true, action: true, entity: true, entityId: true, createdAt: true } }),
+      prisma.provisioningLog.findMany({ where: { serviceId: { in: o.services.map((x) => x.id) }, action: { in: ["create", "suspend", "unsuspend", "terminate"] } }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, serviceId: true, action: true, success: true, message: true, createdAt: true } }),
+    ]);
+    const actorIds = [...new Set(acts.map((a) => a.actorId).filter(Boolean))] as string[];
+    const actors = actorIds.length ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, firstName: true, lastName: true, type: true } }) : [];
+    const history = [
+      ...acts.map((a) => {
+        const who = actors.find((x) => x.id === a.actorId);
+        return { id: a.id, at: a.createdAt, kind: "activity", action: a.action, entity: a.entity, entityId: a.entityId, by: who ? `${who.firstName ?? ""} ${who.lastName ?? ""}`.trim() || (who.type === "STAFF" ? "Staff" : "Customer") : null };
+      }),
+      ...provLogs.map((l) => ({ id: l.id, at: l.createdAt, kind: "provision", action: l.action, success: l.success, message: l.message, serviceId: l.serviceId })),
+    ];
     res.json({
+      history,
       order: {
         ...o,
         reseller,

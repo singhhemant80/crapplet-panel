@@ -84,6 +84,7 @@ const STATUS: Record<string, string> = {
   AVAILABLE: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   ANSWERED: "bg-sky-50 text-sky-700 ring-sky-200",
   COMPLETED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  PARTIAL: "bg-amber-50 text-amber-700 ring-amber-200",
   RUNNING: "bg-sky-50 text-sky-700 ring-sky-200",
   running: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   PENDING: "bg-amber-50 text-amber-700 ring-amber-200",

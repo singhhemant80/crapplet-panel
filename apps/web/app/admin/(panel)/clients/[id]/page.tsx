@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, date, invNo, money } from "@/lib/api";
+import { Ago, planIcon } from "@/components/admin/list-kit";
 import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, PageHeader, Modal, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", SG: "Singapore", CA: "Canada", AU: "Australia", DE: "Germany" };
@@ -16,6 +17,11 @@ export default function ClientDetail() {
   const { data: sum, reload: reloadSum } = useApi(`/admin/clients/${id}/summary`);
   const [tab, setTab] = useState("services");
   const [modal, setModal] = useState<string | null>(null);
+  // links like /admin/clients/x?tab=invoices open that tab
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some(([k]) => k === t)) setTab(t);
+  }, []);
   const refresh = () => {
     reload();
     reloadSum();
@@ -78,7 +84,7 @@ export default function ClientDetail() {
       />
 
       {/* ── KPIs ── */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5 [&>*:last-child]:col-span-2 xl:[&>*:last-child]:col-span-1">
         <Kpi icon="account_balance_wallet" tone="purple" label="Credit balance" value={sum ? money(sum.income.credit, cur) : "…"} onClick={() => setModal("credit")} hint="Manage credits" />
         <Kpi icon="pending_actions" tone={due > 0 ? "rose" : "green"} label="Due now" value={sum ? money(due, cur) : "…"} hint={inv ? `${inv.UNPAID.count + inv.COLLECTIONS.count} unpaid invoice${inv.UNPAID.count + inv.COLLECTIONS.count === 1 ? "" : "s"}` : ""} onClick={() => goTab("invoices")} />
         <Kpi icon="payments" tone="green" label="Lifetime revenue" value={sum ? money(sum.income.gross, cur) : "…"} hint={sum ? `Net ${money(sum.income.net, cur)} after fees` : ""} onClick={() => goTab("statement")} />
@@ -89,6 +95,8 @@ export default function ClientDetail() {
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
         {/* ── main column ── */}
         <div className="min-w-0 space-y-5">
+          <Records tab={tab} setTab={setTab} data={data} services={services} id={id} cur={cur} />
+
           <Panel icon="badge" title="Account details" action={<HeadBtn icon="edit" onClick={() => setModal("profile")}>Edit</HeadBtn>}>
             <dl className="grid gap-x-8 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
               <Item k="Full name" v={fullName(c)} />
@@ -159,27 +167,6 @@ export default function ClientDetail() {
             ) : <Loading />}
           </Panel>
 
-          <div id="client-tabs" className="scroll-mt-24">
-            <div className="mb-3 flex gap-1 overflow-x-auto rounded-2xl border border-line bg-white p-1.5 shadow-card">
-              {TABS.map(([t, l, n]) => (
-                <button key={t} onClick={() => setTab(t)} className={cx("inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-bold transition", tab === t ? "bg-primary-dark text-white shadow" : "text-slate-600 hover:bg-primary-tint hover:text-primary-dark")}>
-                  {l}
-                  {n && (data[n]?.length ?? 0) > 0 && <span className={cx("rounded-full px-1.5 text-[11px]", tab === t ? "bg-white/20" : "bg-slate-100 text-slate-500")}>{data[n].length}</span>}
-                </button>
-              ))}
-            </div>
-            <Card pad={false}>
-              {tab === "services" && <Table head={["Service", "Hostname / IP", "Status", "Recurring", "Next due"]}>{services.map((s: any) => <tr key={s.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/services/${s.id}`}>{s.product.name}</Link></Td><Td>{s.hostname}<div className="font-mono text-xs text-mute">{s.ips.map((i: any) => i.address).join(", ")}</div></Td><Td><Badge status={s.status} /></Td><Td>{money(s.recurringAmount, s.currency)}</Td><Td>{date(s.nextDueDate)}</Td></tr>)}</Table>}
-              {tab === "orders" && <Table head={["Order", "Date", "Total", "Status"]}>{(data.orders ?? []).map((o: any) => <tr key={o.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td><Td>{date(o.createdAt, true)}</Td><Td>{money(o.total, o.currency)}</Td><Td><Badge status={o.status} /></Td></tr>)}</Table>}
-              {tab === "invoices" && <Table head={["Invoice", "Date", "Due", "Total", "Status"]}>{data.invoices.map((i: any) => <tr key={i.id}><Td><Link className="font-bold text-primary-dark" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td><Td>{date(i.issueDate)}</Td><Td>{date(i.dueDate)}</Td><Td>{money(i.total, i.currency)}</Td><Td><Badge status={i.status} /></Td></tr>)}</Table>}
-              {tab === "statement" && <Statement id={id} />}
-              {tab === "transactions" && <Table head={["Date", "Gateway", "Reference", "Type", "Amount"]}>{data.transactions.map((t: any) => <tr key={t.id}><Td>{date(t.createdAt, true)}</Td><Td>{t.gateway}</Td><Td className="font-mono text-xs">{t.gatewayTxnId}</Td><Td>{t.type}</Td><Td>{money(t.amount, t.currency)}</Td></tr>)}</Table>}
-              {tab === "tickets" && <Table head={["Ticket", "Subject", "Department", "Status"]}>{data.tickets.map((t: any) => <tr key={t.id}><Td>#{t.number}</Td><Td><Link className="font-bold text-primary-dark" href={`/admin/tickets/${t.id}`}>{t.subject}</Link></Td><Td>{t.department.name}</Td><Td><Badge status={t.status} /></Td></tr>)}</Table>}
-              {tab === "domains" && <Table head={["Domain", "Status", "Expiry"]}>{data.domains.map((d: any) => <tr key={d.id}><Td className="font-bold">{d.name}</Td><Td><Badge status={d.status} /></Td><Td>{date(d.expiryDate)}</Td></tr>)}</Table>}
-              {tab === "credit" && <Table head={["Date", "Description", "Amount", "Balance"]}>{data.ledger.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td>{l.description}</Td><Td className={l.amount < 0 ? "text-rose-600" : "text-emerald-600"}>{money(l.amount, cur)}</Td><Td>{money(l.balanceAfter, cur)}</Td></tr>)}</Table>}
-              {tab === "logins" && <Table head={["Time", "IP", "Result"]}>{data.logins.map((l: any) => <tr key={l.id}><Td>{date(l.createdAt, true)}</Td><Td className="font-mono text-xs">{l.ip}</Td><Td>{l.success ? <Badge status="ACTIVE">ok</Badge> : <Badge status="FAILED">{l.reason}</Badge>}</Td></tr>)}</Table>}
-            </Card>
-          </div>
         </div>
 
         {/* ── sidebar ── */}
@@ -301,7 +288,112 @@ export default function ClientDetail() {
   );
 }
 
-const TABS: [string, string, string?][] = [["services", "Services", "services"], ["invoices", "Invoices", "invoices"], ["statement", "Statement"], ["orders", "Orders", "orders"], ["transactions", "Transactions", "transactions"], ["tickets", "Tickets", "tickets"], ["domains", "Domains", "domains"], ["credit", "Credit log"], ["logins", "Logins"]];
+/** The customer's records in tabs: services, invoices, orders… — the part staff use most, so it comes first. */
+function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab: (t: string) => void; data: any; services: any[]; id: string; cur: string }) {
+  const today = new Date(new Date().toDateString());
+  const rows: Record<string, any[]> = { services, invoices: data.invoices, orders: data.orders ?? [], transactions: data.transactions, tickets: data.tickets, domains: data.domains, credit: data.ledger, logins: data.logins };
+  const empty = (icon: string, text: string) => (
+    <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-sm text-mute"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary-dark"><Icon name={icon} /></span>{text}</div>
+  );
+  const isEmpty = tab !== "statement" && !(rows[tab]?.length);
+  const unpaid = (data.invoices as any[]).filter((i) => i.status === "UNPAID").length;
+  return (
+    <section id="client-tabs" className="scroll-mt-24 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line bg-[#fbf9ff] p-1.5 [scrollbar-width:none] sm:flex-wrap">
+        {TABS.map(([t, l, n, icon]) => {
+          const count = n ? rows[n]?.length ?? 0 : 0;
+          return (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cx("inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold transition", tab === t ? "bg-white text-primary-dark shadow-card ring-1 ring-line" : "text-slate-600 hover:bg-white/70 hover:text-primary-dark")}>
+              <Icon name={icon} className="text-[17px]" />
+              {l}
+              {count > 0 && <span className={cx("rounded-md px-1.5 text-[11px] tabular-nums", tab === t ? "bg-primary-soft text-primary-dark" : "bg-slate-200/70 text-slate-500")}>{count}</span>}
+              {t === "invoices" && unpaid > 0 && <span className="h-2 w-2 rounded-full bg-rose-500" title={`${unpaid} unpaid`} />}
+            </button>
+          );
+        })}
+      </div>
+      {isEmpty ? empty(TABS.find(([k]) => k === tab)?.[3] ?? "inbox", `No ${TABS.find(([k]) => k === tab)?.[1].toLowerCase()} yet`) : (
+        <>
+          {tab === "services" && (
+            <ul className="divide-y divide-line sm:hidden">
+              {services.map((s: any) => (
+                <li key={s.id}>
+                  <Link href={`/admin/services/${s.id}`} className="flex items-center gap-3 px-4 py-3 active:bg-[#fbf9ff]">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary-dark"><Icon name={planIcon(s.product.type, s.product.provisioner)} className="text-[19px]" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-bold text-ink">{s.product.name}</span>
+                      <span className="block truncate text-[12px] text-mute">{s.hostname || "—"}{s.ips[0] ? ` · ${s.ips[0].address}` : ""}</span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1"><Badge status={s.status} /><span className="text-[12px] font-semibold tabular-nums text-slate-600">{money(s.recurringAmount, s.currency)}</span></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {tab === "invoices" && (
+            <ul className="divide-y divide-line sm:hidden">
+              {data.invoices.map((i: any) => {
+                const over = i.status === "UNPAID" && i.dueDate && new Date(i.dueDate) < today;
+                return (
+                  <li key={i.id}>
+                    <Link href={`/admin/invoices/${i.id}`} className={cx("flex items-center gap-3 px-4 py-3", over && "bg-rose-50/40")}>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-mono text-[13px] font-bold text-primary-dark">{invNo(i)}</span>
+                        <span className={cx("block text-[12px]", over ? "font-bold text-rose-600" : "text-mute")}>{over ? "overdue · " : "due "}{date(i.dueDate)}</span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end gap-1"><span className="font-bold tabular-nums text-ink">{money(i.total, i.currency)}</span><Badge status={i.status} /></span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {tab === "services" && (
+            <div className="hidden sm:block"><Table head={["Service", "Hostname / IP", "Status", "Recurring", "Next due"]}>
+              {services.map((s: any) => {
+                const late = s.nextDueDate && new Date(s.nextDueDate) < today && ["ACTIVE", "SUSPENDED"].includes(s.status);
+                return (
+                  <tr key={s.id} className="hover:bg-[#fbf9ff]">
+                    <Td><Link className="flex items-center gap-2.5 font-bold text-ink hover:text-primary-dark" href={`/admin/services/${s.id}`}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary-dark"><Icon name={planIcon(s.product.type, s.product.provisioner)} className="text-[18px]" /></span>{s.product.name}</Link></Td>
+                    <Td><div className="max-w-[240px] truncate font-semibold text-slate-700">{s.hostname || "—"}</div><div className="font-mono text-xs text-mute">{s.ips.map((i: any) => i.address).join(", ")}</div></Td>
+                    <Td><Badge status={s.status} /></Td>
+                    <Td className="whitespace-nowrap font-semibold tabular-nums">{money(s.recurringAmount, s.currency)}<div className="text-[11.5px] font-normal text-mute">{(s.billingCycle ?? "").toLowerCase().replace("annual", "yearly")}</div></Td>
+                    <Td className={cx("whitespace-nowrap", late ? "font-bold text-rose-600" : "text-slate-600")}>{s.nextDueDate ? date(s.nextDueDate) : "—"}{late && <div className="text-[11px] uppercase">overdue</div>}</Td>
+                  </tr>
+                );
+              })}
+            </Table></div>
+          )}
+          {tab === "orders" && <Table head={["Order", "Placed", "Total", "Status"]}>{rows.orders.map((o: any) => <tr key={o.id} className="hover:bg-[#fbf9ff]"><Td><Link className="font-mono font-bold text-primary-dark hover:underline" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td><Td className="text-slate-600"><Ago at={o.createdAt} /></Td><Td className="font-semibold tabular-nums">{money(o.total, o.currency)}</Td><Td><Badge status={o.status} /></Td></tr>)}</Table>}
+          {tab === "invoices" && (
+            <div className="hidden sm:block"><Table head={["Invoice", "Issued", "Due", "Total", "Status"]}>
+              {data.invoices.map((i: any) => {
+                const over = i.status === "UNPAID" && i.dueDate && new Date(i.dueDate) < today;
+                return (
+                  <tr key={i.id} className={cx("hover:bg-[#fbf9ff]", over && "bg-rose-50/40")}>
+                    <Td><Link className="font-mono font-bold text-primary-dark hover:underline" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link>{i.isWalletTopup && <div className="text-[11px] text-mute">add funds</div>}</Td>
+                    <Td className="whitespace-nowrap text-slate-600">{date(i.issueDate)}</Td>
+                    <Td className={cx("whitespace-nowrap", over ? "font-bold text-rose-600" : "text-slate-600")}>{date(i.dueDate)}{over && <div className="text-[11px] uppercase">overdue</div>}</Td>
+                    <Td className="whitespace-nowrap font-semibold tabular-nums">{money(i.total, i.currency)}{i.status === "UNPAID" && i.amountPaid > 0 && <div className="text-[11.5px] font-normal text-amber-700">{money(i.total - i.amountPaid, i.currency)} left</div>}</Td>
+                    <Td><Badge status={i.status} /></Td>
+                  </tr>
+                );
+              })}
+            </Table></div>
+          )}
+          {tab === "statement" && <Statement id={id} />}
+          {tab === "transactions" && <Table head={["Date", "Gateway", "Reference", "Type", "Amount"]}>{data.transactions.map((t: any) => <tr key={t.id} className="hover:bg-[#fbf9ff]"><Td className="whitespace-nowrap text-slate-600">{date(t.createdAt, true)}</Td><Td className="font-semibold uppercase">{t.gateway}</Td><Td className="max-w-[220px] truncate font-mono text-xs">{t.gatewayTxnId}</Td><Td><Badge status={t.type === "REFUND" ? "REFUNDED" : t.type === "PAYMENT" ? "PAID" : "DRAFT"}>{t.type.replace("_", " ").toLowerCase()}</Badge></Td><Td className={cx("whitespace-nowrap font-bold tabular-nums", t.type === "REFUND" ? "text-sky-700" : "text-emerald-700")}>{t.type === "REFUND" ? "−" : ""}{money(Math.abs(t.amount), t.currency)}</Td></tr>)}</Table>}
+          {tab === "tickets" && <Table head={["Ticket", "Subject", "Department", "Last reply", "Status"]}>{data.tickets.map((t: any) => <tr key={t.id} className="hover:bg-[#fbf9ff]"><Td className="font-mono text-mute">#{t.number}</Td><Td><Link className="font-bold text-ink hover:text-primary-dark" href={`/admin/tickets/${t.id}`}>{t.subject}</Link></Td><Td className="text-slate-600">{t.department.name}</Td><Td className="whitespace-nowrap text-slate-600"><Ago at={t.lastReplyAt} /></Td><Td><Badge status={t.status} /></Td></tr>)}</Table>}
+          {tab === "domains" && <Table head={["Domain", "Status", "Expiry", "Auto-renew"]}>{data.domains.map((d: any) => <tr key={d.id} className="hover:bg-[#fbf9ff]"><Td className="font-bold"><span className="inline-flex items-center gap-2"><Icon name="public" className="text-[18px] text-primary-dark" />{d.name}</span></Td><Td><Badge status={d.status} /></Td><Td className="whitespace-nowrap text-slate-600">{d.expiryDate ? <>{date(d.expiryDate)} <span className="text-mute">(<Ago at={d.expiryDate} />)</span></> : "—"}</Td><Td>{d.autoRenew ? <span className="font-semibold text-emerald-600">On</span> : <span className="text-mute">Off</span>}</Td></tr>)}</Table>}
+          {tab === "credit" && <Table head={["Date", "Description", "Amount", "Balance"]}>{data.ledger.map((l: any) => <tr key={l.id} className="hover:bg-[#fbf9ff]"><Td className="whitespace-nowrap text-slate-600">{date(l.createdAt, true)}</Td><Td>{l.description}</Td><Td className={cx("whitespace-nowrap font-bold tabular-nums", l.amount < 0 ? "text-rose-600" : "text-emerald-600")}>{l.amount > 0 ? "+" : ""}{money(l.amount, cur)}</Td><Td className="whitespace-nowrap tabular-nums">{money(l.balanceAfter, cur)}</Td></tr>)}</Table>}
+          {tab === "logins" && <Table head={["Time", "IP", "Result"]}>{data.logins.map((l: any) => <tr key={l.id} className="hover:bg-[#fbf9ff]"><Td className="whitespace-nowrap text-slate-600">{date(l.createdAt, true)} <span className="text-mute">· <Ago at={l.createdAt} /></span></Td><Td className="font-mono text-xs">{l.ip}</Td><Td>{l.success ? <Badge status="ACTIVE">signed in</Badge> : <Badge status="FAILED">{l.reason ?? "failed"}</Badge>}</Td></tr>)}</Table>}
+        </>
+      )}
+    </section>
+  );
+}
+
+const TABS: [string, string, string | undefined, string][] = [["services", "Services", "services", "dns"], ["invoices", "Invoices", "invoices", "receipt_long"], ["statement", "Statement", undefined, "summarize"], ["orders", "Orders", "orders", "shopping_bag"], ["transactions", "Payments", "transactions", "payments"], ["tickets", "Tickets", "tickets", "support_agent"], ["domains", "Domains", "domains", "public"], ["credit", "Credit log", "credit", "account_balance_wallet"], ["logins", "Logins", "logins", "login"]];
 
 // ───── building blocks ─────
 function Panel({ icon, title, count, action, children }: { icon: string; title: string; count?: number; action?: ReactNode; children: ReactNode }) {

@@ -34,7 +34,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   console.error(`[api] ${req.method} ${req.originalUrl}`, err);
   // hypervisor / provisioning failures carry a message meant for staff — show it instead of a bare 500
   const name = (err as { constructor?: { name?: string } })?.constructor?.name ?? "";
-  if (["VirtualizorError", "ProvisionError", "ProxmoxError"].includes(name) && anyErr.message) {
+  if (["VirtualizorError", "ProvisionError", "ProxmoxError", "UpstreamError", "HostingError"].includes(name) && anyErr.message) {
     return res.status(502).json({ error: anyErr.message, code: "UPSTREAM" });
   }
   res.status(500).json({ error: "Internal server error" });

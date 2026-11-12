@@ -40,7 +40,10 @@ export function explainNetError(e: unknown, host: string, port: number, panel: "
     default:
       return e instanceof Error ? e : new Error(raw);
   }
-  const out = new Error(msg);
+  const out = new UpstreamError(msg);
   (out as any).code = code;
   return out;
 }
+
+/** A panel / hypervisor we call couldn't be reached — the message explains why and is safe to show staff (HTTP 502). */
+export class UpstreamError extends Error {}
