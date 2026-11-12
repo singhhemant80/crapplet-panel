@@ -24,6 +24,7 @@ import { adminAutomation } from "./modules/admin/automation";
 import { adminDashboard } from "./modules/admin/dashboard";
 import { adminWhatsapp, clientWhatsapp } from "./modules/whatsapp/routes";
 import { adminBackups } from "./modules/backup/routes";
+import { adminLatency, publicLatency } from "./modules/latency/routes";
 import { replyTicket } from "./modules/tickets/service";
 import { openTicket } from "./modules/tickets/service";
 
@@ -49,12 +50,13 @@ export function createApp() {
   }));
   api.use("/auth", authRouter);
   api.use("/catalog", catalogRouter);
+  api.use(publicLatency);
   api.use("/client", clientRouter, clientWhatsapp);
   api.use("/payments", paymentsRouter);
   api.use("/webhooks", webhooksRouter);
   api.use("/reseller", resellerRouter);
   api.use("/v1/reseller", resellerRouter); // API-key access for resellers
-  api.use("/admin", adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups);
+  api.use("/admin", adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency);
 
   // public content
   api.get("/content/announcements", ah(async (_req, res) => {

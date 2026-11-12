@@ -59,6 +59,7 @@ export const emailQueue = () => q<EmailJob>("email");
 export const whatsappQueue = () => q<{ messageId: string; vars: Record<string, unknown> }>("whatsapp");
 export const paymentQueue = () => q<PaymentJob>("payments");
 export const migrationQueue = () => q<{ runId: string }>("migration");
+export const latencyQueue = () => q<Record<string, never>>("latency");
 export const backupQueue = () => q<{ runId?: string }>("backup");
 export const maintenanceQueue = () => q<Record<string, unknown>>("maintenance");
 

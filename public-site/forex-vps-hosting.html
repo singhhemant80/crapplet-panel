@@ -180,6 +180,13 @@ header.scrolled{box-shadow:0 4px 20px rgba(0,0,0,.07);}
 /* ping latency dot */
 @keyframes latencyPing{0%{transform:scale(.8);opacity:.9;}50%{transform:scale(1.4);opacity:.4;}100%{transform:scale(.8);opacity:.9;}}
 .latency-ping{animation:latencyPing 1.4s ease-in-out infinite;}
+/* live broker latency */
+.bl-row{display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;}
+.bl-ms{font-variant-numeric:tabular-nums;transition:color .3s;}
+.bl-bump{animation:blBump .6s ease;}
+@keyframes blBump{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+.bl-flash{box-shadow:0 0 0 4px rgba(163,101,254,.35)!important;transition:box-shadow .3s;}
+@media (min-width:640px){#bl-list>li:nth-child(odd){border-right:1px solid #f1f5f9}#bl-list>li:nth-child(n+3){border-top:1px solid #f1f5f9}}
 
 /* price tick up/down flash */
 @keyframes flashGreen{0%,100%{color:#22c55e;}50%{color:#86efac;}}
@@ -467,9 +474,25 @@ body.nav-open{overflow:hidden;}
                     class="bg-[#a365fe] text-white px-8 py-2.5 rounded-xl font-bold text-lg hover:shadow-2xl hover:shadow-[#a365fe]/50 hover:-translate-y-1 transition-all">
                     View Trading Plans
                 </button>
-                <button class="bg-white border border-slate-200 px-8 py-2.5 rounded-xl font-bold text-lg hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm" onclick="location.href='/contact.html'">
+                <button class="bg-white border border-slate-200 px-8 py-2.5 rounded-xl font-bold text-lg hover:bg-slate-50 hover:-translate-y-1 transition-all shadow-sm" onclick="var el=document.getElementById('broker-latency'); if(el && !el.classList.contains('hidden')){el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('bl-flash'); setTimeout(function(){el.classList.remove('bl-flash')},1200);} else {location.href='/contact.html'}">
                     Check Latency
                 </button>
+            </div>
+
+            <!-- Live broker latency (filled from /api/public/broker-latency; hidden until there are real measurements) -->
+            <div id="broker-latency" class="hidden load ld4 w-full max-w-xl mx-auto lg:mx-0 text-left rounded-2xl border border-slate-200 bg-white/90 backdrop-blur shadow-xl shadow-slate-200/60 overflow-hidden" aria-live="polite">
+                <div class="flex items-center justify-between gap-3 px-4 py-2.5 bg-[#0d1117]">
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span></span>
+                        <span class="text-[11px] font-black uppercase tracking-[.14em] text-green-400">Live broker latency</span>
+                    </div>
+                    <span class="font-mono text-[10.5px] text-slate-400" id="bl-ago">just now</span>
+                </div>
+                <ul id="bl-list" class="grid sm:grid-cols-2 divide-y sm:divide-y-0 divide-slate-100"></ul>
+                <div class="flex items-center justify-between gap-2 px-4 py-2 border-t border-slate-100 bg-slate-50/80 text-[11px] text-slate-500">
+                    <span id="bl-from">Measured live from our data centre</span>
+                    <span class="hidden sm:inline font-semibold">TCP connect · every 60s</span>
+                </div>
             </div>
         </div>
 
@@ -486,7 +509,7 @@ body.nav-open{overflow:hidden;}
                         <span class="ml-3 text-xs text-slate-400 font-mono">MetaTrader 5 — crapplet-forex-vps</span>
                         <span class="ml-auto flex items-center gap-1.5">
                             <span class="w-2 h-2 rounded-full bg-green-400 latency-ping"></span>
-                            <span class="text-[10px] text-green-400 font-bold font-mono">&lt;1ms</span>
+                            <span class="text-[10px] text-green-400 font-bold font-mono" id="bl-title-ping">&lt;1ms</span>
                         </span>
                     </div>
 
@@ -556,7 +579,7 @@ body.nav-open{overflow:hidden;}
                             <span class="h-2 w-2 rounded-full bg-green-500 status-dot"></span>
                             MT5 Connected — 3 EAs Running
                         </span>
-                        <span class="font-mono text-xs">Ping: <span class="text-green-500 font-black uptime-val">0.8ms</span></span>
+                        <span class="font-mono text-xs"><span id="bl-ping-label">Ping</span>: <span class="text-green-500 font-black uptime-val" id="bl-ping">0.8ms</span></span>
                     </div>
                 </div>
             </div>
@@ -1467,5 +1490,70 @@ if (closeBtn) {
 </script>
 <script src="/header.js"></script>
 <script src="/currency.js"></script>
+
+<script>
+/* Live broker latency — real TCP connect times measured from our data centre every minute. */
+(function () {
+  var box = document.getElementById("broker-latency");
+  if (!box) return;
+  var list = document.getElementById("bl-list"), agoEl = document.getElementById("bl-ago"), fromEl = document.getElementById("bl-from");
+  var measuredAt = null, last = {};
+  function color(ms) { return ms < 30 ? "#16a34a" : ms < 120 ? "#d97706" : "#e11d48"; }
+  function spark(trend, c) {
+    var pts = [], n = Math.max(trend.length - 1, 1), vals = trend.filter(function (v) { return typeof v === "number"; });
+    if (vals.length < 2) return "";
+    var max = Math.max.apply(null, vals) * 1.2 || 1;
+    trend.forEach(function (v, i) { if (typeof v === "number") pts.push(((i / n) * 56).toFixed(1) + "," + (16 - (v / max) * 16).toFixed(1)); });
+    return '<svg width="56" height="16" viewBox="0 0 56 16" aria-hidden="true"><polyline points="' + pts.join(" ") + '" fill="none" stroke="' + c + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/></svg>';
+  }
+  function ago() {
+    if (!measuredAt) return;
+    var s = Math.max(0, Math.round((Date.now() - measuredAt) / 1000));
+    agoEl.textContent = s < 5 ? "updated just now" : s < 60 ? "updated " + s + "s ago" : "updated " + Math.floor(s / 60) + " min ago";
+  }
+  function render(d) {
+    if (!d || !d.live || !d.brokers || !d.brokers.length) { box.classList.add("hidden"); return; }
+    measuredAt = new Date(d.measuredAt).getTime();
+    fromEl.textContent = "Measured live from " + (d.measuredFrom || "our data centre");
+    var rows = d.brokers.slice(0, 6);
+    list.innerHTML = "";
+    rows.forEach(function (b) {
+      var c = color(b.ms), li = document.createElement("li");
+      li.className = "bl-row";
+      var name = document.createElement("div");
+      name.className = "min-w-0 flex-1";
+      var t = document.createElement("div"); t.className = "truncate text-[13px] font-bold text-slate-800"; t.textContent = b.name;
+      var r = document.createElement("div"); r.className = "truncate text-[10.5px] text-slate-400 font-semibold"; r.textContent = b.region ? b.region : "avg " + b.avg + " ms";
+      name.appendChild(t); name.appendChild(r);
+      var sp = document.createElement("span"); sp.className = "hidden min-[420px]:inline-block"; sp.innerHTML = spark(b.trend || [], c);
+      var ms = document.createElement("span");
+      ms.className = "bl-ms shrink-0 font-mono text-[15px] font-black" + (last[b.name] !== undefined && last[b.name] !== b.ms ? " bl-bump" : "");
+      ms.style.color = c;
+      ms.textContent = (b.ms < 10 ? b.ms.toFixed(1) : Math.round(b.ms)) + " ms";
+      li.appendChild(name); li.appendChild(sp); li.appendChild(ms);
+      list.appendChild(li);
+      last[b.name] = b.ms;
+    });
+    box.classList.remove("hidden");
+    // the terminal mock-up shows the real fastest broker too
+    var best = d.brokers[0], v = (best.ms < 10 ? best.ms.toFixed(1) : Math.round(best.ms)) + "ms";
+    var p = document.getElementById("bl-ping"), pt = document.getElementById("bl-title-ping"), pl = document.getElementById("bl-ping-label");
+    if (p) p.textContent = v;
+    if (pt) pt.textContent = v;
+    if (pl) pl.textContent = "Ping to " + best.name;
+    ago();
+  }
+  function load() {
+    fetch("/api/public/broker-latency", { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(render)
+      .catch(function () { /* keep whatever is shown */ });
+  }
+  load();
+  setInterval(load, 30000);
+  setInterval(ago, 1000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) load(); });
+})();
+</script>
 </body>
 </html>
