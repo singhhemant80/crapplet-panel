@@ -5,7 +5,7 @@ import { AdminAuthCard } from "@/components/admin/auth-card";
 
 export default function AdminLogin() {
   return (
-    <AdminAuthCard title="Staff sign in">
+    <AdminAuthCard title="Welcome back" subtitle="Sign in to manage customers, servers and billing.">
       <Suspense><LoginForm portal="admin" /></Suspense>
     </AdminAuthCard>
   );

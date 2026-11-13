@@ -161,3 +161,18 @@ adminDashboard.get(
     });
   }),
 );
+
+/** Small numbers for the sidebar badges — cheap enough to poll every minute. */
+adminDashboard.get(
+  "/nav-counts",
+  requireStaff(),
+  ah(async (_req, res) => {
+    const [orders, tickets, paymentReviews, failedSetup] = await Promise.all([
+      prisma.order.count({ where: { status: "PENDING" } }),
+      prisma.ticket.count({ where: { status: { in: ["OPEN", "CUSTOMER_REPLY"] } } }),
+      prisma.paymentIntent.count({ where: { status: "PENDING_REVIEW" } }),
+      prisma.service.count({ where: { status: "FAILED" } }),
+    ]);
+    res.json({ orders, tickets, paymentReviews, failedSetup });
+  }),
+);
