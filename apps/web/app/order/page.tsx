@@ -1,4 +1,5 @@
 "use client";
+import { bandwidth } from "@/lib/units";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +25,7 @@ function groupIcon(name: string) {
   return "cloud";
 }
 
-const bw = (g?: number | null) => (!g ? "Unmetered" : g >= 1024 ? `${+(g / 1024).toFixed(1)} TB` : `${g} GB`);
+const bw = (g?: number | null) => bandwidth(g);
 
 /** Spec rows shown on a plan card — VPS get a hardware table, hosting its feature list. */
 function specRows(p: any): [string, string, string][] {

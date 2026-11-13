@@ -1,4 +1,5 @@
 "use client";
+import { bandwidth } from "@/lib/units";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge, useLiveStates } from "@/components/live-state";
 import { OsLogo } from "@/components/os-logo";
@@ -132,9 +133,9 @@ function ServiceCard({ s, st }: { s: any; st?: { state: string; reason?: string 
   const days = s.nextDueDate ? Math.ceil((new Date(s.nextDueDate).getTime() - Date.now()) / 86400_000) : null;
   const specs =
     kind === "vps"
-      ? [["memory", `${s.product.cpuCores ?? "—"} vCPU`], ["memory_alt", gb(s.product.ramMb)], ["hard_drive", `${s.product.diskGb ?? "—"} GB NVMe`]]
+      ? [["memory", `${s.product.cpuCores ?? "—"} vCPU`], ["memory_alt", gb(s.product.ramMb)], ["hard_drive", `${s.product.diskGb ?? "—"} GB NVMe`], ...(s.product.bandwidthGb != null ? [["swap_vert", bandwidth(s.product.bandwidthGb)]] : [])]
       : kind === "hosting"
-        ? [["hard_drive", s.product.diskGb ? `${s.product.diskGb} GB disk` : "Unlimited disk"], ["swap_vert", s.product.bandwidthGb ? `${s.product.bandwidthGb} GB bandwidth` : "Unmetered"], ["mail", "Email & SSL"]]
+        ? [["hard_drive", s.product.diskGb ? `${s.product.diskGb} GB disk` : "Unlimited disk"], ["swap_vert", s.product.bandwidthGb ? `${bandwidth(s.product.bandwidthGb)} bandwidth` : "Unmetered"], ["mail", "Email & SSL"]]
         : [];
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-[#ece7f7] bg-white shadow-card transition hover:-translate-y-0.5 hover:border-[#dccafb] hover:shadow-lg">

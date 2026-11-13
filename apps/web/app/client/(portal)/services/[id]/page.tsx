@@ -1,4 +1,5 @@
 "use client";
+import { bandwidth } from "@/lib/units";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
@@ -63,7 +64,7 @@ export default function ServicePage() {
         icon={isVps && svc.osTemplate ? <OsLogo os={svc.osTemplate} size={34} /> : <Icon name={isHosting ? "language" : isVps ? "terminal" : "widgets"} className="text-[26px]" />}
         title={svc.hostname || svc.product.name}
         badge={<Badge status={svc.status} />}
-        subtitle={isHosting ? `${svc.product.name} · ${reseller ? "Reseller hosting (cPanel + WHM)" : "cPanel web hosting"}` : isVps ? `${svc.product.name} · ${svc.product.virtType ?? "KVM"} VPS · ${svc.product.cpuCores} vCPU · ${gb(svc.product.ramMb)} · ${svc.product.diskGb} GB NVMe` : svc.product.name}
+        subtitle={isHosting ? `${svc.product.name} · ${reseller ? "Reseller hosting (cPanel + WHM)" : "cPanel web hosting"}` : isVps ? `${svc.product.name} · ${svc.product.virtType ?? "KVM"} VPS · ${svc.product.cpuCores} vCPU · ${gb(svc.product.ramMb)} · ${svc.product.diskGb} GB NVMe${svc.product.bandwidthGb ? ` · ${bandwidth(svc.product.bandwidthGb)} bandwidth` : ""}` : svc.product.name}
         meta={<>
           {svc.status === "ACTIVE" && (isVps || isHosting) && <span className="rounded-lg bg-white/95 px-1.5 py-1"><LiveBadge state={live?.state} reason={live?.reason} loading={!live} /></span>}
           {(ip || live?.ip) && <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 font-mono text-[12.5px] font-semibold ring-1 ring-white/15"><Icon name="lan" className="text-[16px] text-white/70" />{ip ?? live?.ip}<span className="[&_button]:text-white/80"><Copy text={ip ?? live?.ip} /></span></span>}
@@ -137,7 +138,7 @@ export default function ServicePage() {
                   <Meter label="Network out" value={mbStr(live.netOutMb ?? 0)} sub="since boot" icon="upload" />
                 </>
               )}
-              <Meter label="Bandwidth this month" value={live.bandwidthUsedGb != null ? `${fmtNum(live.bandwidthUsedGb)} GB` : "—"} sub={live.bandwidthGb ? `of ${live.bandwidthGb} GB` : "unmetered"} pct={live.bandwidthGb && live.bandwidthUsedGb != null ? (live.bandwidthUsedGb / live.bandwidthGb) * 100 : undefined} icon="swap_vert" />
+              <Meter label="Bandwidth this month" value={live.bandwidthUsedGb != null ? `${fmtNum(live.bandwidthUsedGb)} GB` : "—"} sub={(live.bandwidthGb || svc.product.bandwidthGb) ? `of ${bandwidth(live.bandwidthGb || svc.product.bandwidthGb)}` : "unmetered"} pct={(live.bandwidthGb || svc.product.bandwidthGb) && live.bandwidthUsedGb != null ? (live.bandwidthUsedGb / (live.bandwidthGb || svc.product.bandwidthGb)) * 100 : undefined} icon="swap_vert" />
             </div>
           )}
           {usage.length > 1 && (
@@ -183,7 +184,7 @@ export default function ServicePage() {
                 <dd className="flex items-center gap-2 font-semibold text-ink">{svc.osTemplate && <OsLogo os={svc.osTemplate} size={22} className="rounded-md" />}{svc.osTemplate?.name ?? "—"}</dd>
                 <dt className="text-mute">Resources</dt>
                 <dd className="font-semibold text-ink">
-                  {svc.product.cpuCores} vCPU · {gb(svc.product.ramMb)} RAM · {svc.product.diskGb} GB SSD
+                  {svc.product.cpuCores} vCPU · {gb(svc.product.ramMb)} RAM · {svc.product.diskGb} GB SSD{svc.product.bandwidthGb ? ` · ${bandwidth(svc.product.bandwidthGb)} bandwidth` : ""}
                 </dd>
                 <dt className="text-mute">Login</dt>
                 <dd>

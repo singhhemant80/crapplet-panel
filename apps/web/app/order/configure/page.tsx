@@ -1,4 +1,5 @@
 "use client";
+import { bandwidth } from "@/lib/units";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, CYCLES, CYCLE_MONTHS, gb, money } from "@/lib/api";
@@ -259,7 +260,7 @@ function Configure() {
             )}
             {p.isVps && (
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-                {[["developer_board", `${p.specs.cpuCores} vCPU`], ["memory", gb(p.specs.ramMb)], ["database", `${p.specs.diskGb} GB SSD`], ["public", `${p.specs.ipv4Count} × IPv4`]].map(([i, t]) => (
+                {[["developer_board", `${p.specs.cpuCores} vCPU`], ["memory", gb(p.specs.ramMb)], ["database", `${p.specs.diskGb} GB SSD`], ...(p.specs.bandwidthGb != null ? [["swap_vert", `${bandwidth(p.specs.bandwidthGb)} bandwidth`]] : []), ["public", `${p.specs.ipv4Count} × IPv4`]].map(([i, t]) => (
                   <span key={t} className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf7ff] px-3 py-1.5 ring-1 ring-[#ede4ff]"><Icon name={i} className="text-[18px] text-primary-dark" />{t}</span>
                 ))}
               </div>
@@ -389,7 +390,7 @@ function Configure() {
             </div>
             <div className="p-5">
               <dl className="space-y-2.5 text-[13px]">
-                {p.isVps && <div className="flex justify-between gap-3"><dt className="text-mute">Resources</dt><dd className="text-right font-semibold text-ink">{p.specs.cpuCores} vCPU · {gb(p.specs.ramMb)} · {p.specs.diskGb} GB</dd></div>}
+                {p.isVps && <div className="flex justify-between gap-3"><dt className="text-mute">Resources</dt><dd className="text-right font-semibold text-ink">{p.specs.cpuCores} vCPU · {gb(p.specs.ramMb)} · {p.specs.diskGb} GB{p.specs.bandwidthGb != null && <> · {bandwidth(p.specs.bandwidthGb)}</>}</dd></div>}
                 {loc && <div className="flex justify-between gap-3"><dt className="text-mute">Location</dt><dd className="font-semibold text-ink">{loc.name}</dd></div>}
                 {osName && <div className="flex justify-between gap-3"><dt className="text-mute">OS</dt><dd className="truncate font-semibold text-ink">{osName}</dd></div>}
                 {!p.isHosting && hostname && <div className="flex justify-between gap-3"><dt className="text-mute">Hostname</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
