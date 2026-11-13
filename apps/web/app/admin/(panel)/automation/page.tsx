@@ -241,6 +241,22 @@ function SettingsTab({ data, onSaved }: { data: any; onSaved: () => void }) {
         </div>
       </Card>
 
+      <Card title="UPI AutoPay">
+        <div className="space-y-4">
+          <Toggle checked={f.upiAutopay ?? true} onChange={(v) => set("upiAutopay", v)} label="Offer UPI AutoPay when customers pay for services, and charge renewals to it" />
+          <Row>
+            <Field label="Gateway for new mandates" hint="Existing mandates keep renewing on the gateway they were set up with">
+              <Select value={f.autopayGateway ?? "auto"} onChange={(e) => set("autopayGateway", e.target.value)}>
+                <option value="auto">Automatic — Razorpay if it's on, otherwise Cashfree</option>
+                <option value="razorpay">Razorpay</option>
+                <option value="cashfree">Cashfree</option>
+              </Select>
+            </Field>
+            <Field label="Charge renewals (days before due)" hint="At least 2 — the bank notifies the customer 24 hours before each debit"><Input {...num("autopayDaysBeforeDue")} /></Field>
+          </Row>
+        </div>
+      </Card>
+
       <Card title="Payment reminders">
         <div className="space-y-4">
           <Field label="Reminder before due (days, comma separated)" hint="e.g. 7, 3 — an “invoice due soon” email on each of these days"><Input value={txt.reminderDaysBefore} onChange={(e) => setTxt({ ...txt, reminderDaysBefore: e.target.value })} /></Field>

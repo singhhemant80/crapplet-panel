@@ -60,6 +60,8 @@ export const DEFAULT_SETTINGS = {
     applyCreditAutomatically: true,
     // UPI AutoPay (Razorpay): offered when paying an order with renewals; renewals are charged to it
     upiAutopay: true,
+    /** which gateway sets up new mandates: auto = Razorpay when it's on, else Cashfree */
+    autopayGateway: "auto" as "auto" | "razorpay" | "cashfree",
     /** start the AutoPay debit this many days before the due date (the bank notifies 24 h before, debits ~25 h after) */
     autopayDaysBeforeDue: 3,
     // reminders

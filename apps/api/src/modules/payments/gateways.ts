@@ -218,8 +218,10 @@ const stripe: Gateway = {
 };
 
 // ───────────────────────── Cashfree (PG API 2023-08-01) ─────────────────────────
-const cfBase = (test: boolean) => (test ? "https://sandbox.cashfree.com/pg" : "https://api.cashfree.com/pg");
-const cfHeaders = (cfg: GatewayConfig) => ({ "x-client-id": cfg.appId, "x-client-secret": cfg.secretKey, "x-api-version": "2023-08-01", "Content-Type": "application/json" });
+/** overridable only so tests can point at a stand-in Cashfree */
+export const cfBase = (test: boolean) =>
+  process.env.NODE_ENV !== "production" && process.env.CASHFREE_API_BASE ? process.env.CASHFREE_API_BASE : test ? "https://sandbox.cashfree.com/pg" : "https://api.cashfree.com/pg";
+export const cfHeaders = (cfg: GatewayConfig) => ({ "x-client-id": cfg.appId, "x-client-secret": cfg.secretKey, "x-api-version": "2023-08-01", "Content-Type": "application/json" });
 const cashfree: Gateway = {
   code: "cashfree",
   currencies: ["INR"],
@@ -259,7 +261,29 @@ const cashfree: Gateway = {
     if (evt.type === "PAYMENT_SUCCESS_WEBHOOK" && p?.payment_status === "SUCCESS") {
       payments.push({ gatewayOrderId: evt.data.order.order_id, gatewayTxnId: String(p.cf_payment_id), amount: Math.round(Number(p.payment_amount) * 100), paid: true, raw: evt.data });
     }
-    return { eventId: `${evt.type}:${p?.cf_payment_id ?? ts}`, type: evt.type, payments };
+    // ── UPI AutoPay (Cashfree subscriptions) ──
+    const d = evt.data ?? {};
+    const tokens: { id: string; status: string }[] = [];
+    const failures: { gatewayOrderId: string; reason: string }[] = [];
+    // the approval payment (it pays the invoice the mandate was set up with) — keyed by the subscription
+    if (evt.type === "SUBSCRIPTION_AUTH_STATUS" && d.payment_status === "SUCCESS" && d.subscription_id) {
+      payments.push({ gatewayOrderId: String(d.subscription_id), gatewayTxnId: `cfsub-auth-${d.subscription_id}`, amount: Math.round(Number(d.payment_amount ?? 0) * 100), paid: true, raw: d });
+      tokens.push({ id: String(d.subscription_id), status: "confirmed" });
+    }
+    // renewal charges — keyed by our payment_id
+    if (evt.type === "SUBSCRIPTION_PAYMENT_SUCCESS" && d.payment_status === "SUCCESS" && d.payment_type !== "AUTH" && d.payment_id) {
+      payments.push({ gatewayOrderId: String(d.payment_id), gatewayTxnId: `cfsub-${d.cf_payment_id ?? d.payment_id}`, amount: Math.round(Number(d.payment_amount ?? 0) * 100), paid: true, raw: d });
+    }
+    if ((evt.type === "SUBSCRIPTION_PAYMENT_FAILED" || evt.type === "SUBSCRIPTION_PAYMENT_CANCELLED") && d.payment_id) {
+      failures.push({ gatewayOrderId: String(d.payment_id), reason: String(d.failure_details?.failure_reason ?? (evt.type === "SUBSCRIPTION_PAYMENT_CANCELLED" ? "Cancelled" : "Payment failed")).slice(0, 300) });
+    }
+    if (evt.type === "SUBSCRIPTION_STATUS_CHANGED" && d.subscription_details?.subscription_id) {
+      const st = String(d.subscription_details.subscription_status ?? "");
+      const map: Record<string, string> = { ACTIVE: "confirmed", ON_HOLD: "paused", CUSTOMER_PAUSED: "paused", CUSTOMER_CANCELLED: "cancelled", CANCELLED: "cancelled", EXPIRED: "cancelled", COMPLETED: "cancelled", CARD_EXPIRED: "cancelled", LINK_EXPIRED: "rejected" };
+      if (map[st]) tokens.push({ id: String(d.subscription_details.subscription_id), status: map[st] });
+    }
+    const ref = p?.cf_payment_id ?? d.cf_payment_id ?? d.payment_id ?? d.subscription_details?.subscription_id ?? ts;
+    return { eventId: `${evt.type}:${ref}:${d.payment_status ?? d.subscription_details?.subscription_status ?? ""}`, type: evt.type, payments, tokens: tokens.length ? tokens : undefined, failures: failures.length ? failures : undefined };
   },
   /** Cashfree refunds are made against the order: POST /orders/{order_id}/refunds */
   async refund(txnId, amount, cfg, test, ctx) {

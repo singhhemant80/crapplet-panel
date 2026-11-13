@@ -1,5 +1,5 @@
 import { prisma, Prisma } from "../../db";
-import { AUTOPAY_CODE, autopayEligible, createAutopayRegistration, onChargeFailed, onTokenEvent, saveMandateFromPayment } from "./autopay";
+import { AUTOPAY_CODES, autopayEligible, autopayProvider, checkCashfreeMandate, createAutopayRegistration, createCashfreeMandate, onChargeFailed, onTokenEvent, saveMandateFromPayment } from "./autopay";
 import { decryptJson } from "../../lib/crypto";
 import { badRequest, conflict, HttpError, notFound } from "../../lib/http";
 import { applyPayment, invoiceLabel } from "../billing/invoices";
@@ -14,10 +14,11 @@ export async function gatewayConfig(code: string) {
 
 export async function startPayment(args: { userId: string; invoiceId: string; gateway: string; amount?: number }) {
   // "UPI AutoPay": a Razorpay payment that also sets up the mandate for renewals
-  const autopay = args.gateway === AUTOPAY_CODE;
+  const autopay = AUTOPAY_CODES.includes(args.gateway);
   if (autopay) {
-    if (!(await autopayEligible(args.invoiceId, args.userId))) throw badRequest("UPI AutoPay isn't available for this invoice — please choose another payment method");
-    args = { ...args, gateway: "razorpay", amount: undefined };
+    const provider = await autopayProvider();
+    if (!provider || !(await autopayEligible(args.invoiceId, args.userId))) throw badRequest("UPI AutoPay isn't available for this invoice — please choose another payment method");
+    args = { ...args, gateway: provider.code, amount: undefined };
   }
   const inv = await prisma.invoice.findUnique({ where: { id: args.invoiceId }, include: { user: true } });
   if (!inv || inv.userId !== args.userId) throw notFound("Invoice not found");
@@ -33,7 +34,11 @@ export async function startPayment(args: { userId: string; invoiceId: string; ga
   const intent = await prisma.paymentIntent.create({ data: { userId: args.userId, invoiceId: inv.id, gateway: args.gateway, amount, currency: inv.currency } });
   const payer = { id: inv.userId, name: `${inv.user.firstName} ${inv.user.lastName}`.trim(), email: inv.user.email, phone: inv.user.phone };
   try {
-    const r = autopay ? await createAutopayRegistration(intent, payer, secrets, `Invoice ${invoiceLabel(inv)}`) : await impl.createPayment({ ...intent }, payer, secrets, pub, row.testMode, `Invoice ${invoiceLabel(inv)}`);
+    const r = !autopay
+      ? await impl.createPayment({ ...intent }, payer, secrets, pub, row.testMode, `Invoice ${invoiceLabel(inv)}`)
+      : args.gateway === "cashfree"
+        ? await createCashfreeMandate(intent, payer, { cfg: secrets, testMode: row.testMode })
+        : await createAutopayRegistration(intent, payer, secrets, `Invoice ${invoiceLabel(inv)}`);
     if (r.gatewayOrderId && !autopay) await prisma.paymentIntent.update({ where: { id: intent.id }, data: { gatewayOrderId: r.gatewayOrderId } });
     return { intentId: intent.id, ...r.client };
   } catch (e) {
@@ -68,7 +73,7 @@ export async function settleVerified(gateway: string, v: Verified) {
     raw: v.raw,
     description: `${gateway} payment`,
   });
-  if (gateway === "razorpay" && (intent.meta as { autopay?: string } | null)?.autopay === "register") {
+  if ((intent.meta as { autopay?: string } | null)?.autopay === "register") {
     await saveMandateFromPayment(intent.id, v.raw as Record<string, unknown>).catch((e) => console.error(`[autopay] couldn't save the mandate for ${intent.id}:`, (e as Error).message));
   }
   return { applied: !r.duplicate, invoicePaid: r.paid, invoiceId: intent.invoiceId };
@@ -77,6 +82,13 @@ export async function settleVerified(gateway: string, v: Verified) {
 export async function verifyReturn(args: { userId?: string; intentId: string; body: Record<string, unknown> }) {
   const intent = await prisma.paymentIntent.findUnique({ where: { id: args.intentId } });
   if (!intent || (args.userId && intent.userId !== args.userId)) throw notFound("Payment not found");
+  // Cashfree UPI AutoPay: back from the mandate approval page
+  if (intent.gateway === "cashfree" && (intent.meta as { autopay?: string } | null)?.autopay === "register") {
+    if (intent.status === "PAID") return { paid: true, invoiceId: intent.invoiceId };
+    const c = await checkCashfreeMandate(intent);
+    if (!c.paid) return { paid: false, status: "pending" };
+    return { paid: true, ...(await settleVerified("cashfree", { ...c.verified, intentId: intent.id })) };
+  }
   const { impl, secrets, row } = await gatewayConfig(intent.gateway);
   if (!impl.verifyReturn) throw badRequest("This gateway confirms payments via webhook only");
   const v = await impl.verifyReturn(args.body, secrets, row.testMode, intent);

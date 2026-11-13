@@ -60,6 +60,18 @@ function InvoiceView() {
           router.replace(`/client/invoices/${id}`);
           reload();
         });
+    } else if (sp.get("autopay") === "cashfree" && sp.get("intent")) {
+      // back from Cashfree's AutoPay approval page
+      verified.current = true;
+      setVerifying(true);
+      api(`/payments/${sp.get("intent")}/verify`, { body: {} })
+        .then((r) => (r.paid ? toast.success("Payment received — UPI AutoPay is on for renewals") : toast.info("Waiting for your bank to confirm AutoPay. This invoice updates automatically once it does.")))
+        .catch((e) => toast.error(e.message))
+        .finally(() => {
+          setVerifying(false);
+          router.replace(`/client/invoices/${id}`);
+          reload();
+        });
     } else if (sp.get("payment") === "success") toast.success("Payment received — thank you!");
     else if (sp.get("payment") === "failed") toast.error("Payment failed or was cancelled.");
   }, [sp, id, router, reload]);
@@ -103,6 +115,13 @@ function InvoiceView() {
           modal: { ondismiss: () => setBusy(false) },
         });
         rz.open();
+        return;
+      }
+      if (r.type === "cashfree_subscription") {
+        // UPI AutoPay via Cashfree: approve the mandate (it also pays this invoice), then back here
+        await loadScript("https://sdk.cashfree.com/js/v3/cashfree.js");
+        const cf = window.Cashfree({ mode: r.mode });
+        cf.subscriptionsCheckout({ subsSessionId: r.subsSessionId, redirectTarget: "_self" });
         return;
       }
       if (r.type === "cashfree") {
