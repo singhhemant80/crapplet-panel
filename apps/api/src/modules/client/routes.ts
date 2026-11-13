@@ -156,6 +156,24 @@ clientRouter.put(
   }),
 );
 
+// ───── UPI AutoPay ─────
+clientRouter.get(
+  "/autopay",
+  ah(async (req, res) => {
+    const list = await prisma.payMethod.findMany({ where: { userId: req.user!.id, status: { not: "REVOKED" } }, orderBy: { createdAt: "desc" }, omit: { tokenEnc: true } });
+    res.json({ methods: list });
+  }),
+);
+
+clientRouter.delete(
+  "/autopay/:id",
+  ah(async (req, res) => {
+    const { cancelMandate } = await import("../payments/autopay");
+    await cancelMandate(req.params.id, req.user!.id, req.user!.id);
+    res.json({ ok: true });
+  }),
+);
+
 // ───── Profile ─────
 clientRouter.put(
   "/profile",

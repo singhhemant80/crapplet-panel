@@ -40,6 +40,10 @@ export interface WebhookResult {
   eventId: string;
   type: string;
   payments: Verified[];
+  /** UPI AutoPay mandates whose state changed (Razorpay token.* events) */
+  tokens?: { id: string; status: string }[];
+  /** failed charges (payment.failed) — used for AutoPay renewal attempts */
+  failures?: { gatewayOrderId: string; reason: string }[];
 }
 export type GatewayConfig = Record<string, string>;
 export interface PublicGatewayConfig {
@@ -64,7 +68,7 @@ const h = (headers: Record<string, string | string[] | undefined>, k: string) =>
   return Array.isArray(v) ? v[0] : v ?? "";
 };
 
-async function httpJson<T>(url: string, init: { method: string; headers?: Record<string, string>; body?: string }): Promise<T> {
+export async function httpJson<T>(url: string, init: { method: string; headers?: Record<string, string>; body?: string }): Promise<T> {
   const host = new URL(url).host;
   let res: Awaited<ReturnType<typeof request>>;
   try {
@@ -90,13 +94,15 @@ async function httpJson<T>(url: string, init: { method: string; headers?: Record
 }
 
 // ───────────────────────── Razorpay ─────────────────────────
+/** overridable only so tests can point at a stand-in Razorpay */
+export const RZP_BASE = process.env.NODE_ENV !== "production" && process.env.RAZORPAY_API_BASE ? process.env.RAZORPAY_API_BASE : "https://api.razorpay.com/v1";
 const razorpay: Gateway = {
   code: "razorpay",
   currencies: ["INR"],
   name: "Razorpay (UPI, Cards, Netbanking, Wallets)",
   async createPayment(intent, payer, cfg, _pub, _t, label) {
     const auth = "Basic " + Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
-    const order = await httpJson<{ id: string }>("https://api.razorpay.com/v1/orders", {
+    const order = await httpJson<{ id: string }>(`${RZP_BASE}/orders`, {
       method: "POST",
       headers: { Authorization: auth, "Content-Type": "application/json" },
       body: JSON.stringify({ amount: intent.amount, currency: intent.currency, receipt: intent.id, notes: { intentId: intent.id, invoiceId: intent.invoiceId } }),
@@ -114,7 +120,7 @@ const razorpay: Gateway = {
     if (!safeEqual(hmacHex("sha256", cfg.keySecret, `${orderId}|${paymentId}`), sig)) throw new HttpError(400, "Razorpay signature mismatch");
     // double-check with Razorpay's API that the payment is captured for this order
     const auth = "Basic " + Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
-    const p = await httpJson<{ id: string; order_id: string; amount: number; status: string; fee?: number }>(`https://api.razorpay.com/v1/payments/${paymentId}`, { method: "GET", headers: { Authorization: auth } });
+    const p = await httpJson<{ id: string; order_id: string; amount: number; status: string; fee?: number }>(`${RZP_BASE}/payments/${paymentId}`, { method: "GET", headers: { Authorization: auth } });
     if (p.order_id !== orderId) throw new HttpError(400, "Payment does not belong to this order");
     return { gatewayOrderId: orderId, gatewayTxnId: p.id, amount: p.amount, paid: p.status === "captured", fee: p.fee ?? 0, raw: p };
   },
@@ -126,13 +132,19 @@ const razorpay: Gateway = {
     const payments: Verified[] = [];
     if (evt.event === "payment.captured" || evt.event === "order.paid") {
       const p = evt.payload.payment.entity;
-      payments.push({ gatewayOrderId: p.order_id, gatewayTxnId: p.id, amount: p.amount, paid: p.status === "captured", fee: p.fee ?? 0, raw: p });
+      payments.push({ gatewayOrderId: p.order_id, gatewayTxnId: p.id, amount: p.amount, currency: p.currency, paid: p.status === "captured", fee: p.fee ?? 0, raw: p });
     }
-    return { eventId, type: evt.event, payments };
+    // UPI AutoPay mandate state (cancelled / paused from the customer's UPI app, rejected by the bank …)
+    const tokens = /^token\./.test(String(evt.event)) && evt.payload?.token?.entity?.id ? [{ id: String(evt.payload.token.entity.id), status: String(evt.event).slice(6) }] : undefined;
+    const failures =
+      evt.event === "payment.failed" && evt.payload?.payment?.entity?.order_id
+        ? [{ gatewayOrderId: String(evt.payload.payment.entity.order_id), reason: String(evt.payload.payment.entity.error_description ?? evt.payload.payment.entity.error_reason ?? "Payment failed").slice(0, 300) }]
+        : undefined;
+    return { eventId, type: evt.event, payments, tokens, failures };
   },
   async refund(txnId, amount, cfg, _test, ctx) {
     const auth = "Basic " + Buffer.from(`${cfg.keyId}:${cfg.keySecret}`).toString("base64");
-    const r = await httpJson<{ id: string; status?: string }>(`https://api.razorpay.com/v1/payments/${txnId}/refund`, {
+    const r = await httpJson<{ id: string; status?: string }>(`${RZP_BASE}/payments/${txnId}/refund`, {
       method: "POST",
       headers: { Authorization: auth, "Content-Type": "application/json" },
       body: JSON.stringify({ amount, speed: "normal", receipt: ctx?.ref?.slice(0, 40), notes: ctx?.reason ? { reason: ctx.reason.slice(0, 250) } : undefined }),

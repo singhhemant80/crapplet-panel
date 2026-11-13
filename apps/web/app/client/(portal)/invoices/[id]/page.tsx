@@ -31,7 +31,7 @@ function InvoiceView() {
   const { me } = useSession();
   const { data, loading, reload } = useApi(`/client/invoices/${id}`);
   // only methods that can charge this invoice's currency (e.g. PayPal / Stripe / wire for USD)
-  const methods = useApi(data?.invoice ? `/payments/methods?currency=${data.invoice.currency}` : null, [data?.invoice?.currency]);
+  const methods = useApi(data?.invoice ? `/payments/methods?currency=${data.invoice.currency}&invoiceId=${data.invoice.id}` : null, [data?.invoice?.currency, data?.invoice?.id]);
   const [method, setMethod] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState<any>(null);
@@ -85,12 +85,14 @@ function InvoiceView() {
           description: r.description,
           image: "/Crapplet_Icon.png",
           prefill: r.prefill,
+          // UPI AutoPay: this payment also approves the mandate for renewals
+          ...(r.recurring ? { customer_id: r.customerId, recurring: 1 } : {}),
           theme: { color: "#7c3aed" },
           handler: async (resp: any) => {
             setVerifying(true);
             try {
               const v = await api(`/payments/${r.intentId}/verify`, { body: resp });
-              v.paid ? toast.success("Payment received — thank you!") : toast.info("Payment is processing.");
+              v.paid ? toast.success(r.recurring ? "Payment received — UPI AutoPay is on for renewals" : "Payment received — thank you!") : toast.info("Payment is processing.");
             } catch (e: any) {
               toast.error(e.message);
             } finally {
@@ -197,11 +199,25 @@ function InvoiceView() {
                     </div>
                   )}
                   {methods.data && !methods.data.methods?.length && <Alert tone="warn">No payment method is set up for {inv.currency} yet. Please contact billing@crapplet.co.in.</Alert>}
+                  {methods.data?.autopay && (
+                    <div className="flex items-start gap-2.5 rounded-xl bg-emerald-50 px-3.5 py-3 text-[13px] text-emerald-800 ring-1 ring-emerald-200">
+                      <Icon name="autorenew" className="mt-px text-[18px]" />
+                      <span><b>UPI AutoPay is on</b>{methods.data.autopay.label?.includes(" — ") ? ` (${methods.data.autopay.label.split(" — ").pop()})` : ""} — this invoice will be paid automatically before it&apos;s due. You can also pay it now.</span>
+                    </div>
+                  )}
                   {methods.data?.methods?.map((m: any) => (
-                    <label key={m.code} className={cx("flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition", method === m.code ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line hover:border-primary/40")}>
-                      <input type="radio" className="accent-[#7c3aed]" checked={method === m.code} onChange={() => setMethod(m.code)} />
-                      <Icon name={m.code === "upi" ? "qr_code_2" : m.code === "bank" || m.code === "wire" ? "account_balance" : m.code === "stripe" ? "credit_card" : m.code === "paypal" ? "account_balance_wallet" : m.offline ? "payments" : "bolt"} className="text-primary-dark" />
-                      <span className="text-sm font-semibold text-ink">{m.name}</span>
+                    <label key={m.code} className={cx("block cursor-pointer rounded-xl border p-3.5 transition", method === m.code ? "border-primary bg-primary-tint ring-2 ring-primary/20" : "border-line hover:border-primary/40")}>
+                      <span className="flex items-center gap-3">
+                        <input type="radio" className="accent-[#7c3aed]" checked={method === m.code} onChange={() => setMethod(m.code)} />
+                        <Icon name={m.autopay ? "autorenew" : m.code === "upi" ? "qr_code_2" : m.code === "bank" || m.code === "wire" ? "account_balance" : m.code === "stripe" ? "credit_card" : m.code === "paypal" ? "account_balance_wallet" : m.offline ? "payments" : "bolt"} className="text-primary-dark" />
+                        <span className="flex-1 text-sm font-semibold text-ink">{m.name}</span>
+                        {m.recommended && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide text-emerald-700">Recommended</span>}
+                      </span>
+                      {m.autopay && method === m.code && (
+                        <span className="mt-2 block pl-7 text-[12.5px] leading-relaxed text-mute">
+                          Pay {money(due, inv.currency)} now with any UPI app and approve AutoPay once. Renewals are then paid automatically — your UPI app notifies you 24 hours before each debit, and you can turn it off any time from Payments.
+                        </span>
+                      )}
                     </label>
                   ))}
                   {methods.data?.methods?.length > 0 && (

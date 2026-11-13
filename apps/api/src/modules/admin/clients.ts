@@ -221,6 +221,11 @@ adminClients.put(
   requireStaff("billing.manage"),
   ah(async (req, res) => {
     const b = parse(z.object({ isDefault: z.boolean().optional(), autopay: z.boolean().optional(), status: z.enum(["ACTIVE", "EXPIRED", "REVOKED"]).optional() }), req.body);
+    if (b.status === "REVOKED") {
+      // revoking a UPI AutoPay mandate also cancels it at the gateway
+      const { cancelMandate } = await import("../payments/autopay");
+      await cancelMandate(req.params.pid, req.params.id, req.user!.id);
+    }
     const pm = await prisma.payMethod.findFirst({ where: { id: req.params.pid, userId: req.params.id } });
     if (!pm) throw notFound();
     await prisma.$transaction(async (tx) => {
@@ -237,6 +242,11 @@ adminClients.delete(
   ah(async (req, res) => {
     const pm = await prisma.payMethod.findFirst({ where: { id: req.params.pid, userId: req.params.id } });
     if (!pm) throw notFound();
+    if (pm.externalId && pm.status !== "REVOKED") {
+      // a UPI AutoPay mandate is cancelled at the gateway before the record goes
+      const { cancelMandate } = await import("../payments/autopay");
+      await cancelMandate(pm.id, req.params.id, req.user!.id);
+    }
     await prisma.payMethod.delete({ where: { id: pm.id } });
     await audit({ actorId: req.user!.id, userId: req.params.id, action: "client.paymethod_removed", entity: "paymethod", entityId: pm.id, details: { label: pm.label } });
     res.json({ ok: true });

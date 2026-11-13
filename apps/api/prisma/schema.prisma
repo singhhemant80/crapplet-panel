@@ -124,7 +124,11 @@ model PayMethod {
   tokenEnc   String? // gateway customer/token/mandate id, encrypted
   isDefault  Boolean   @default(false)
   autopay    Boolean   @default(false)
-  status     String    @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  status     String    @default("ACTIVE") // ACTIVE | PAUSED | EXPIRED | REVOKED
+  /** gateway's token / mandate id (Razorpay token_…) — to match the gateway's token.* webhooks */
+  externalId String?   @unique
+  /** most the mandate allows per debit (paise) — set when the customer approved it */
+  maxAmount  Int?
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
 

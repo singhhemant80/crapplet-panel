@@ -58,6 +58,10 @@ export const DEFAULT_SETTINGS = {
     domainInvoiceDaysBeforeDue: 30,
     invoiceCreatedEmail: true,
     applyCreditAutomatically: true,
+    // UPI AutoPay (Razorpay): offered when paying an order with renewals; renewals are charged to it
+    upiAutopay: true,
+    /** start the AutoPay debit this many days before the due date (the bank notifies 24 h before, debits ~25 h after) */
+    autopayDaysBeforeDue: 3,
     // reminders
     reminderDaysBefore: [7, 3],
     overdueReminderDaysAfter: [1, 3, 5],

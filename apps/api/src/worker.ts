@@ -74,6 +74,10 @@ const maintenance = new Worker(
           })),
         );
       }
+      case "autopay": {
+        const { runAutopay } = await import("./modules/payments/autopay");
+        return runAutopay();
+      }
       case "sync-services": {
         // keep every customer's IPs and OS in line with Virtualizor (same as "Sync all")
         const { readSyncAll, runSyncAll } = await import("./modules/provisioning/virtualizor-sync-all");
@@ -136,6 +140,7 @@ async function schedule() {
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("sync-ips", { every: 10 * 60_000 }, { name: "sync-ips" });
   await q.upsertJobScheduler("sync-services", { every: 30 * 60_000 }, { name: "sync-services" });
+  await q.upsertJobScheduler("autopay", { every: 60 * 60_000 }, { name: "autopay" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   // automatic database backups: checked every 5 minutes against Settings → Backups
   await latencyQueue().upsertJobScheduler("broker-latency", { every: 60_000 }, { name: "broker-latency" });

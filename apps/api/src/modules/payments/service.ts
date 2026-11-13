@@ -1,4 +1,5 @@
 import { prisma, Prisma } from "../../db";
+import { AUTOPAY_CODE, autopayEligible, createAutopayRegistration, onChargeFailed, onTokenEvent, saveMandateFromPayment } from "./autopay";
 import { decryptJson } from "../../lib/crypto";
 import { badRequest, conflict, HttpError, notFound } from "../../lib/http";
 import { applyPayment, invoiceLabel } from "../billing/invoices";
@@ -12,6 +13,12 @@ export async function gatewayConfig(code: string) {
 }
 
 export async function startPayment(args: { userId: string; invoiceId: string; gateway: string; amount?: number }) {
+  // "UPI AutoPay": a Razorpay payment that also sets up the mandate for renewals
+  const autopay = args.gateway === AUTOPAY_CODE;
+  if (autopay) {
+    if (!(await autopayEligible(args.invoiceId, args.userId))) throw badRequest("UPI AutoPay isn't available for this invoice — please choose another payment method");
+    args = { ...args, gateway: "razorpay", amount: undefined };
+  }
   const inv = await prisma.invoice.findUnique({ where: { id: args.invoiceId }, include: { user: true } });
   if (!inv || inv.userId !== args.userId) throw notFound("Invoice not found");
   if (inv.status !== "UNPAID") throw conflict("This invoice is not awaiting payment");
@@ -26,8 +33,8 @@ export async function startPayment(args: { userId: string; invoiceId: string; ga
   const intent = await prisma.paymentIntent.create({ data: { userId: args.userId, invoiceId: inv.id, gateway: args.gateway, amount, currency: inv.currency } });
   const payer = { id: inv.userId, name: `${inv.user.firstName} ${inv.user.lastName}`.trim(), email: inv.user.email, phone: inv.user.phone };
   try {
-    const r = await impl.createPayment({ ...intent }, payer, secrets, pub, row.testMode, `Invoice ${invoiceLabel(inv)}`);
-    if (r.gatewayOrderId) await prisma.paymentIntent.update({ where: { id: intent.id }, data: { gatewayOrderId: r.gatewayOrderId } });
+    const r = autopay ? await createAutopayRegistration(intent, payer, secrets, `Invoice ${invoiceLabel(inv)}`) : await impl.createPayment({ ...intent }, payer, secrets, pub, row.testMode, `Invoice ${invoiceLabel(inv)}`);
+    if (r.gatewayOrderId && !autopay) await prisma.paymentIntent.update({ where: { id: intent.id }, data: { gatewayOrderId: r.gatewayOrderId } });
     return { intentId: intent.id, ...r.client };
   } catch (e) {
     await prisma.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED", meta: { error: String(e) } } });
@@ -61,6 +68,9 @@ export async function settleVerified(gateway: string, v: Verified) {
     raw: v.raw,
     description: `${gateway} payment`,
   });
+  if (gateway === "razorpay" && (intent.meta as { autopay?: string } | null)?.autopay === "register") {
+    await saveMandateFromPayment(intent.id, v.raw as Record<string, unknown>).catch((e) => console.error(`[autopay] couldn't save the mandate for ${intent.id}:`, (e as Error).message));
+  }
   return { applied: !r.duplicate, invoicePaid: r.paid, invoiceId: intent.invoiceId };
 }
 
@@ -90,6 +100,8 @@ export async function handleWebhook(code: string, raw: Buffer, headers: Record<s
   const results = [];
   try {
     for (const p of evt.payments) results.push(await settleVerified(code, p));
+    for (const t of evt.tokens ?? []) await onTokenEvent(t.id, t.status);
+    for (const f of evt.failures ?? []) await onChargeFailed(f.gatewayOrderId, f.reason);
     await prisma.webhookEvent.update({ where: { gateway_eventId: { gateway: code, eventId: evt.eventId } }, data: { processedAt: new Date(), error: null } });
   } catch (e) {
     await prisma.webhookEvent.update({ where: { gateway_eventId: { gateway: code, eventId: evt.eventId } }, data: { error: String(e) } });

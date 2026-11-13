@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { autopayOffer } from "./autopay";
 import { z } from "zod";
 import { prisma } from "../../db";
 import { config } from "../../config";
@@ -16,11 +17,16 @@ paymentsRouter.get(
     // ?currency=USD → only methods that can charge that currency
     const cur = typeof req.query.currency === "string" ? req.query.currency.toUpperCase() : null;
     const rows = await prisma.paymentGateway.findMany({ where: { enabled: true }, orderBy: { sortOrder: "asc" } });
+    const methods = rows
+      .filter((r) => GATEWAYS[r.code])
+      .map((r) => ({ code: r.code, name: r.name, offline: !!GATEWAYS[r.code].offline, currencies: gatewayCurrencies(r.code, r.publicConfig) as string[] }))
+      .filter((m) => !cur || m.currencies.includes(cur));
+    // ?invoiceId= → offer UPI AutoPay first when the invoice has renewals (and no mandate is set up yet)
+    const invoiceId = typeof req.query.invoiceId === "string" ? req.query.invoiceId : null;
+    const offer = invoiceId && req.user?.type === "CLIENT" ? await autopayOffer(invoiceId, req.user.id).catch(() => null) : null;
     res.json({
-      methods: rows
-        .filter((r) => GATEWAYS[r.code])
-        .map((r) => ({ code: r.code, name: r.name, offline: !!GATEWAYS[r.code].offline, currencies: gatewayCurrencies(r.code, r.publicConfig) }))
-        .filter((m) => !cur || m.currencies.includes(cur)),
+      methods: offer && !offer.active ? [{ code: offer.code, name: "UPI AutoPay — pay now, renewals paid automatically", offline: false, currencies: ["INR"], autopay: true, recommended: true }, ...methods] : methods,
+      autopay: offer?.active ?? null,
     });
   }),
 );
