@@ -28,6 +28,8 @@ crud(adminCatalog, "/product-groups", "productGroup", z.object({ name: z.string(
 });
 
 // ───────────── Products ─────────────
+export const VPS_BANDWIDTH_GB = 10_000;
+
 const productSchema = z.object({
   groupId: z.string(),
   legacyPid: z.number().int().nullable().optional(),
@@ -147,6 +149,8 @@ adminCatalog.post(
   ah(async (req, res) => {
     const b = parse(productSchema, req.body);
     const { pricing, wholesale, serverIds, osTemplateIds, addonIds, configOptions, moduleConfig, ...data } = b;
+    // VPS plans come with 10 TB of bandwidth unless set otherwise
+    if (String(data.type).startsWith("VPS") && data.bandwidthGb == null) data.bandwidthGb = VPS_BANDWIDTH_GB;
     const p = await prisma.$transaction(async (tx) => {
       const p = await tx.product.create({ data: { ...data, moduleConfig: moduleConfig as Prisma.InputJsonValue } });
       await saveProductRelations(tx, p.id, { pricing, wholesale, serverIds, osTemplateIds, addonIds, configOptions });
