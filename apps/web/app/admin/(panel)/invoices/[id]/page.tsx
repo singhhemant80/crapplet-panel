@@ -1,10 +1,12 @@
 "use client";
 import { InvoiceSheet } from "@/components/invoice-sheet";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { LineEditor, dateInput, linesFromApi, linesToApi, type Line } from "@/components/admin/billing-kit";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, date, money } from "@/lib/api";
-import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, Modal, PageHeader, Select, Table, Td, Toggle, toast, useApi } from "@/components/ui";
+import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 export default function AdminInvoice() {
   const { id } = useParams<{ id: string }>();
@@ -12,8 +14,25 @@ export default function AdminInvoice() {
   const [pay, setPay] = useState(false);
   const [cn, setCn] = useState(false);
   const [refund, setRefund] = useState(false);
+  const [edit, setEdit] = useState(false);
+  const [split, setSplit] = useState(false);
+  const [mail, setMail] = useState(false);
+  const router = useRouter();
   if (loading || !data) return <Loading />;
   const i = data.invoice;
+  const editable = i.status === "UNPAID" || i.status === "DRAFT";
+  const movable = editable && !(i.amountPaid > 0) && !i.number && !i.isWalletTopup;
+  const run = (path: string, body: unknown, ok: string, after?: (r: any) => void, method?: string) =>
+    api(path, { body, method }).then((r) => { toast.success(ok); after ? after(r) : reload(); }).catch((e) => toast.error(e.message));
+  const more: [string, string, () => void, boolean?][] = [
+    ...(editable ? ([["Apply account credit", "account_balance_wallet", () => run(`/admin/invoices/${id}/apply-credit`, {}, "Credit applied")]] as any) : []),
+    ["Duplicate as draft", "content_copy", () => run(`/admin/invoices/${id}/duplicate`, {}, "Copy created as a draft", (r) => router.push(`/admin/invoices/${r.id}`))],
+    ...(movable && i.items.length > 1 ? ([["Split into two invoices", "call_split", () => setSplit(true)]] as any) : []),
+    ...(i.status === "UNPAID" || i.status === "PAID" ? ([["Email the customer…", "forward_to_inbox", () => setMail(true)]] as any) : []),
+    ...(i.status === "UNPAID" && movable ? ([["Move back to draft", "edit_note", () => run(`/admin/invoices/${id}/status`, { status: "DRAFT" }, "Moved to draft — hidden from the customer")]] as any) : []),
+    ...(i.status === "CANCELLED" && !i.number && !i.transactions.length ? ([["Reopen as unpaid", "replay", () => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: false }, "Reopened")]] as any) : []),
+    ...(movable && !i.order ? ([["Delete invoice", "delete", () => confirm("Delete this invoice permanently? This can't be undone.") && run(`/admin/invoices/${id}`, undefined, "Invoice deleted", () => router.push("/admin/invoices"), "DELETE"), true]] as any) : []),
+  ];
   return (
     <>
       <PageHeader icon="receipt_long"
@@ -28,6 +47,11 @@ export default function AdminInvoice() {
         back="/admin/invoices" title={<span className="flex items-center gap-3">{data.label} <Badge status={i.status} /></span>} subtitle={<span><Link className="font-bold text-primary-dark" href={`/admin/clients/${i.user.id}`}>{i.user.firstName} {i.user.lastName}</Link> · proforma {i.proformaNumber} · place of supply {i.placeOfSupply ?? "—"}</span>}
         actions={<>
           <Button variant="outline" size="sm" icon="picture_as_pdf" onClick={() => window.open(`/api/admin/invoices/${id}/pdf`, "_blank")}>PDF</Button>
+          {editable && <Button size="sm" variant="secondary" icon="edit" onClick={() => setEdit(true)}>Edit invoice</Button>}
+          {i.status === "DRAFT" && <>
+            <Button size="sm" icon="send" onClick={() => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: true }, "Invoice issued and emailed")}>Issue &amp; send</Button>
+            <Button size="sm" variant="outline" onClick={() => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: false }, "Invoice issued")}>Issue without email</Button>
+          </>}
           {i.status === "UNPAID" && <>
             <Button size="sm" icon="add_card" onClick={() => setPay(true)}>Record payment</Button>
             <Button size="sm" variant="outline" icon="mail" onClick={() => api(`/admin/invoices/${id}/remind`, { body: {} }).then(() => toast.success("Reminder sent"))}>Send reminder</Button>
@@ -36,7 +60,9 @@ export default function AdminInvoice() {
           </>}
           {i.status === "PAID" && i.amountPaid > 0 && <Button size="sm" variant="danger" icon="currency_exchange" onClick={() => setRefund(true)}>Refund</Button>}
           {i.status === "PAID" && <Button size="sm" variant="outline" icon="undo" onClick={() => setCn(true)}>Credit note</Button>}
+          <MoreMenu items={more} />
         </>} />
+      {i.status === "DRAFT" && <Alert tone="warn" className="mb-4">This invoice is a <b>draft</b> — the customer can't see it yet. Edit it as needed, then <b>Issue &amp; send</b>.</Alert>}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <InvoiceSheet data={data} admin />
         <div className="space-y-6">
@@ -63,6 +89,9 @@ export default function AdminInvoice() {
       </div>
       <PayModal open={pay} onClose={() => setPay(false)} id={id} due={i.total - i.amountPaid} currency={i.currency} onDone={reload} />
       <RefundModal open={refund} onClose={() => setRefund(false)} id={id} onDone={reload} />
+      {edit && <EditModal inv={i} onClose={() => setEdit(false)} onDone={() => { setEdit(false); reload(); }} />}
+      {split && <SplitModal inv={i} onClose={() => setSplit(false)} onDone={(nid) => { setSplit(false); toast.success("Split — opening the new invoice"); router.push(`/admin/invoices/${nid}`); }} />}
+      <EmailModal open={mail} onClose={() => setMail(false)} id={id} status={i.status} />
       <CreditNoteModal open={cn} onClose={() => setCn(false)} id={id} max={i.total} currency={i.currency} onDone={reload} />
     </>
   );
@@ -172,6 +201,116 @@ function RefundModal({ open, onClose, id, onDone }: { open: boolean; onClose: ()
           </Button>
         </div>
       )}
+    </Modal>
+  );
+}
+
+function MoreMenu({ items }: { items: [string, string, () => void, boolean?][] }) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  return (
+    <>
+      <Button size="sm" variant="outline" icon="more_horiz" aria-haspopup="menu" aria-expanded={!!pos}
+        onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPos(pos ? null : { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }); }}>More</Button>
+      {pos && typeof document !== "undefined" && createPortal(
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => setPos(null)} />
+          <div role="menu" style={{ top: pos.top, right: pos.right }} className="fixed z-[95] w-60 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-xl">
+            {items.map(([label, icon, fn, danger]) => (
+              <button key={label} role="menuitem" type="button" onClick={() => { setPos(null); fn(); }} className={cx("flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm font-semibold hover:bg-primary-tint", danger ? "text-rose-600" : "text-slate-700")}>
+                <Icon name={icon} className="text-[19px]" />{label}
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/** Edit lines, dates, notes and the customer's GSTIN on an unpaid / draft invoice. */
+function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; onDone: () => void }) {
+  const [lines, setLines] = useState<Line[]>(() => linesFromApi(inv.items));
+  const [v, setV] = useState({ issueDate: dateInput(inv.issueDate), dueDate: dateInput(inv.dueDate), notes: inv.notes ?? "", customerGstin: inv.customerGstin ?? "" });
+  const [busy, setBusy] = useState(false);
+  const linked = inv.items.filter((x: any) => x.relId && ["SERVICE", "ADDON", "DOMAIN"].includes(x.type)).map((x: any) => x.id);
+  async function save() {
+    setBusy(true);
+    try {
+      const r = await api(`/admin/invoices/${inv.id}`, { method: "PUT", body: { items: linesToApi(lines), issueDate: v.issueDate || undefined, dueDate: v.dueDate || undefined, notes: v.notes, customerGstin: v.customerGstin } });
+      toast.success(r.paid ? "Saved — the new total is already covered, so it's marked paid" : "Invoice updated");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <Modal open onClose={onClose} title={`Edit invoice ${inv.number ?? inv.proformaNumber}`} wide>
+      <div className="space-y-4">
+        <LineEditor lines={lines} onChange={setLines} currency={inv.currency} />
+        {lines.some((l) => linked.includes(l.id)) && <p className="text-xs text-mute"><Icon name="link" className="mr-1 align-[-3px] text-[15px]" />Lines for services, addons and domains stay linked — paying the invoice still renews them. Removing one means it won't be renewed by this invoice.</p>}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Invoice date"><Input type="date" value={v.issueDate} onChange={(e) => setV({ ...v, issueDate: e.target.value })} /></Field>
+          <Field label="Due date"><Input type="date" value={v.dueDate} onChange={(e) => setV({ ...v, dueDate: e.target.value })} /></Field>
+          <Field label="Customer GSTIN" hint="Blank = unregistered"><Input value={v.customerGstin} onChange={(e) => setV({ ...v, customerGstin: e.target.value.toUpperCase() })} placeholder="09ABCDE1234F1Z5" /></Field>
+        </div>
+        <Field label="Notes on the invoice"><Textarea rows={3} value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} /></Field>
+        {inv.amountPaid > 0 && <Alert tone="info">{money(inv.amountPaid, inv.currency)} is already paid on this invoice — the new total can't go below that.</Alert>}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button icon="save" loading={busy} onClick={save} disabled={!lines.some((l) => l.description.trim())}>Save changes</Button>
+        </div>
+        <p className="text-xs text-mute">GST, totals and place of supply are recalculated when you save.</p>
+      </div>
+    </Modal>
+  );
+}
+
+function SplitModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; onDone: (id: string) => void }) {
+  const [pick, setPick] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal open onClose={onClose} title="Split invoice">
+      <p className="mb-3 text-sm text-mute">Tick the lines to move to a new invoice. The rest stay here; totals and GST are recalculated on both.</p>
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {inv.items.map((x: any) => (
+          <li key={x.id}><label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm">
+            <input type="checkbox" className="h-4 w-4 accent-primary" checked={pick.includes(x.id)} onChange={(e) => setPick(e.target.checked ? [...pick, x.id] : pick.filter((p) => p !== x.id))} />
+            <span className="min-w-0 flex-1 truncate">{x.description}</span><b>{money(x.amount, inv.currency)}</b>
+          </label></li>
+        ))}
+      </ul>
+      <div className="mt-4 flex justify-end">
+        <Button icon="call_split" loading={busy} disabled={!pick.length || pick.length === inv.items.length} onClick={async () => {
+          setBusy(true);
+          try { onDone((await api(`/admin/invoices/${inv.id}/split`, { body: { itemIds: pick } })).id); } catch (e: any) { toast.error(e.message); }
+          setBusy(false);
+        }}>Move {pick.length || ""} line{pick.length === 1 ? "" : "s"} to a new invoice</Button>
+      </div>
+    </Modal>
+  );
+}
+
+const TEMPLATES = [
+  ["created", "Invoice created", "The invoice with a pay-now link"],
+  ["reminder", "Payment reminder", "A friendly reminder before or on the due date"],
+  ["overdue", "Overdue notice", "The invoice is past due"],
+  ["paid", "Payment confirmation", "Receipt for a paid invoice"],
+] as const;
+function EmailModal({ open, onClose, id, status }: { open: boolean; onClose: () => void; id: string; status: string }) {
+  const [t, setT] = useState<string>(status === "PAID" ? "paid" : "created");
+  return (
+    <Modal open={open} onClose={onClose} title="Email the customer">
+      <div className="space-y-2">
+        {TEMPLATES.map(([k, title, text]) => (
+          <label key={k} className={cx("flex cursor-pointer items-start gap-3 rounded-xl border p-3", t === k ? "border-primary bg-primary-tint" : "border-line")}>
+            <input type="radio" className="mt-1 accent-primary" checked={t === k} onChange={() => setT(k)} />
+            <span><b className="text-sm">{title}</b><span className="block text-xs text-mute">{text}</span></span>
+          </label>
+        ))}
+      </div>
+      <div className="mt-4 flex justify-end"><Button icon="send" onClick={() => api(`/admin/invoices/${id}/email`, { body: { template: t } }).then(() => { toast.success("Email queued"); onClose(); }).catch((e) => toast.error(e.message))}>Send email</Button></div>
     </Modal>
   );
 }

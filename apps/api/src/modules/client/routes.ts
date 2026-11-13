@@ -12,6 +12,7 @@ import { enqueueProvision } from "../../jobs/queues";
 import { profileSchema, resolveStateCode } from "../auth/routes";
 import { applyCreditToInvoice, createInvoice, invoiceLabel } from "../billing/invoices";
 import { renderInvoicePdf } from "../billing/pdf";
+import { acceptQuote } from "../billing/extras";
 import { assertClientCan, liveStates, liveStatus, usageHistory } from "../provisioning/provisioner";
 import { attachmentPath, openTicket, replyTicket, ticketUpload } from "../tickets/service";
 import { getSettings } from "../../lib/settings";
@@ -45,7 +46,7 @@ clientRouter.get(
       prisma.transaction.findMany({ where: { userId, type: { in: ["PAYMENT", "WALLET_TOPUP"] }, createdAt: { gte: sixMonthsAgo } }, select: { amount: true, createdAt: true } }),
       prisma.loginHistory.findMany({ where: { userId, success: true }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, ip: true, userAgent: true } }),
       prisma.affiliate.findUnique({ where: { userId }, select: { code: true, balance: true, _count: { select: { referrals: true } } } }),
-      prisma.invoice.count({ where: { userId } }),
+      prisma.invoice.count({ where: { userId, status: { not: "DRAFT" } } }),
     ]);
     const p = user.profile;
     const months = Array.from({ length: 6 }, (_, i) => {
@@ -391,7 +392,8 @@ clientRouter.get(
   "/invoices",
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
-    const where = { userId: req.user!.id, ...(typeof req.query.status === "string" ? { status: req.query.status as "PAID" } : {}) };
+    // drafts are staff-only until they're issued
+    const where = { userId: req.user!.id, ...(typeof req.query.status === "string" && req.query.status !== "DRAFT" ? { status: req.query.status as "PAID" } : { status: { not: "DRAFT" as const } }) };
     const [rows, total] = await Promise.all([prisma.invoice.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }), prisma.invoice.count({ where })]);
     res.json({ invoices: rows, total, page, pageSize });
   }),
@@ -401,7 +403,7 @@ clientRouter.get(
   "/invoices/:id",
   ah(async (req, res) => {
     const inv = await prisma.invoice.findFirst({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id: req.params.id, userId: req.user!.id, status: { not: "DRAFT" } },
       include: { items: true, transactions: { orderBy: { createdAt: "asc" } }, paymentIntents: { where: { status: "PENDING_REVIEW" } } },
     });
     if (!inv) throw notFound("Invoice not found");
@@ -413,7 +415,7 @@ clientRouter.get(
 clientRouter.get(
   "/invoices/:id/pdf",
   ah(async (req, res) => {
-    const inv = await prisma.invoice.findFirst({ where: { id: req.params.id, userId: req.user!.id } });
+    const inv = await prisma.invoice.findFirst({ where: { id: req.params.id, userId: req.user!.id, status: { not: "DRAFT" } } });
     if (!inv) throw notFound("Invoice not found");
     const pdf = await renderInvoicePdf(inv.id);
     res.setHeader("Content-Type", "application/pdf");
@@ -660,5 +662,45 @@ clientRouter.get(
   "/downloads",
   ah(async (_req, res) => {
     res.json({ downloads: await prisma.download.findMany({ orderBy: { createdAt: "desc" } }) });
+  }),
+);
+
+// ───── Quotes ─────
+clientRouter.get(
+  "/quotes",
+  ah(async (req, res) => {
+    const quotes = await prisma.quote.findMany({ where: { userId: req.user!.id, status: { not: "DRAFT" } }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, number: true, subject: true, status: true, currency: true, total: true, validUntil: true, createdAt: true, invoiceId: true } });
+    res.json({ quotes });
+  }),
+);
+
+clientRouter.get(
+  "/quotes/:id",
+  ah(async (req, res) => {
+    const q = await prisma.quote.findFirst({ where: { id: req.params.id, userId: req.user!.id, status: { not: "DRAFT" } }, select: { id: true, number: true, subject: true, status: true, currency: true, items: true, subtotal: true, taxTotal: true, total: true, validUntil: true, customerNotes: true, createdAt: true, sentAt: true, acceptedAt: true, declinedAt: true, invoiceId: true } });
+    if (!q) throw notFound("Quote not found");
+    const st = await getSettings();
+    res.json({ quote: q, company: st.company });
+  }),
+);
+
+clientRouter.post(
+  "/quotes/:id/accept",
+  ah(async (req, res) => {
+    const r = await acceptQuote(req.params.id, req.user!.id);
+    if (!r.already) await audit({ actorId: req.user!.id, userId: req.user!.id, action: "quote.accepted", entity: "quote", entityId: req.params.id, details: { invoiceId: r.invoiceId } });
+    res.json(r);
+  }),
+);
+
+clientRouter.post(
+  "/quotes/:id/decline",
+  ah(async (req, res) => {
+    const b = parse(z.object({ reason: z.string().max(1000).optional() }), req.body ?? {});
+    const q = await prisma.quote.findFirst({ where: { id: req.params.id, userId: req.user!.id, status: { in: ["SENT", "EXPIRED"] } } });
+    if (!q) throw conflict("This quote can't be declined");
+    await prisma.quote.update({ where: { id: q.id }, data: { status: "DECLINED", declinedAt: new Date(), ...(b.reason ? { adminNotes: `${q.adminNotes ? `${q.adminNotes}\n` : ""}Customer declined: ${b.reason}` } : {}) } });
+    await audit({ actorId: req.user!.id, userId: req.user!.id, action: "quote.declined", entity: "quote", entityId: q.id, details: { reason: b.reason ?? null } });
+    res.json({ ok: true });
   }),
 );

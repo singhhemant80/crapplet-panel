@@ -71,6 +71,8 @@ model User {
   contacts       ClientContact[]
   files          ClientFile[]
   payMethods     PayMethod[]
+  billableItems    BillableItem[]
+  quotes           Quote[]
 }
 
 /** Extra people on a customer's account (billing, technical…) — WHMCS "Contacts". */
@@ -1392,4 +1394,67 @@ model EmailCampaignRecipient {
 
   @@unique([campaignId, email])
   @@index([campaignId, status])
+}
+
+/// A charge for a customer that isn't a product: invoiced now, on the next invoice, on a date, or every N months.
+model BillableItem {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description      String
+  /// per unit, in paise (or cents) of `currency`
+  amount           Int
+  quantity         Int       @default(1)
+  currency         String    @default("INR")
+  taxable          Boolean   @default(true)
+  /// NOW | NEXT_INVOICE | ON_DATE | RECURRING
+  invoiceAction    String    @default("NEXT_INVOICE")
+  /// ON_DATE: the day to invoice; RECURRING: the next day to invoice
+  dueDate          DateTime?
+  recurEveryMonths Int?
+  /// RECURRING: how many times in all (null = until stopped)
+  recurTimes       Int?
+  recurDone        Int       @default(0)
+  /// no more invoicing (one-off billed, recurring finished or stopped)
+  invoiced         Boolean   @default(false)
+  invoiceId        String?
+  lastInvoicedAt   DateTime?
+  serviceId        String?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId, invoiced])
+  @@index([invoiced, invoiceAction, dueDate])
+}
+
+/// A quote (estimate) sent to a customer; accepting it creates an invoice.
+model Quote {
+  id            String    @id @default(cuid())
+  number        String    @unique
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  /// DRAFT | SENT | ACCEPTED | DECLINED | EXPIRED | INVOICED
+  status        String    @default("DRAFT")
+  currency      String    @default("INR")
+  validUntil    DateTime
+  /// [{ description, quantity, unitPrice, taxable }]
+  items         Json
+  subtotal      Int       @default(0)
+  taxTotal      Int       @default(0)
+  total         Int       @default(0)
+  customerNotes String?
+  adminNotes    String?
+  invoiceId     String?
+  sentAt        DateTime?
+  acceptedAt    DateTime?
+  declinedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

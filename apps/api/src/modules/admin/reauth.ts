@@ -61,6 +61,10 @@ export const RULES: Rule[] = [
 
   // money
   { methods: ["POST"], path: /^\/invoices\/[^/]+\/(refund|cancel|credit-note|payment)$/, label: "Invoice payment, refund or cancellation" },
+  { methods: ["PUT", "DELETE"], path: /^\/invoices\/[^/]+$/, label: "Edit or delete an invoice" },
+  { methods: ["POST"], path: /^\/invoices\/(merge|[^/]+\/(split|status))$/, label: "Change an invoice" },
+  { methods: ["POST"], path: /^\/invoices\/bulk$/, label: "Bulk invoice action", when: (req) => ["mark_paid", "cancel", "delete"].includes(String((req.body as { action?: unknown })?.action ?? "")) },
+  { methods: ["DELETE"], path: /^\/quotes\/[^/]+$/, label: "Delete a quote" },
   { methods: ["POST"], path: /^\/transactions\/[^/]+\/refund$/, label: "Refund" },
   { methods: ["POST"], path: /^\/payment-reviews\/[^/]+$/, label: "Approve a payment" },
   { methods: ["POST"], path: /^\/referrals\/[^/]+\/approve$/, label: "Affiliate payout" },

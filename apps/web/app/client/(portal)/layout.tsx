@@ -24,6 +24,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Billing",
     items: [
       { href: "/client/invoices", label: "Invoices", icon: "receipt_long", badge: (s) => s.unpaidInvoices || null, tone: "rose" },
+      { href: "/client/quotes", label: "Quotes", icon: "request_quote" },
       { href: "/client/payments", label: "Payments", icon: "payments" },
       { href: "/client/wallet", label: "Wallet & credit", icon: "account_balance_wallet" },
     ],

@@ -26,6 +26,8 @@ import { adminWhatsapp, clientWhatsapp } from "./modules/whatsapp/routes";
 import { adminBackups, publicRestore } from "./modules/backup/routes";
 import { adminCampaigns, publicCampaigns } from "./modules/campaigns/routes";
 import { adminLatency, publicLatency } from "./modules/latency/routes";
+import { adminInvoices } from "./modules/admin/invoices";
+import { adminBillingExtras } from "./modules/admin/billing-extras";
 import { customerTargetGuard, reauthGuard, reauthRouter } from "./modules/admin/reauth";
 import { replyTicket } from "./modules/tickets/service";
 import { openTicket } from "./modules/tickets/service";
@@ -60,7 +62,7 @@ export function createApp() {
   api.use("/webhooks", webhooksRouter);
   api.use("/reseller", resellerRouter);
   api.use("/v1/reseller", resellerRouter); // API-key access for resellers
-  api.use("/admin", reauthGuard, customerTargetGuard, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency, adminCampaigns);
+  api.use("/admin", reauthGuard, customerTargetGuard, adminInvoices, adminBillingExtras, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency, adminCampaigns);
 
   // public content
   api.get("/content/announcements", ah(async (_req, res) => {

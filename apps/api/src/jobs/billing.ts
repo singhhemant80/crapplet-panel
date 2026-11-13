@@ -11,6 +11,7 @@
 import { prisma } from "../db";
 import { addCycle, addDays, istDayStart, addMonths, CYCLE_LABEL } from "../lib/money";
 import { getSettings } from "../lib/settings";
+import { expireQuotes, pendingForNextInvoice, runBillableItems } from "../modules/billing/extras";
 import { addInvoiceItemsTx, createInvoice, invoiceEmailVars, applyCreditToInvoice, cancelInvoice, type NewInvoiceItem } from "../modules/billing/invoices";
 import { queueEmail } from "../modules/email/mailer";
 import { enqueueProvision } from "./queues";
@@ -61,7 +62,13 @@ export async function generateRenewalInvoices(opts: { userId?: string; rec?: Rec
         { type: "SERVICE", relId: svc.id, description: `${svc.product.name} (${CYCLE_LABEL[svc.billingCycle]} renewal)${svc.hostname ? ` — ${svc.hostname}` : ""}`, hsnSac: svc.product.hsnSac, unitPrice: svc.recurringAmount, taxable: svc.product.taxable, periodStart, periodEnd },
         ...svc.addons.map((x) => ({ type: "ADDON" as const, relId: x.id, description: `${x.addon.name} (renewal)`, unitPrice: x.recurringAmount, taxable: x.addon.taxable, periodStart, periodEnd })),
       ];
-      const inv = await prisma.$transaction((tx) => createInvoice(tx, { userId: svc.userId, items, dueDate: periodStart, currency: svc.currency }));
+      const inv = await prisma.$transaction(async (tx) => {
+        // the customer's waiting "add to next invoice" charges ride along with the renewal
+        const extra = await pendingForNextInvoice(tx, svc.userId, svc.currency);
+        const inv = await createInvoice(tx, { userId: svc.userId, items: [...items, ...extra.lines], dueDate: periodStart, currency: svc.currency });
+        await extra.done(inv.id);
+        return inv;
+      });
       created++;
       await rec({ action: "invoice_created", entity: "invoice", entityId: inv.id, userId: svc.userId, label: `${invNo(inv)} · ${svc.hostname ?? svc.product.name}`, message: `${CYCLE_LABEL[svc.billingCycle]} renewal due ${periodStart.toDateString()}` });
       let paid = false;
@@ -339,6 +346,11 @@ export async function runAutomation(opts: { trigger: "schedule" | "manual"; acto
   // order matters: bill first, then remind, then charge late fees, then suspend
   await step("Renewal invoices", () => generateRenewalInvoices({ rec }));
   await step("Reminders", () => sendReminders(rec));
+  await step("Billable items", async () => {
+    const r = await runBillableItems();
+    if (r.invoices) await rec({ action: "invoice_created", label: "Billable items", message: `${r.items} billable item(s) invoiced on ${r.invoices} invoice(s)` });
+  });
+  await step("Quotes", () => expireQuotes());
   await step("Late fees", () => applyLateFees(rec));
   await step("Suspensions", () => processSuspensions(rec));
   await step("Unpaid orders", () => cancelUnpaidOrders(rec));

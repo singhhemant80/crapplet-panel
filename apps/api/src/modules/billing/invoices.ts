@@ -119,6 +119,17 @@ export async function addInvoiceItemsTx(db: Tx, invoiceId: string, extra: NewInv
       data: { invoiceId, type: i.type, relId: i.relId ?? null, description: i.description, hsnSac: i.hsnSac ?? settings.tax.defaultSac, quantity: qty, unitPrice: i.unitPrice, amount: i.unitPrice * qty, taxable: i.taxable ?? true, periodStart: i.periodStart ?? null, periodEnd: i.periodEnd ?? null },
     });
   }
+  return recomputeInvoiceTx(db, invoiceId);
+}
+
+/**
+ * Recompute GST and totals from an invoice's current lines, with the customer details captured on it
+ * (after lines are added, edited, removed, moved or merged).
+ */
+export async function recomputeInvoiceTx(db: Tx, invoiceId: string) {
+  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  const settings = await getSettings(db);
+  const snap = (inv.billingSnapshot ?? {}) as { country?: string; stateCode?: string | null; gstin?: string | null };
   const items = await db.invoiceItem.findMany({ where: { invoiceId } });
   const tax = computeGst(
     items.map((i) => ({ amount: i.amount, taxable: i.taxable })),
@@ -134,13 +145,13 @@ export async function addInvoiceItemsTx(db: Tx, invoiceId: string, extra: NewInv
   const discount = -items.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
   return db.invoice.update({
     where: { id: invoiceId },
-    data: { subtotal: tax.subtotal + discount, discount, taxableAmount: tax.taxableAmount, cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst, taxTotal: tax.taxTotal, total: tax.total },
+    data: { subtotal: tax.subtotal + discount, discount, taxableAmount: tax.taxableAmount, cgst: tax.cgst, sgst: tax.sgst, igst: tax.igst, taxTotal: tax.taxTotal, total: tax.total, placeOfSupply: tax.placeOfSupply, placeOfSupplyCode: tax.placeOfSupplyCode },
     include: { items: true },
   });
 }
 
 /** Sequential tax-invoice number per Indian financial year, assigned when the invoice is paid. */
-async function assignTaxNumber(db: Db, invoiceId: string) {
+export async function assignTaxNumber(db: Db, invoiceId: string) {
   const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   if (inv.number) return inv.number;
   const s = await getSettings(db);

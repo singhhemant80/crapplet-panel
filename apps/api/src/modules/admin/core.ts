@@ -894,11 +894,17 @@ adminCore.post(
         notes: z.string().max(2000).optional(),
         items: z.array(z.object({ description: z.string().min(1).max(300), unitPrice: z.number().int(), quantity: z.number().int().min(1).default(1), taxable: z.boolean().default(true), hsnSac: z.string().optional() })).min(1),
         sendEmail: z.boolean().default(true),
+        currency: z.string().length(3).toUpperCase().optional(),
+        draft: z.boolean().default(false),
       }),
       req.body,
     );
-    const inv = await prisma.$transaction((tx) => createInvoice(tx, { userId: b.userId, dueDate: b.dueDate, notes: b.notes, items: b.items.map((i) => ({ ...i, type: "CUSTOM" as const })) }));
-    if (b.sendEmail) {
+    if (b.currency) await requireCurrency(b.currency);
+    const inv = await prisma.$transaction(async (tx) => {
+      const inv = await createInvoice(tx, { userId: b.userId, dueDate: b.dueDate, notes: b.notes, currency: b.currency, items: b.items.map((i) => ({ ...i, type: i.unitPrice < 0 ? ("PROMO" as const) : ("CUSTOM" as const) })) });
+      return b.draft ? tx.invoice.update({ where: { id: inv.id }, data: { status: "DRAFT" } }) : inv;
+    });
+    if (b.sendEmail && !b.draft) {
       const u = await prisma.user.findUniqueOrThrow({ where: { id: b.userId } });
       await queueEmail("invoice.created", u.email, invoiceEmailVars(inv, u.firstName), u.id);
     }

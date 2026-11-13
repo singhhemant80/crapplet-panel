@@ -59,6 +59,8 @@ export const NAV: Group[] = [
     icon: "account_balance_wallet",
     items: [
       { href: "/admin/invoices", label: "Invoices", icon: "receipt_long", perm: "billing.view" },
+      { href: "/admin/quotes", label: "Quotes", icon: "request_quote", perm: "billing.view" },
+      { href: "/admin/billable-items", label: "Billable Items", icon: "playlist_add", perm: "billing.view" },
       { href: "/admin/transactions", label: "Transactions", icon: "payments", perm: "billing.view" },
       { href: "/admin/payment-reviews", label: "Payment Reviews", icon: "fact_check", perm: "billing.view", badge: "paymentReviews" },
       { href: "/admin/gateways", label: "Payment Gateways", icon: "account_balance", perm: "payments.manage" },
