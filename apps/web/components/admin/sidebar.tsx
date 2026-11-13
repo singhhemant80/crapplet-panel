@@ -175,21 +175,16 @@ export function Sidebar({ rail, onToggleRail, mobile }: { rail: boolean; onToggl
       <div className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-violet-600/25 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,.045)_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(180deg,#000,transparent_45%)]" />
 
-      {/* brand */}
-      <Link href="/admin" className={cx("relative flex shrink-0 items-center gap-3 pt-5", slim ? "justify-center px-0 pb-4" : "px-5 pb-4")}>
-        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white shadow-[0_8px_24px_-6px_rgba(56,189,248,.55)] ring-1 ring-white/40">
+      {/* brand — the full logo, unaltered, on a white plate (slim mode shows the logo's cloud mark) */}
+      <Link href="/admin" className={cx("relative block shrink-0", slim ? "px-3 pb-3 pt-4" : "px-4 pb-3 pt-4")} aria-label="Crapplet Cloud — Dashboard">
+        <span className={cx("flex items-center justify-center rounded-2xl bg-white shadow-[0_10px_28px_-10px_rgba(56,189,248,.6)] ring-1 ring-white/50", slim ? "h-[58px] w-[58px]" : "h-[66px] px-4")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/Crapplet_Icon.png" alt="" className="h-9 w-9" />
+          {slim ? <img src="/Crapplet_Icon.png" alt="Crapplet Cloud" className="h-11 w-11" /> : <img src="/Crapplet_logo.png" alt="Crapplet Cloud" className="h-auto w-full max-w-[212px]" />}
         </span>
         {!slim && (
-          <span className="min-w-0 leading-tight">
-            <span className="block text-[17px] font-extrabold tracking-tight text-white">
-              Crapplet <span className="bg-gradient-to-r from-sky-400 to-violet-400 bg-clip-text text-transparent">Cloud</span>
-            </span>
-            <span className="mt-0.5 flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[.18em] text-slate-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-              Admin console
-            </span>
+          <span className="mt-2.5 flex items-center justify-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[.18em] text-slate-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+            Admin console
           </span>
         )}
       </Link>
