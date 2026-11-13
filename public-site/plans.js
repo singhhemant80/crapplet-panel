@@ -145,7 +145,7 @@
         (p.tagline ? '<p class="text-sm ' + (dark ? 'text-white/60' : 'text-slate-500') + ' leading-snug">' + esc(p.tagline) + '</p>' : '') +
         '<div class="mt-3">' + price(p, dark) + '</div>' +
       '</div>' +
-      tiles(specs, dark, 'grid-cols-2') +
+      tiles(specs.length % 2 ? specs.concat([{ icon: 'location_on', value: 'Noida, IN', label: 'Tier III data centre' }]) : specs, dark, 'grid-cols-2') +
       button(p, dark) +
       freeDomain(p, dark) +
       (feat.length ? '<ul class="space-y-3 pt-4 border-t ' + (dark ? 'border-white/10' : 'border-slate-100') + '">' + feat.map(function (f) {
