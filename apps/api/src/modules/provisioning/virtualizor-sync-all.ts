@@ -181,6 +181,20 @@ export async function runSyncAll(s: SyncAllState) {
       await progress(true);
       continue;
     }
+    // still no IPs for some of our VPSes: ask Virtualizor about each one (its single-VPS answer carries them)
+    const bare = [...new Set(mine.map((x) => String(x.remoteId)))].filter((id) => rows.get(id) && !ipsOf(rows.get(id)!).length);
+    if (bare.length) {
+      s.phase = `Reading IPs of ${bare.length} VPS from ${m.name}`;
+      await progress(true);
+      const client = virtualizorFor(m);
+      for (let i = 0; i < bare.length; i += 5)
+        await Promise.all(
+          bare.slice(i, i + 5).map(async (id) => {
+            const got = await client.vpsIps(id).catch(() => [] as string[]);
+            if (got.length) rows.get(id)!.ips = got;
+          }),
+        );
+    }
     s.phase = `Updating services on ${m.name}`;
     const byVps = new Map<string, typeof mine>();
     for (const svc of mine) byVps.set(String(svc.remoteId), [...(byVps.get(String(svc.remoteId)) ?? []), svc]);

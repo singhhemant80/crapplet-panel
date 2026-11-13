@@ -26,6 +26,7 @@ const VPS: Record<string, Record<string, unknown>> = {
   [`${V + 2}`]: { vpsid: `${V+2}`, hostname: `byip-${RUN}`, serid: "1", ips: { "2": ip(2), "3": ip(3) }, osid: "9001", os_name: "almalinux-9-x86_64", os_distro: "almalinux" },
   [`${V + 3}`]: { vpsid: `${V+3}`, hostname: `byhost-${RUN}`, serid: "1", ips: { "4": ip(4) }, osid: "271", os_name: "ubuntu-22.04-x86_64" },
   [`${V + 5}`]: { vpsid: `${V + 5}`, hostname: `noips-${RUN}`, serid: "1", osid: "271", os_name: "ubuntu-22.04-x86_64" },
+  [`${V + 6}`]: { vpsid: `${V + 6}`, hostname: `single-${RUN}`, serid: "1" },
   [`${V + 4}`]: { vpsid: `${V+4}`, hostname: `twin-${RUN}`, serid: "1", ips: { "5": ip(5) } },
 };
 
@@ -46,12 +47,20 @@ before(async () => {
   await mk("twinA", { hostname: `twin-${RUN}` }); // two services claim the same hostname → not guessed
   await mk("twinB", { hostname: `twin-${RUN}` });
   await mk("nothing", { hostname: `nowhere-${RUN}` });
+  await mk("single", { serverId, remoteId: `${V + 6}`, hostname: `single-${RUN}` });
   await mk("noips", { serverId, remoteId: `${V + 5}`, hostname: `noips-${RUN}` });
 
   // our test master answers with VPS; any other master in the dev database is "unreachable"
   VirtualizorClient.prototype.listVps = async function (this: { creds: { host: string } }, page: number) {
     if (this.creds.host !== "virt.invalid") throw new Error("unreachable in tests");
     return { vs: page === 1 ? JSON.parse(JSON.stringify(VPS)) : {} } as never;
+  } as never;
+  // asked about one VPS, Virtualizor includes its IPs (the list above doesn't, for V+6)
+  VirtualizorClient.prototype.call = async function (this: { creds: { host: string } }, act: string, params: Record<string, unknown> = {}) {
+    if (this.creds.host !== "virt.invalid") throw new Error("unreachable in tests");
+    if (act === "vs" && params.vpsid === `${V + 6}`) return { vs: { [`${V + 6}`]: { vpsid: `${V + 6}`, ips: { "77": ip(11) } } } };
+    if (act === "vs" && params.vpsid) return { vs: {} };
+    throw new Error(`unexpected ${act}`);
   } as never;
   VirtualizorClient.prototype.ips = async function (this: { creds: { host: string } }) {
     if (this.creds.host !== "virt.invalid") throw new Error("unreachable in tests");
@@ -103,6 +112,8 @@ test("sync gives customers' services their IPs and operating system, and links i
 
   assert.deepEqual((await look(svc.noips)).ips.map((i) => i.address), [ip(9)], "IPs from Virtualizor's IP list when the VPS row has none");
 
+  assert.deepEqual((await look(svc.single)).ips.map((i) => i.address), [ip(11)], "IPs from the single-VPS answer when the list and IP list have none");
+
   // what the client area reads
   const clientView = await prisma.service.findMany({ where: { userId, id: { in: [svc.linked, svc.byip, svc.byhost] } }, include: { ips: true, osTemplate: true } });
   assert.ok(clientView.every((x) => x.ips.length && x.osTemplate?.name));
@@ -112,5 +123,5 @@ test("a second run changes nothing", async () => {
   const s = await runSyncAll(fresh());
   assert.equal(s.updated, 0);
   assert.equal(s.linked, 0);
-  assert.equal(s.unchanged, 4);
+  assert.equal(s.unchanged, 5);
 });
