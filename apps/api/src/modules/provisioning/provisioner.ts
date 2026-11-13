@@ -10,7 +10,7 @@ import { getSettings } from "../../lib/settings";
 import { queueEmail } from "../email/mailer";
 import { allocateIpsForService, releaseServiceIps } from "../ipam/service";
 import { ProxmoxClient, type PveNode } from "./proxmox";
-import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, pickVps, storagesOfNode, type NodeHints, type VirtStorage } from "./virtualizor";
+import { ADOPT_POLLS, ADOPT_POLL_MS, VirtualizorClient, isNoAnswer, pickVps, storagesOfNode, vpsIpsOf, type NodeHints, type VirtStorage } from "./virtualizor";
 import type { ProvisionAction } from "../../jobs/queues";
 import { HostingError, cpanelChangePackage, cpanelCreate, cpanelPassword, cpanelStatus, cpanelSuspend, cpanelTerminate, cpanelUnsuspend } from "./cpanel-provisioner";
 
@@ -788,7 +788,7 @@ export async function recordServiceIps(serviceId: string, serverId: string, actu
       await tx.ipAddress.upsert({
         where: { address },
         update: { status: "ALLOCATED", serviceId, serverId, isPrimary: n === 0, reservedById: null, reservedOrderId: null, reservedUntil: null },
-        create: { address, version: 4, status: "ALLOCATED", serviceId, serverId, isPrimary: n === 0, notes: "Assigned by Virtualizor" },
+        create: { address, version: address.includes(":") ? 6 : 4, status: "ALLOCATED", serviceId, serverId, isPrimary: n === 0, notes: "Assigned by Virtualizor" },
       });
     }
   });
@@ -808,8 +808,20 @@ function virtualizorState(code: number | undefined, row: Record<string, unknown>
 }
 
 /** Live state for many services at once — one Virtualizor call per master (list pages, client area). */
+const ipRefreshAt = new Map<string, number>();
+/** Services with no IP on record get one quiet refresh from Virtualizor (at most every 10 minutes each). */
+function refreshMissingIps(ids: string[]) {
+  const now = Date.now();
+  for (const id of ids.slice(0, 10)) {
+    if ((ipRefreshAt.get(id) ?? 0) > now - 10 * 60_000) continue;
+    ipRefreshAt.set(id, now);
+    void syncVirtualizorService(id).catch(() => undefined);
+  }
+}
+
 export async function liveStates(serviceIds: string[]) {
-  const svcs = await prisma.service.findMany({ where: { id: { in: serviceIds.slice(0, 200) }, remoteId: { not: null } }, include: { server: true, product: { select: { provisioner: true } } } });
+  const svcs = await prisma.service.findMany({ where: { id: { in: serviceIds.slice(0, 200) }, remoteId: { not: null } }, include: { server: true, product: { select: { provisioner: true } }, _count: { select: { ips: true } } } });
+  refreshMissingIps(svcs.filter((s) => s.product.provisioner === "VIRTUALIZOR" && s.server && !s._count.ips && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s) => s.id));
   const out: Record<string, { state: LiveState; reason?: string }> = {};
   const byServer = new Map<string, typeof svcs>();
   for (const s of svcs) if (s.server && s.product.provisioner === "VIRTUALIZOR") byServer.set(s.server.id, [...(byServer.get(s.server.id) ?? []), s]);
@@ -892,6 +904,14 @@ export async function liveStatus(serviceId: string) {
     const [r, codes, u] = await Promise.all([client.getVps(svc.remoteId), client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>), client.liveUsage(svc.remoteId).catch(() => null)]);
     const v = pickVps(r, svc.remoteId) ?? {};
     const st = virtualizorState(codes[svc.remoteId], v);
+    // the service has no IPs on record (or they've changed): take Virtualizor's now
+    let liveIps = vpsIpsOf(v as Record<string, unknown>);
+    if (!liveIps.length && !svc.ips.length) liveIps = (await client.ipsByVps().catch(() => new Map<string, string[]>())).get(String(svc.remoteId)) ?? [];
+    const have = svc.ips.map((i) => i.address);
+    if (liveIps.length && (liveIps.length !== have.length || liveIps.some((a) => !have.includes(a)))) {
+      await recordServiceIps(svc.id, svc.server.id, liveIps).catch(() => undefined);
+      await log(svc.id, "sync", true, `IPs from Virtualizor: ${have.join(", ") || "none"} → ${liveIps.join(", ")}`).catch(() => undefined);
+    }
     const n = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Number(x));
     const running = st.state === "running";
     return {
@@ -908,7 +928,7 @@ export async function liveStatus(serviceId: string) {
       uptimeSec: u?.uptimeSec,
       bandwidthUsedGb: u?.bandwidthUsedGb ?? n(v.used_bandwidth),
       bandwidthGb: u?.bandwidthGb ?? n(v.bandwidth),
-      ips: Object.values((v.ips ?? {}) as Record<string, string>).map(String),
+      ips: liveIps,
       node: v.serid !== undefined ? String(v.serid) : undefined,
     };
   }

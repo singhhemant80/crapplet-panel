@@ -96,19 +96,38 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   };
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 shrink-0 items-center justify-between px-5">
-        <Link href="/client" className="flex items-center">
-          <img src="/Crapplet_logo.png" alt="Crapplet Cloud" className="h-8 brightness-0 invert" />
-        </Link>
-        <button className="grid h-9 w-9 place-items-center rounded-lg text-white/70 hover:bg-white/10 lg:hidden" onClick={() => setDrawer(false)} aria-label="Close menu">
-          <Icon name="close" />
-        </button>
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#0b0f2a] text-slate-300">
+      {/* light from the logo's colours — same look as the admin console */}
+      <div className="pointer-events-none absolute -left-20 -top-24 h-72 w-72 rounded-full bg-sky-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-violet-600/25 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,.045)_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(180deg,#000,transparent_45%)]" />
+
+      {/* brand — the full logo, unaltered, on a white plate */}
+      <div className="relative shrink-0 px-4 pb-3 pt-4">
+        <div className="flex items-center gap-2">
+          <Link href="/client" className="flex h-[66px] min-w-0 flex-1 items-center justify-center rounded-2xl bg-white px-4 shadow-[0_10px_28px_-10px_rgba(56,189,248,.6)] ring-1 ring-white/50" aria-label="Crapplet Cloud — Dashboard">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/Crapplet_logo.png" alt="Crapplet Cloud" className="h-auto w-full max-w-[200px]" />
+          </Link>
+          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 text-white lg:hidden" onClick={() => setDrawer(false)} aria-label="Close menu">
+            <Icon name="close" className="text-[18px]" />
+          </button>
+        </div>
+        <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[.18em] text-slate-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+          Client area
+        </div>
       </div>
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3 pt-1 [scrollbar-width:thin]">
-        {SECTIONS.map((sec) => (
-          <div key={sec.title}>
-            <div className="mb-1 px-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/40">{sec.title}</div>
+
+      <nav className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,.12) transparent" }}>
+        {SECTIONS.map((sec, si) => (
+          <div key={sec.title} className={si ? "mt-1" : ""}>
+            {sec.title !== "Overview" && (
+              <div className="flex items-center gap-2 px-3 pb-1.5 pt-3">
+                <span className={cx("text-[10.5px] font-extrabold uppercase tracking-[.16em]", sec.items.some(active) ? "text-sky-300/90" : "text-slate-500")}>{sec.title}</span>
+                <span className="h-px flex-1 bg-white/[.06]" />
+              </div>
+            )}
             <div className="space-y-0.5">
               {sec.items.map((n) => {
                 const on = active(n);
@@ -118,14 +137,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     key={n.href}
                     href={n.href}
                     className={cx(
-                      "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-semibold transition",
-                      on ? "bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.06)]" : "text-white/65 hover:bg-white/[0.06] hover:text-white",
+                      "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-[13.5px] font-semibold transition",
+                      on ? "bg-white/[.08] text-white ring-1 ring-white/10" : "text-slate-300/85 hover:bg-white/[.05] hover:text-white",
                     )}
                   >
-                    {on && <span className="absolute -left-3 top-2 h-[calc(100%-16px)] w-1 rounded-r-full bg-gradient-to-b from-fuchsia-400 to-violet-400" />}
-                    <Icon name={n.icon} className={cx("text-[20px]", on ? "text-fuchsia-300" : "text-white/50 group-hover:text-white/80")} fill={on} />
-                    <span className="flex-1 truncate">{n.label}</span>
-                    {b ? <span className={cx("min-w-[20px] rounded-full px-1.5 py-px text-center text-[11px] font-bold", n.tone === "rose" ? "bg-rose-500 text-white" : n.tone === "amber" ? "bg-amber-400 text-amber-950" : "bg-white/15 text-white")}>{b}</span> : null}
+                    {on && <span className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-sky-400 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,.8)]" />}
+                    <span className={cx("grid h-8 w-8 shrink-0 place-items-center rounded-[10px] transition", on ? "bg-gradient-to-br from-sky-400 via-indigo-500 to-violet-600 text-white shadow-[0_6px_16px_-4px_rgba(99,102,241,.75)]" : "bg-white/[.04] text-slate-400 group-hover:bg-white/10 group-hover:text-white")}>
+                      <Icon name={n.icon} className="text-[18px]" fill={on} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{n.label}</span>
+                    {b ? <span className={cx("min-w-[22px] rounded-full px-1.5 text-center text-[11px] font-extrabold leading-5", n.tone === "rose" ? "bg-rose-500 text-white" : n.tone === "amber" ? "bg-amber-400 text-amber-950" : "bg-white/15 text-white")}>{b}</span> : null}
                   </Link>
                 );
               })}
@@ -133,21 +154,25 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-white/10 p-3">
-        <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-white/[0.12] to-white/[0.04] p-3 ring-1 ring-white/10">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-fuchsia-200"><Icon name="account_balance_wallet" className="text-[19px]" /></span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[10.5px] font-bold uppercase tracking-wider text-white/50">Account credit</div>
-            <div className="truncate text-[15px] font-extrabold text-white">{shell ? money(shell.creditBalance, cur) : "…"}</div>
+
+      <div className="relative shrink-0 border-t border-white/[.07] p-3">
+        <div className="rounded-2xl bg-white/[.05] p-2.5 ring-1 ring-white/10">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-sky-400 to-violet-600 text-white"><Icon name="account_balance_wallet" className="text-[19px]" /></span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Account credit</div>
+              <div className="truncate text-[15px] font-extrabold text-white">{shell ? money(shell.creditBalance, cur) : "…"}</div>
+            </div>
+            <Link href="/client/wallet" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-indigo-600 hover:bg-sky-50" aria-label="Add funds" title="Add funds">
+              <Icon name="add" className="text-[18px]" />
+            </Link>
           </div>
-          <Link href="/client/wallet" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-primary-dark hover:bg-fuchsia-50" aria-label="Add funds" title="Add funds">
-            <Icon name="add" className="text-[18px]" />
-          </Link>
+          <div className="mt-2.5 flex gap-1 border-t border-white/[.07] pt-2">
+            <Link href="/client/tickets/new" title="24/7 support — open a ticket" className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12px] font-bold text-emerald-300 hover:bg-white/10"><Icon name="headset_mic" className="text-[17px]" />Support</Link>
+            <Link href="/client/security" title="Security" aria-label="Security" className="grid h-8 w-9 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"><Icon name="shield_lock" className="text-[18px]" /></Link>
+            <button onClick={signOut} title="Sign out" aria-label="Sign out" className="grid h-8 w-9 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-rose-300"><Icon name="logout" className="text-[18px]" /></button>
+          </div>
         </div>
-        <Link href="/client/tickets/new" className="mt-2 flex items-center gap-3 rounded-xl px-3 py-1.5 text-[13px] font-semibold text-white/70 hover:bg-white/[0.06] hover:text-white">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400/15 text-emerald-300"><Icon name="headset_mic" className="text-[17px]" /></span>
-          <span className="leading-tight">24/7 support · <span className="font-medium text-white/50">open a ticket</span></span>
-        </Link>
       </div>
     </div>
   );
@@ -155,14 +180,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-screen bg-[#f5f3fb]">
       {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] bg-[radial-gradient(120%_60%_at_0%_0%,#3b1786_0%,#1d0b45_45%,#130730_100%)] lg:block">{sidebar}</aside>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[272px] lg:block">{sidebar}</aside>
       {/* mobile drawer */}
       <div className={cx("fixed inset-0 z-50 lg:hidden", drawer ? "" : "pointer-events-none")}>
         <div className={cx("absolute inset-0 bg-slate-950/50 backdrop-blur-sm transition", drawer ? "opacity-100" : "opacity-0")} onClick={() => setDrawer(false)} />
-        <aside className={cx("absolute inset-y-0 left-0 w-[280px] max-w-[85vw] bg-[radial-gradient(120%_60%_at_0%_0%,#3b1786_0%,#1d0b45_45%,#130730_100%)] shadow-2xl transition-transform", drawer ? "translate-x-0" : "-translate-x-full")}>{sidebar}</aside>
+        <aside className={cx("absolute inset-y-0 left-0 w-[288px] max-w-[85vw] shadow-2xl transition-transform", drawer ? "translate-x-0" : "-translate-x-full")}>{sidebar}</aside>
       </div>
 
-      <div className="lg:pl-[264px]">
+      <div className="lg:pl-[272px]">
         <header className="sticky top-0 z-20 border-b border-[#ece7f7] bg-white/85 backdrop-blur-xl">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
             <button className="grid h-10 w-10 place-items-center rounded-xl border border-line text-slate-600 lg:hidden" onClick={() => setDrawer(true)} aria-label="Open menu">

@@ -25,6 +25,7 @@ const VPS: Record<string, Record<string, unknown>> = {
   [`${V + 1}`]: { vpsid: `${V+1}`, hostname: `linked-${RUN}`, serid: "2", ips: { "1": ip(1) }, osid: "271", os_name: "ubuntu-22.04-x86_64", os_distro: "ubuntu" },
   [`${V + 2}`]: { vpsid: `${V+2}`, hostname: `byip-${RUN}`, serid: "1", ips: { "2": ip(2), "3": ip(3) }, osid: "9001", os_name: "almalinux-9-x86_64", os_distro: "almalinux" },
   [`${V + 3}`]: { vpsid: `${V+3}`, hostname: `byhost-${RUN}`, serid: "1", ips: { "4": ip(4) }, osid: "271", os_name: "ubuntu-22.04-x86_64" },
+  [`${V + 5}`]: { vpsid: `${V + 5}`, hostname: `noips-${RUN}`, serid: "1", osid: "271", os_name: "ubuntu-22.04-x86_64" },
   [`${V + 4}`]: { vpsid: `${V+4}`, hostname: `twin-${RUN}`, serid: "1", ips: { "5": ip(5) } },
 };
 
@@ -45,11 +46,16 @@ before(async () => {
   await mk("twinA", { hostname: `twin-${RUN}` }); // two services claim the same hostname → not guessed
   await mk("twinB", { hostname: `twin-${RUN}` });
   await mk("nothing", { hostname: `nowhere-${RUN}` });
+  await mk("noips", { serverId, remoteId: `${V + 5}`, hostname: `noips-${RUN}` });
 
   // our test master answers with VPS; any other master in the dev database is "unreachable"
   VirtualizorClient.prototype.listVps = async function (this: { creds: { host: string } }, page: number) {
     if (this.creds.host !== "virt.invalid") throw new Error("unreachable in tests");
-    return { vs: page === 1 ? VPS : {} } as never;
+    return { vs: page === 1 ? JSON.parse(JSON.stringify(VPS)) : {} } as never;
+  } as never;
+  VirtualizorClient.prototype.ips = async function (this: { creds: { host: string } }) {
+    if (this.creds.host !== "virt.invalid") throw new Error("unreachable in tests");
+    return { ips: { "901": { ip: ip(9), vpsid: `${V + 5}` }, "902": { ip: ip(10), vpsid: "0" } } } as never;
   } as never;
 });
 
@@ -95,6 +101,8 @@ test("sync gives customers' services their IPs and operating system, and links i
   assert.deepEqual(s.notLinked?.map((x) => x.serviceId).filter((id) => Object.values(svc).includes(id)).sort(), [svc.twinA, svc.twinB, svc.nothing].sort());
   assert.ok(s.changes.some((c) => c.serviceId === svc.byip && c.linked === `VPS ${V + 2}` && c.os === "AlmaLinux 9"));
 
+  assert.deepEqual((await look(svc.noips)).ips.map((i) => i.address), [ip(9)], "IPs from Virtualizor's IP list when the VPS row has none");
+
   // what the client area reads
   const clientView = await prisma.service.findMany({ where: { userId, id: { in: [svc.linked, svc.byip, svc.byhost] } }, include: { ips: true, osTemplate: true } });
   assert.ok(clientView.every((x) => x.ips.length && x.osTemplate?.name));
@@ -104,5 +112,5 @@ test("a second run changes nothing", async () => {
   const s = await runSyncAll(fresh());
   assert.equal(s.updated, 0);
   assert.equal(s.linked, 0);
-  assert.equal(s.unchanged, 3);
+  assert.equal(s.unchanged, 4);
 });

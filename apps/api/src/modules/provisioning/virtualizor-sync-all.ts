@@ -13,6 +13,7 @@ import { config } from "../../config";
 import { prisma } from "../../db";
 import { recordServiceIps, virtualizorFor } from "./provisioner";
 import { osTemplateForVps } from "./virtualizor-os";
+import { vpsIpsOf } from "./virtualizor";
 
 export interface SyncAllState {
   status: "running" | "done" | "error";
@@ -37,12 +38,7 @@ export interface SyncAllState {
 }
 
 const FILE = path.resolve(config.uploadDir, "virtualizor-sync-all.json");
-const isV4 = (s: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
-const ipsOf = (row: Record<string, unknown>): string[] => {
-  const v = row.ips;
-  const raw = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v as Record<string, unknown>) : typeof v === "string" ? v.split(/[\s,]+/) : [];
-  return raw.map(String).map((x) => x.trim()).filter(isV4);
-};
+const ipsOf = (row: Record<string, unknown>): string[] => vpsIpsOf(row);
 
 export async function readSyncAll(): Promise<SyncAllState | null> {
   try {
@@ -109,6 +105,11 @@ export async function runSyncAll(s: SyncAllState) {
         const list = Object.entries(r.vs ?? {});
         for (const [k, v] of list) rows.set(String((v as Record<string, unknown>).vpsid ?? k), v as Record<string, unknown>);
         if (list.length < per) break;
+      }
+      // some Virtualizor versions don't put IPs in the VPS list — take them from the IP list instead
+      if ([...rows.values()].some((r) => !ipsOf(r).length)) {
+        const byVps = await client.ipsByVps().catch(() => null);
+        if (byVps) for (const [vpsid, r] of rows) if (!ipsOf(r).length && byVps.get(vpsid)?.length) r.ips = byVps.get(vpsid);
       }
       rowsBy.set(m.id, rows);
       s.servers.push({ name: m.name, vps: rows.size });

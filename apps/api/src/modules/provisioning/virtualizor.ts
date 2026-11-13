@@ -302,12 +302,29 @@ export class VirtualizorClient {
   ips(page = 1, reslen = 1000) {
     return this.call<{ ips?: Record<string, Record<string, unknown>> }>("ips", { page, reslen });
   }
-  /** Details of one VPS, including the IPs Virtualizor gave it. */
+  /** The IPs Virtualizor gave one VPS — from its details, or else from Virtualizor's IP list. */
   async vpsIps(vpsid: string): Promise<string[]> {
-    const r = await this.call<{ vs?: Record<string, { ips?: Record<string, string> | string[] }> }>("vs", { vpsid });
-    const v = pickVps(r as never, vpsid) as { ips?: Record<string, string> | string[] } | null;
-    const raw = v?.ips ? (Array.isArray(v.ips) ? v.ips : Object.values(v.ips)) : [];
-    return raw.map(String).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    const r = await this.call<{ vs?: Record<string, Record<string, unknown>> }>("vs", { vpsid });
+    const fromRow = vpsIpsOf(pickVps(r as never, vpsid) as Record<string, unknown> | null);
+    if (fromRow.length) return fromRow;
+    return (await this.ipsByVps().catch(() => new Map<string, string[]>())).get(String(vpsid)) ?? [];
+  }
+  /** vpsid → its IPs, from Virtualizor's IP list (for VPS rows that don't carry their IPs). */
+  async ipsByVps(): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    for (let page = 1; page <= 50; page++) {
+      const r = await this.ips(page, 1000);
+      const list = Object.values(r.ips ?? {});
+      for (const row of list) {
+        const vpsid = String(row.vpsid ?? row.vps_id ?? "");
+        const ip = String(row.ip ?? row.ipaddress ?? "").trim();
+        if (!vpsid || vpsid === "0" || !isIp(ip)) continue;
+        out.set(vpsid, [...(out.get(vpsid) ?? []), ip]);
+      }
+      if (list.length < 1000) break;
+    }
+    for (const [k, v] of out) out.set(k, sortIps(v));
+    return out;
   }
   /** Server groups (used for automatic node selection). */
   serverGroups() {
@@ -595,6 +612,39 @@ export function collectStorageRefs(obj: unknown, acc: Pick<NodeHints, "uuids" | 
 }
 
 /** Pick one VPS out of an `act=vs` reply: keyed by id, or a row whose vpsid matches; a lone row without a vpsid field is accepted. */
+const isV4 = (s: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
+const isV6 = (s: string) => /^[0-9a-f:]+$/i.test(s) && s.includes(":") && s.length >= 3;
+export const isIp = (s: string) => isV4(s) || isV6(s);
+/** IPv4 first (in Virtualizor's order), then IPv6. */
+const sortIps = (a: string[]) => [...new Set(a)].sort((x, y) => Number(isV6(x)) - Number(isV6(y)));
+
+/**
+ * The IPs in a VPS row, whatever shape this Virtualizor version uses:
+ * ips: {"12": "1.2.3.4"} | ["1.2.3.4"] | {"12": {ip: "1.2.3.4"}} | "1.2.3.4, …", plus ip / ipv4 / ips6 fields.
+ */
+export function vpsIpsOf(row: Record<string, unknown> | null | undefined): string[] {
+  if (!row) return [];
+  const out: string[] = [];
+  const take = (v: unknown): void => {
+    if (v === null || v === undefined || v === "") return;
+    if (typeof v === "string" || typeof v === "number") {
+      for (const part of String(v).split(/[\s,;]+/)) if (isIp(part.trim())) out.push(part.trim());
+      return;
+    }
+    if (Array.isArray(v)) return v.forEach(take);
+    if (typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (o.ip !== undefined || o.ipaddress !== undefined || o.address !== undefined) return take(o.ip ?? o.ipaddress ?? o.address);
+      for (const [k, x] of Object.entries(o)) {
+        if (isIp(k) && (x === true || x === 1 || x === "1" || typeof x === "object")) out.push(k); // keyed by the IP itself
+        else take(x);
+      }
+    }
+  };
+  for (const key of ["ips", "ip", "ipv4", "primary_ip", "ips6", "ipv6", "ips_int"]) take(row[key]);
+  return sortIps(out);
+}
+
 export function pickVps(r: { vs?: Record<string, Record<string, unknown>> | null } | null | undefined, vpsid: string | number): Record<string, unknown> | null {
   const vs = r?.vs ?? {};
   const id = String(vpsid);

@@ -27,3 +27,16 @@ test("one VPS is picked only by its own id — never 'the first row' of an unfil
   assert.equal(pickVps({ vs: {} }, "3100"), null);
   assert.equal(pickVps(null, "3100"), null);
 });
+
+test("a VPS's IPs are read whatever shape Virtualizor sends", async () => {
+  const { vpsIpsOf } = await import("../src/modules/provisioning/virtualizor");
+  assert.deepEqual(vpsIpsOf({ ips: { "12": "103.1.2.3" } }), ["103.1.2.3"]);
+  assert.deepEqual(vpsIpsOf({ ips: ["103.1.2.3", "103.1.2.4"] }), ["103.1.2.3", "103.1.2.4"]);
+  assert.deepEqual(vpsIpsOf({ ips: { "12": { ip: "103.1.2.3", ippid: "2" } } }), ["103.1.2.3"]);
+  assert.deepEqual(vpsIpsOf({ ips: "103.1.2.3, 103.1.2.4" }), ["103.1.2.3", "103.1.2.4"]);
+  assert.deepEqual(vpsIpsOf({ ips: { "103.1.2.3": true } }), ["103.1.2.3"], "keyed by the IP");
+  assert.deepEqual(vpsIpsOf({ ips6: { "1": "2001:db8::10" }, ips: { "2": "103.1.2.3" } }), ["103.1.2.3", "2001:db8::10"], "IPv4 first");
+  assert.deepEqual(vpsIpsOf({ ip: "103.1.2.9" }), ["103.1.2.9"]);
+  assert.deepEqual(vpsIpsOf({ ips: {} }), []);
+  assert.deepEqual(vpsIpsOf(null), []);
+});
