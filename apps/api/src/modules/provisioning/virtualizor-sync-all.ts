@@ -1,5 +1,7 @@
 /**
- * Sync every Virtualizor service at once: IPs, node and hostname straight from Virtualizor.
+ * Sync every Virtualizor service at once: IPs, operating system, node and hostname straight from Virtualizor.
+ * Services that aren't linked to a VPS yet (e.g. imported from WHMCS without a VPS id) are linked by their
+ * IP address, or else by a hostname only one VPS has.
  *
  * One paged "list VPS" call per Virtualizor master (≈ 1 request per 200 VPSes) instead of one
  * call per service, then only services that differ are written. Runs in the background; progress
@@ -10,6 +12,7 @@ import path from "node:path";
 import { config } from "../../config";
 import { prisma } from "../../db";
 import { recordServiceIps, virtualizorFor } from "./provisioner";
+import { osTemplateForVps } from "./virtualizor-os";
 
 export interface SyncAllState {
   status: "running" | "done" | "error";
@@ -25,7 +28,11 @@ export interface SyncAllState {
   missing: { serviceId: string; hostname: string | null; remoteId: string; server: string }[];
   /** several live services point at the same VPS — left untouched, fix by hand */
   duplicates?: { remoteId: string; server: string; services: { serviceId: string; hostname: string | null }[] }[];
-  changes: { serviceId: string; hostname: string | null; before: string[]; after: string[]; node?: string }[];
+  changes: { serviceId: string; hostname: string | null; before: string[]; after: string[]; node?: string; os?: string; linked?: string }[];
+  /** services that weren't linked to a VPS and now are */
+  linked?: number;
+  /** services that aren't linked to a VPS and couldn't be matched */
+  notLinked?: { serviceId: string; hostname: string | null; reason: string }[];
   error?: string;
 }
 
@@ -64,6 +71,8 @@ export async function startSyncAll(actorId?: string) {
   return s;
 }
 
+type Svc = { id: string; hostname: string | null; remoteId: string | null; node: string | null; serverId: string | null; osTemplateId: string | null; ips: { address: string; isPrimary: boolean }[] };
+
 export async function runSyncAll(s: SyncAllState) {
   let lastSave = 0;
   const progress = async (force = false) => {
@@ -72,20 +81,25 @@ export async function runSyncAll(s: SyncAllState) {
       await save(s);
     }
   };
+  s.linked = 0;
+  s.notLinked = [];
   const masters = await prisma.server.findMany({ where: { type: "VIRTUALIZOR" } });
-  const services = await prisma.service.findMany({
-    where: { serverId: { in: masters.map((m) => m.id) }, remoteId: { not: null }, status: { notIn: ["TERMINATED", "CANCELLED"] }, product: { provisioner: "VIRTUALIZOR" } },
-    select: { id: true, hostname: true, remoteId: true, node: true, serverId: true, ips: { select: { address: true, isPrimary: true } } },
+  const masterIds = new Set(masters.map((m) => m.id));
+  const services: Svc[] = await prisma.service.findMany({
+    where: { status: { notIn: ["TERMINATED", "CANCELLED"] }, product: { provisioner: "VIRTUALIZOR" } },
+    select: { id: true, hostname: true, remoteId: true, node: true, serverId: true, osTemplateId: true, ips: { select: { address: true, isPrimary: true } } },
   });
+  const linkedOk = (x: Svc) => !!x.remoteId && !!x.serverId && masterIds.has(x.serverId);
+  const unlinked = services.filter((x) => !linkedOk(x));
   s.total = services.length;
   await progress(true);
 
+  // 1. every VPS on every master that has services here (all masters when some services still need linking)
+  const rowsBy = new Map<string, Map<string, Record<string, unknown>>>();
   for (const m of masters) {
-    const mine = services.filter((x) => x.serverId === m.id);
-    if (!mine.length) continue;
+    if (!unlinked.length && !services.some((x) => x.serverId === m.id)) continue;
     s.phase = `Reading VPS list from ${m.name}`;
     await progress(true);
-    // every VPS on this master, page by page
     const rows = new Map<string, Record<string, unknown>>();
     try {
       const client = virtualizorFor(m);
@@ -96,14 +110,76 @@ export async function runSyncAll(s: SyncAllState) {
         for (const [k, v] of list) rows.set(String((v as Record<string, unknown>).vpsid ?? k), v as Record<string, unknown>);
         if (list.length < per) break;
       }
+      rowsBy.set(m.id, rows);
       s.servers.push({ name: m.name, vps: rows.size });
     } catch (e) {
       s.servers.push({ name: m.name, vps: 0, error: (e as Error).message });
+    }
+  }
+
+  // 2. link services that have no VPS yet: by IP first, then by a hostname only one VPS has
+  if (unlinked.length) {
+    s.phase = "Linking services to their VPS";
+    await progress(true);
+    const taken = new Set(services.filter(linkedOk).map((x) => `${x.serverId}|${x.remoteId}`));
+    const byIp = new Map<string, string[]>();
+    const byHost = new Map<string, string[]>();
+    for (const [mid, rows] of rowsBy)
+      for (const [vpsid, row] of rows) {
+        const ref = `${mid}|${vpsid}`;
+        for (const ip of ipsOf(row)) byIp.set(ip, [...(byIp.get(ip) ?? []), ref]);
+        const h = String(row.hostname ?? "").trim().toLowerCase();
+        if (h) byHost.set(h, [...(byHost.get(h) ?? []), ref]);
+      }
+    const hostCount = new Map<string, number>();
+    for (const x of services) if (x.hostname) hostCount.set(x.hostname.trim().toLowerCase(), (hostCount.get(x.hostname.trim().toLowerCase()) ?? 0) + 1);
+    for (const svc of unlinked) {
+      let ref: string | null = null;
+      let how = "";
+      if (svc.remoteId) {
+        // has a VPS id but no (known) master: the master whose list has that VPS
+        const hits = [...rowsBy.entries()].filter(([, rows]) => rows.has(String(svc.remoteId))).map(([mid]) => `${mid}|${svc.remoteId}`);
+        if (hits.length === 1) { ref = hits[0]; how = "VPS id"; }
+      }
+      if (!ref && svc.ips.length) {
+        const hits = [...new Set(svc.ips.flatMap((i) => byIp.get(i.address) ?? []))];
+        if (hits.length === 1) { ref = hits[0]; how = `IP ${svc.ips.map((i) => i.address).join(", ")}`; }
+      }
+      const h = svc.hostname?.trim().toLowerCase();
+      if (!ref && h && hostCount.get(h) === 1) {
+        const hits = byHost.get(h) ?? [];
+        if (hits.length === 1) { ref = hits[0]; how = `hostname ${svc.hostname}`; }
+      }
+      if (!ref || taken.has(ref)) {
+        s.checked++;
+        if (s.notLinked.length < 1000)
+          s.notLinked.push({ serviceId: svc.id, hostname: svc.hostname, reason: ref ? "Its matching VPS already belongs to another service" : svc.ips.length || h ? "No VPS in Virtualizor has this IP or hostname" : "No IP or hostname to match on" });
+        continue;
+      }
+      taken.add(ref);
+      const [mid, vpsid] = ref.split("|");
+      await prisma.service.update({ where: { id: svc.id }, data: { remoteId: vpsid, serverId: mid } });
+      await prisma.provisioningLog.create({ data: { serviceId: svc.id, action: "sync", success: true, message: `Linked to Virtualizor VPS ${vpsid} on ${masters.find((m) => m.id === mid)?.name} (matched by ${how})` } });
+      svc.remoteId = vpsid;
+      svc.serverId = mid;
+      s.linked++;
+      if (s.changes.length < 2000) s.changes.push({ serviceId: svc.id, hostname: svc.hostname, before: svc.ips.map((i) => i.address), after: svc.ips.map((i) => i.address), linked: `VPS ${vpsid}` });
+    }
+    await progress(true);
+  }
+
+  // 3. bring every linked service in line with its VPS
+  const osCache = new Map<string, string | null>();
+  const osNames = new Map((await prisma.osTemplate.findMany({ where: { source: "virtualizor" }, select: { id: true, name: true } })).map((o) => [o.id, o.name]));
+  for (const m of masters) {
+    const mine = services.filter((x) => linkedOk(x) && x.serverId === m.id);
+    if (!mine.length) continue;
+    const rows = rowsBy.get(m.id);
+    if (!rows) {
       s.checked += mine.length;
       await progress(true);
       continue;
     }
-
     s.phase = `Updating services on ${m.name}`;
     const byVps = new Map<string, typeof mine>();
     for (const svc of mine) byVps.set(String(svc.remoteId), [...(byVps.get(String(svc.remoteId)) ?? []), svc]);
@@ -125,23 +201,33 @@ export async function runSyncAll(s: SyncAllState) {
       const before = [...(primary ? [primary] : []), ...svc.ips.map((i) => i.address).filter((a) => a !== primary)];
       const node = row.serid !== undefined && row.serid !== null ? String(row.serid) : undefined;
       const hostname = row.hostname ? String(row.hostname) : undefined;
+      const osId = await osTemplateForVps(m, row, osCache).catch(() => null);
       // compare as sets — Virtualizor's list order isn't meaningful
       const ipsChanged = after.length > 0 && (after.length !== before.length || after.some((a) => !before.includes(a)));
       const nodeChanged = node !== undefined && node !== svc.node;
       const hostChanged = !!hostname && hostname !== svc.hostname;
-      if (!ipsChanged && !nodeChanged && !hostChanged) {
+      const osChanged = !!osId && osId !== svc.osTemplateId;
+      if (!ipsChanged && !nodeChanged && !hostChanged && !osChanged) {
         s.unchanged++;
         await progress();
         continue;
       }
       try {
         if (ipsChanged) await recordServiceIps(svc.id, m.id, after);
-        if (nodeChanged || hostChanged) await prisma.service.update({ where: { id: svc.id }, data: { ...(nodeChanged ? { node } : {}), ...(hostChanged ? { hostname } : {}) } });
+        if (nodeChanged || hostChanged || osChanged) await prisma.service.update({ where: { id: svc.id }, data: { ...(nodeChanged ? { node } : {}), ...(hostChanged ? { hostname } : {}), ...(osChanged ? { osTemplateId: osId } : {}) } });
+        let osName: string | undefined;
+        if (osChanged) {
+          if (!osNames.has(osId!)) osNames.set(osId!, (await prisma.osTemplate.findUnique({ where: { id: osId! }, select: { name: true } }))?.name ?? "?");
+          osName = osNames.get(osId!);
+        }
         await prisma.provisioningLog.create({
-          data: { serviceId: svc.id, action: "sync", success: true, message: `Bulk sync from Virtualizor: ${ipsChanged ? `IPs ${before.join(", ") || "none"} → ${after.join(", ")}` : "IPs unchanged"}${nodeChanged ? ` · node ${svc.node ?? "?"} → ${node}` : ""}${hostChanged ? ` · hostname ${svc.hostname ?? "?"} → ${hostname}` : ""}` },
+          data: { serviceId: svc.id, action: "sync", success: true, message: `Bulk sync from Virtualizor: ${ipsChanged ? `IPs ${before.join(", ") || "none"} → ${after.join(", ")}` : "IPs unchanged"}${osChanged ? ` · OS → ${osName}` : ""}${nodeChanged ? ` · node ${svc.node ?? "?"} → ${node}` : ""}${hostChanged ? ` · hostname ${svc.hostname ?? "?"} → ${hostname}` : ""}` },
         });
         s.updated++;
-        if (s.changes.length < 2000) s.changes.push({ serviceId: svc.id, hostname: hostname ?? svc.hostname, before, after: ipsChanged ? after : before, ...(nodeChanged ? { node } : {}) });
+        const prev = s.changes.find((c) => c.serviceId === svc.id);
+        const change = { serviceId: svc.id, hostname: hostname ?? svc.hostname, before, after: ipsChanged ? after : before, ...(nodeChanged ? { node } : {}), ...(osName ? { os: osName } : {}) };
+        if (prev) Object.assign(prev, change);
+        else if (s.changes.length < 2000) s.changes.push(change);
       } catch (e) {
         if (s.missing.length < 1000) s.missing.push({ serviceId: svc.id, hostname: svc.hostname, remoteId: `${svc.remoteId} (error: ${(e as Error).message.slice(0, 120)})`, server: m.name });
       }

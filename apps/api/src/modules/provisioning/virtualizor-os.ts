@@ -96,3 +96,31 @@ export async function syncVirtualizorOs(server: Server) {
   });
   return { found: list.length, created, updated, disabled: gone.count };
 }
+
+/**
+ * The OS template a VPS from Virtualizor's list runs (its `osid` / `os_name`), as an OsTemplate id.
+ * A template the master no longer offers is recorded (switched off for new orders) so the service still shows its OS.
+ * `cache` saves lookups across a bulk sync.
+ */
+export async function osTemplateForVps(server: { id: string }, row: Record<string, unknown>, cache = new Map<string, string | null>()): Promise<string | null> {
+  const osid = Number(row.osid ?? row.os_id ?? 0);
+  const name = String(row.os_name ?? row.osname ?? "").trim();
+  if (!(osid > 0) && !name) return null;
+  const key = `${server.id}|${osid}|${name}`;
+  if (cache.has(key)) return cache.get(key)!;
+  let id: string | null = null;
+  if (osid > 0) id = (await prisma.osTemplate.findUnique({ where: { virtualizorServerId_virtualizorOsId: { virtualizorServerId: server.id, virtualizorOsId: osid } }, select: { id: true } }))?.id ?? null;
+  if (!id && name) id = (await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, remoteName: name }, select: { id: true } }))?.id ?? null;
+  if (!id && osid > 0 && name) {
+    const distro = String(row.os_distro ?? row.distro ?? "").toLowerCase() || (/^([a-z]+)/i.exec(name)?.[1]?.toLowerCase() ?? null);
+    const family = /win/i.test(name) || distro === "windows" ? "windows" : "linux";
+    id = (
+      await prisma.osTemplate.create({
+        data: { name: prettyOsName(name, distro), remoteName: name, distro, family, source: "virtualizor", syncedAt: new Date(), virtualizorServerId: server.id, virtualizorOsId: osid, virtualizorVirt: row.virt ? String(row.virt) : null, defaultUser: family === "windows" ? "Administrator" : "root", enabled: false },
+        select: { id: true },
+      })
+    ).id;
+  }
+  cache.set(key, id);
+  return id;
+}

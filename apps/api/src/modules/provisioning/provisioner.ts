@@ -842,10 +842,13 @@ export async function syncVirtualizorService(serviceId: string) {
   if (!row) throw new ProvisionError(`VPS ${svc.remoteId} wasn't found on ${svc.server.name} — it may have been deleted in Virtualizor`, false);
   const ips = await client.vpsIps(svc.remoteId).catch(() => [] as string[]);
   if (ips.length) await recordServiceIps(svc.id, svc.server.id, ips);
-  await prisma.service.update({ where: { id: svc.id }, data: { ...(row.serid !== undefined ? { node: String(row.serid) } : {}), ...(row.hostname ? { hostname: String(row.hostname) } : {}) } });
+  const { osTemplateForVps } = await import("./virtualizor-os");
+  const osId = await osTemplateForVps(svc.server, row as Record<string, unknown>).catch(() => null);
+  await prisma.service.update({ where: { id: svc.id }, data: { ...(row.serid !== undefined ? { node: String(row.serid) } : {}), ...(row.hostname ? { hostname: String(row.hostname) } : {}), ...(osId ? { osTemplateId: osId } : {}) } });
+  const osName = osId ? (await prisma.osTemplate.findUnique({ where: { id: osId }, select: { name: true } }))?.name : null;
   const codes = await client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>);
   const st = virtualizorState(codes[svc.remoteId], row);
-  await log(svc.id, "sync", true, `Synced from Virtualizor: ${ips.join(", ") || "no IPs"} · node ${row.serid ?? "?"} · ${st.state}`);
+  await log(svc.id, "sync", true, `Synced from Virtualizor: ${ips.join(", ") || "no IPs"}${osName ? ` · ${osName}` : ""} · node ${row.serid ?? "?"} · ${st.state}`);
   return { ips, node: row.serid ?? null, hostname: row.hostname ?? null, ...st };
 }
 

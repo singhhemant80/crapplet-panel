@@ -74,6 +74,15 @@ const maintenance = new Worker(
           })),
         );
       }
+      case "sync-services": {
+        // keep every customer's IPs and OS in line with Virtualizor (same as "Sync all")
+        const { readSyncAll, runSyncAll } = await import("./modules/provisioning/virtualizor-sync-all");
+        const cur = await readSyncAll();
+        if (cur?.status === "running" && Date.now() - new Date(cur.startedAt).getTime() < 30 * 60_000) return { skipped: "a sync is already running" };
+        if (!(await prisma.server.count({ where: { type: "VIRTUALIZOR", enabled: true } }))) return { skipped: "no Virtualizor servers" };
+        const r = await runSyncAll({ status: "running", startedAt: new Date().toISOString(), startedBy: "automatic", phase: "Reading VPS lists from Virtualizor", servers: [], checked: 0, total: 0, updated: 0, unchanged: 0, missing: [], duplicates: [], changes: [] });
+        return { total: r.total, updated: r.updated, linked: r.linked, notLinked: r.notLinked?.length ?? 0, missing: r.missing.length };
+      }
       case "sync-ips": {
         // IP Management mirrors Virtualizor — refresh every 10 minutes
         const masters = await prisma.server.findMany({ where: { type: "VIRTUALIZOR", enabled: true } });
@@ -126,6 +135,7 @@ async function schedule() {
   // before billing runs, so renewal invoices use today's rate
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("sync-ips", { every: 10 * 60_000 }, { name: "sync-ips" });
+  await q.upsertJobScheduler("sync-services", { every: 30 * 60_000 }, { name: "sync-services" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   // automatic database backups: checked every 5 minutes against Settings → Backups
   await latencyQueue().upsertJobScheduler("broker-latency", { every: 60_000 }, { name: "broker-latency" });
