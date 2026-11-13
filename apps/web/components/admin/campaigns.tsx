@@ -1,5 +1,6 @@
 "use client";
 /** Email campaign editor (drafts & scheduled) and report (sending & sent). */
+import { cleanHtml } from "@/lib/sanitize";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
@@ -297,7 +298,7 @@ function RichEditor({ value, onChange }: { value: string; onChange: (v: string) 
 
   // load content into the editable area only when switching into it (never while typing — that moves the cursor)
   useEffect(() => {
-    if (mode === "visual" && ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value;
+    if (mode === "visual" && ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = cleanHtml(value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 

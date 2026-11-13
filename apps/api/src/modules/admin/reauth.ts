@@ -163,3 +163,26 @@ reauthRouter.delete(
     res.json({ active: false });
   }),
 );
+
+/**
+ * Every /admin/clients/:id/… route acts on a customer. Refuse when the id is a staff account, so the
+ * client tools (edit email/status, set password, reset 2FA, credit, close, merge …) can't be turned on
+ * an administrator by someone who only has client permissions.
+ */
+export async function customerTargetGuard(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const m = /^\/clients\/([^/]+)/.exec(req.path);
+    if (!m || !req.user || req.user.type !== "STAFF") return next();
+    const u = await prisma.user.findUnique({ where: { id: m[1] }, select: { type: true } });
+    if (u && u.type !== "CLIENT") return next(new HttpError(404, "Client not found"));
+    // the merge target too
+    const into = (req.body as { intoUserId?: unknown } | undefined)?.intoUserId;
+    if (typeof into === "string") {
+      const t = await prisma.user.findUnique({ where: { id: into }, select: { type: true } });
+      if (t && t.type !== "CLIENT") return next(new HttpError(404, "Client not found"));
+    }
+    next();
+  } catch (e) {
+    next(e);
+  }
+}

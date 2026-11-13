@@ -1,4 +1,5 @@
 "use client";
+import { safeNext } from "@/lib/safe-next";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,7 +39,7 @@ export function LoginForm({ portal = "client" }: { portal?: "client" | "admin" }
   const router = useRouter();
   const sp = useSearchParams();
   const { me, reload } = useSession();
-  const next = sp.get("next") || (portal === "admin" ? "/admin" : "/client");
+  const next = safeNext(sp.get("next"), portal === "admin" ? "/admin" : "/client");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [challenge, setChallenge] = useState<string | null>(null);

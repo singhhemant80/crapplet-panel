@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { stripActiveHtml } from "../../lib/html";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma, Prisma, BillingCycle, ProductType, Provisioner, VirtType, AutoSetup, ConfigOptionType, PromoType } from "../../db";
@@ -382,7 +383,7 @@ adminCatalog.put(
   ah(async (req, res) => {
     const d = DEFAULT_TEMPLATES[req.params.key];
     if (!d) throw notFound();
-    const b = parse(z.object({ subject: z.string().min(1), body: z.string().min(1), enabled: z.boolean().default(true) }), req.body);
+    const b = parse(z.object({ subject: z.string().min(1).max(300), body: z.string().min(1).max(200_000).transform(stripActiveHtml), enabled: z.boolean().default(true) }), req.body);
     await prisma.emailTemplate.upsert({ where: { key: req.params.key }, update: b, create: { key: req.params.key, name: d.name, ...b } });
     res.json({ ok: true });
   }),

@@ -46,7 +46,7 @@ export const PERMISSIONS = [
 ] as const;
 
 export function signAccessToken(u: { id: string; type: string; sid: string }) {
-  return jwt.sign({ sub: u.id, typ: u.type, sid: u.sid }, config.jwtSecret, { expiresIn: config.accessTokenTtlSec, issuer: "crapplet" });
+  return jwt.sign({ sub: u.id, typ: u.type, sid: u.sid }, config.jwtSecret, { expiresIn: config.accessTokenTtlSec, issuer: "crapplet", algorithm: "HS256" });
 }
 
 async function loadUser(userId: string, sessionId?: string): Promise<AuthUser | null> {
@@ -89,7 +89,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     }
     const token = bearer || req.cookies?.cc_at;
     if (token) {
-      const payload = jwt.verify(token, config.jwtSecret, { issuer: "crapplet" }) as { sub: string; sid: string; purpose?: string };
+      const payload = jwt.verify(token, config.jwtSecret, { issuer: "crapplet", algorithms: ["HS256"] }) as { sub: string; sid: string; purpose?: string };
       if (!payload.purpose) {
         const u = await loadUser(payload.sub, payload.sid);
         if (u) req.user = u;
@@ -107,7 +107,7 @@ export function csrfGuard(req: Request, _res: Response, next: NextFunction) {
   if (req.path.startsWith("/webhooks") || req.path.startsWith("/payments/callback")) return next();
   // email unsubscribe (a form in the email's landing page, and Gmail/Yahoo one-click) — token-protected, no cookies needed
   if (/^(\/api)?\/e\/u\/[A-Za-z0-9_-]+$/.test(req.path)) return next();
-  const usesCookie = !req.headers.authorization && req.cookies?.cc_at;
+  const usesCookie = !req.headers.authorization && (req.cookies?.cc_at || req.cookies?.cc_rt);
   if (usesCookie && req.headers["x-requested-with"] !== "crapplet") return next(new HttpError(403, "CSRF check failed"));
   next();
 }

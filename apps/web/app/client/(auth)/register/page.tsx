@@ -1,4 +1,5 @@
 "use client";
+import { safeNext } from "@/lib/safe-next";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -61,7 +62,7 @@ function RegisterForm() {
       const body = { ...v, companyName: business ? v.companyName : "", gstin: business ? v.gstin : "", pan: v.pan, ref: sp.get("ref") ?? undefined };
       await api("/auth/register", { body });
       await reload();
-      router.replace(sp.get("next") || "/client?welcome=1");
+      router.replace(safeNext(sp.get("next"), "/client?welcome=1"));
     } catch (e) {
       const x = e as ApiError;
       setError(x.message);

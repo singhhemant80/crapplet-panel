@@ -5,3 +5,8 @@ apps/api/src/generated/
 apps/api/.env
 apps/api/storage/
 *.log
+
+# never commit database / cache dumps
+*.rdb
+*.sql.gz
+*.dump

@@ -33,7 +33,7 @@ export default function Templates() {
                 <Button variant="outline" icon="send" onClick={() => { const to = prompt("Send a test to"); if (to) api(`/admin/email-templates/${sel.key}/preview`, { body: { sendTo: to } }).then(() => toast.success("Test sent")).catch((e) => toast.error(e.message)); }}>Send test</Button>
                 {sel.customized && <Button variant="ghost" onClick={() => api(`/admin/email-templates/${sel.key}`, { method: "DELETE" }).then(() => { toast.success("Reset to default"); setSel(null); reload(); })}>Reset to default</Button>}
               </div>
-              {preview && <div className="rounded-xl border border-line p-4"><div className="mb-2 text-sm font-bold">{preview.subject}</div><div className="text-sm" dangerouslySetInnerHTML={{ __html: preview.body }} /></div>}
+              {preview && <div className="rounded-xl border border-line p-4"><div className="mb-2 text-sm font-bold">{preview.subject}</div><iframe title="Email preview" srcDoc={preview.body} sandbox="" className="h-[520px] w-full rounded-lg border border-line bg-white" /></div>}
             </div>
           </Card>
         ) : <Card><p className="text-sm text-mute">Select a template to edit.</p></Card>}

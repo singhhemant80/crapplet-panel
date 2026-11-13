@@ -66,6 +66,13 @@ const registerSchema = profileSchema.extend({
   ref: z.string().trim().max(40).optional(),
 });
 
+/** Per-account brute-force guard (on top of the per-IP limiter): recent failures for this account. */
+const LOCK_MINUTES = 15;
+async function recentFailures(where: { email?: string; userId?: string }, reasons: string[]) {
+  return prisma.loginHistory.count({ where: { ...where, success: false, reason: { in: reasons }, createdAt: { gt: new Date(Date.now() - LOCK_MINUTES * 60_000) } } });
+}
+const tooMany = () => new HttpError(429, `Too many failed attempts — please wait ${LOCK_MINUTES} minutes and try again`, "TOO_MANY_ATTEMPTS");
+
 function setAuthCookies(res: Response, access: string, refresh: string) {
   const secure = config.cookieSecure === "auto" ? !!res.req?.secure : config.cookieSecure;
   const base = { httpOnly: true, secure, sameSite: "lax" as const };
@@ -177,6 +184,7 @@ authRouter.post(
   limiter,
   ah(async (req, res) => {
     const body = parse(loginSchema, req.body);
+    if ((await recentFailures({ email: body.email }, ["bad_credentials"])) >= 10) throw tooMany();
     const user = await prisma.user.findUnique({ where: { email: body.email } });
     const ok = user ? await verifyPassword(user, body.password) : await bcrypt.compare(body.password, DUMMY_HASH);
     const fail = async (reason: string) => {
@@ -190,7 +198,7 @@ authRouter.post(
     if (body.portal === "admin" && user.type !== "STAFF") return fail("not_staff");
 
     if (user.totpEnabled) {
-      const challenge = jwt.sign({ sub: user.id, purpose: "2fa" }, config.jwtSecret, { expiresIn: 300, issuer: "crapplet" });
+      const challenge = jwt.sign({ sub: user.id, purpose: "2fa" }, config.jwtSecret, { expiresIn: 300, issuer: "crapplet", algorithm: "HS256" });
       return res.json({ twoFactorRequired: true, challenge });
     }
     await prisma.loginHistory.create({
@@ -208,12 +216,14 @@ authRouter.post(
     const body = parse(z.object({ challenge: z.string(), code: z.string().regex(/^\d{6}$/) }), req.body);
     let payload: { sub: string; purpose: string };
     try {
-      payload = jwt.verify(body.challenge, config.jwtSecret, { issuer: "crapplet" }) as typeof payload;
+      payload = jwt.verify(body.challenge, config.jwtSecret, { issuer: "crapplet", algorithms: ["HS256"] }) as typeof payload;
     } catch {
       throw new HttpError(401, "Login challenge expired, please sign in again");
     }
     if (payload.purpose !== "2fa") throw new HttpError(401, "Invalid challenge");
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.status !== "ACTIVE") throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+    if ((await recentFailures({ userId: user.id }, ["bad_2fa"])) >= 5) throw tooMany();
     if (!user.totpSecretEnc || !authenticator.verify({ token: body.code, secret: decrypt(user.totpSecretEnc) })) {
       await prisma.loginHistory.create({ data: { userId: user.id, email: user.email, ip: clientIp(req), success: false, reason: "bad_2fa" } });
       throw new HttpError(401, "Invalid authentication code", "INVALID_2FA");
@@ -323,7 +333,7 @@ authRouter.post(
     const t = await prisma.verificationToken.findUnique({ where: { tokenHash: sha256(token) } });
     if (!t || t.type !== "EMAIL_VERIFY" || t.usedAt || t.expiresAt < new Date()) throw badRequest("This verification link is invalid or has expired");
     await prisma.$transaction([
-      prisma.verificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } }),
+      prisma.verificationToken.updateMany({ where: { userId: t.userId, type: "PASSWORD_RESET", usedAt: null }, data: { usedAt: new Date() } }),
       prisma.user.update({ where: { id: t.userId }, data: { emailVerifiedAt: new Date() } }),
     ]);
     res.json({ ok: true });
@@ -369,7 +379,7 @@ authRouter.post(
     const t = await prisma.verificationToken.findUnique({ where: { tokenHash: sha256(body.token) } });
     if (!t || t.type !== "PASSWORD_RESET" || t.usedAt || t.expiresAt < new Date()) throw badRequest("This reset link is invalid or has expired");
     await prisma.$transaction([
-      prisma.verificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } }),
+      prisma.verificationToken.updateMany({ where: { userId: t.userId, type: "PASSWORD_RESET", usedAt: null }, data: { usedAt: new Date() } }),
       prisma.user.update({ where: { id: t.userId }, data: { passwordHash: await bcrypt.hash(body.password, 12) } }),
       prisma.session.updateMany({ where: { userId: t.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
     ]);

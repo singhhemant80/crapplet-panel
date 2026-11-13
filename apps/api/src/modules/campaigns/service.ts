@@ -8,6 +8,7 @@
  * The recipient list is fixed when sending starts. The worker sends a slice every minute (perMinute) so the
  * mail server isn't flooded; a campaign can be paused, resumed or cancelled half-way.
  */
+import { stripActiveHtml } from "../../lib/html";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { prisma, type Prisma } from "../../db";
@@ -36,7 +37,7 @@ export const campaignSchema = z.object({
   kind: z.enum(["OFFER", "INFO"]),
   subject: z.string().trim().min(1).max(200),
   preheader: z.string().trim().max(200).nullable().optional(),
-  body: z.string().min(1).max(200_000),
+  body: z.string().min(1).max(200_000).transform(stripActiveHtml),
   audience: audienceSchema.default({}),
   perMinute: z.number().int().min(1).max(1000).default(60),
 });
