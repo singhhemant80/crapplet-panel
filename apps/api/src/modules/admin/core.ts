@@ -232,8 +232,22 @@ adminCore.post(
   "/clients/:id/credit",
   requireStaff("billing.manage"),
   ah(async (req, res) => {
-    const b = parse(z.object({ amount: z.number().int().refine((v) => v !== 0), description: z.string().min(3).max(200) }), req.body);
-    const balance = await adjustCredit(prisma, { userId: req.params.id, amount: b.amount, description: `${b.description} (staff)`, refType: "staff", refId: req.user!.id });
+    const b = parse(
+      z.object({
+        amount: z.number().int().refine((v) => v !== 0, "Enter an amount").optional(),
+        /** take the whole balance off */
+        removeAll: z.boolean().optional(),
+        description: z.string().trim().min(3, "Add a short reason (at least 3 characters)").max(200),
+      }),
+      req.body,
+    );
+    const prof = await prisma.clientProfile.findUnique({ where: { userId: req.params.id }, select: { creditBalance: true, currency: true } });
+    if (!prof) throw notFound("Client not found");
+    const amount = b.removeAll ? -prof.creditBalance : b.amount;
+    if (!amount) throw badRequest(b.removeAll ? "There's no credit to remove" : "Enter an amount");
+    if (amount < 0 && -amount > prof.creditBalance)
+      throw badRequest(`Only ${(prof.creditBalance / 100).toFixed(2)} ${prof.currency} of credit is available — you can remove at most that`);
+    const balance = await adjustCredit(prisma, { userId: req.params.id, amount, description: `${b.description} (staff)`, refType: "staff", refId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: req.params.id, action: "client.credit_adjusted", details: b });
     res.json({ balance });
   }),

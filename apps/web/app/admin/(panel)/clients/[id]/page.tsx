@@ -276,7 +276,7 @@ export default function ClientDetail() {
       <ContactModal open={modal === "contact"} onClose={close} id={id} onDone={refresh} />
       <PayMethodModal open={modal === "paymethod"} onClose={close} id={id} onDone={refresh} />
       <FileModal open={modal === "file"} onClose={close} id={id} onDone={refresh} />
-      <CreditModal open={modal === "credit"} onClose={close} id={id} currency={cur} onDone={refresh} />
+      <CreditModal open={modal === "credit"} onClose={close} id={id} currency={cur} balance={sum?.income?.credit ?? c.profile?.creditBalance ?? 0} onDone={refresh} />
       <InvoiceModal open={modal === "invoice"} onClose={close} id={id} currency={cur} onDone={refresh} />
       <FundsModal open={modal === "funds"} onClose={close} id={id} currency={cur} onDone={refresh} />
       <TicketModal open={modal === "ticket"} onClose={close} id={id} onDone={refresh} />
@@ -806,15 +806,53 @@ function CloseModal({ open, onClose, c, onDone }: any) {
   );
 }
 
-function CreditModal({ open, onClose, id, currency = "INR", onDone }: any) {
+function CreditModal({ open, onClose, id, currency = "INR", balance = 0, onDone }: any) {
+  const [mode, setMode] = useState<"add" | "remove">("add");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const paise = Math.round(Number(amount || 0) * 100);
+  const after = mode === "add" ? balance + paise : balance - paise;
+  async function save(body: Record<string, unknown>, msg: string) {
+    if (description.trim().length < 3) return toast.error("Add a short reason (at least 3 characters)");
+    setBusy(true);
+    try {
+      const r = await api(`/admin/clients/${id}/credit`, { body: { ...body, description: description.trim() } });
+      toast.success(`${msg} — balance now ${money(r.balance, currency)}`);
+      setAmount("");
+      setDescription("");
+      onClose();
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <Modal open={open} onClose={onClose} title="Manage credits">
+    <Modal open={open} onClose={onClose} title="Manage credit">
       <div className="space-y-4">
-        <Field label={`Amount (${currency})`} hint="Use a negative number to deduct."><Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-        <Field label="Reason"><Input value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-        <Button onClick={() => api(`/admin/clients/${id}/credit`, { body: { amount: Math.round(Number(amount) * 100), description } }).then(() => { toast.success("Credit updated"); onClose(); onDone(); }).catch((e) => toast.error(e.message))}>Save</Button>
+        <div className="flex items-center justify-between rounded-xl bg-[#faf7ff] px-4 py-3 ring-1 ring-[#ede4ff]">
+          <span className="text-sm text-mute">Current credit balance</span>
+          <b className="text-lg text-ink">{money(balance, currency)}</b>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(["add", "remove"] as const).map((m) => (
+            <button key={m} type="button" onClick={() => setMode(m)} className={cx("flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-bold transition", mode === m ? (m === "add" ? "border-emerald-400 bg-emerald-50 text-emerald-800" : "border-rose-400 bg-rose-50 text-rose-700") : "border-line bg-white text-slate-600 hover:border-primary/40")}>
+              <Icon name={m === "add" ? "add_circle" : "remove_circle"} className="text-[18px]" />{m === "add" ? "Add credit" : "Remove credit"}
+            </button>
+          ))}
+        </div>
+        <Field label={`Amount (${currency})`} hint={paise > 0 ? `Balance after: ${money(after, currency)}` : mode === "remove" ? `At most ${money(balance, currency)}` : undefined}>
+          <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value.replace("-", ""))} placeholder="0.00" />
+        </Field>
+        <Field label="Reason" hint="Shown in the customer's credit history"><Input value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} placeholder={mode === "add" ? "e.g. Goodwill credit for downtime" : "e.g. Credit removed — added by mistake"} /></Field>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {balance > 0 ? <Button variant="ghost" icon="delete_sweep" className="text-rose-600" loading={busy} onClick={() => confirm(`Remove all ${money(balance, currency)} of this customer's credit?`) && save({ removeAll: true }, "All credit removed")}>Remove all credit</Button> : <span />}
+          <Button icon={mode === "add" ? "add" : "remove"} variant={mode === "add" ? "primary" : "danger"} loading={busy} disabled={paise <= 0 || (mode === "remove" && paise > balance)} onClick={() => save({ amount: mode === "add" ? paise : -paise }, mode === "add" ? "Credit added" : "Credit removed")}>
+            {mode === "add" ? "Add credit" : "Remove credit"}
+          </Button>
+        </div>
       </div>
     </Modal>
   );

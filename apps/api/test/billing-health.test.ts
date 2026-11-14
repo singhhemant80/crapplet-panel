@@ -178,3 +178,26 @@ test("staff see the check over the API; only billing managers can run fixes", as
   assert.ok(r.json.checks.length >= 10);
   assert.equal((await staff.req("POST", "/admin/billing/health/fix", { key: "cancelled_paid" })).status, 400, "review-only checks have no fix");
 });
+
+test("staff can add, remove and clear a customer's credit, with clear messages", async () => {
+  const uid = (await prisma.user.create({ data: { email: `bh-cr-${RUN}@t.test`, passwordHash: "x", firstName: "Cr", type: "CLIENT", status: "ACTIVE", profile: { create: { country: "IN" } } } })).id;
+  ids.crUser = uid;
+  const call = (body: Record<string, unknown>) => staff.req("POST", `/admin/clients/${uid}/credit`, body);
+  assert.equal((await call({ amount: 12889, description: "Goodwill" })).json.balance, 12889);
+  const tooMuch = await call({ amount: -20000, description: "Remove" });
+  assert.equal(tooMuch.status, 400);
+  assert.match(tooMuch.json.error, /Only 128\.89 INR of credit is available/);
+  assert.equal((await call({ amount: -2889, description: "Partly" })).json.balance, 10000);
+  const noReason = await call({ removeAll: true, description: "x" });
+  assert.equal(noReason.status, 400);
+  assert.match(JSON.stringify(noReason.json), /short reason/);
+  assert.equal((await call({ removeAll: true, description: "Credit added by mistake" })).json.balance, 0);
+  assert.equal((await call({ removeAll: true, description: "Again" })).status, 400, "nothing left to remove");
+  const log = await prisma.creditLedger.findMany({ where: { userId: uid }, orderBy: { createdAt: "asc" } });
+  assert.deepEqual(log.map((l) => l.amount), [12889, -2889, -10000]);
+  assert.equal(log[2].description, "Credit added by mistake (staff)");
+  await prisma.creditLedger.deleteMany({ where: { userId: uid } });
+  await prisma.activityLog.deleteMany({ where: { userId: uid } }).catch(() => undefined);
+  await prisma.clientProfile.deleteMany({ where: { userId: uid } });
+  await prisma.user.delete({ where: { id: uid } });
+});
