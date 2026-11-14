@@ -66,14 +66,18 @@ export async function settleVerified(gateway: string, v: Verified) {
     console.warn(`[payments] ${gateway} ${v.gatewayTxnId} amount ${v.amount} < intent ${intent.amount}`);
   }
   await prisma.paymentIntent.updateMany({ where: { id: intent.id, status: { in: ["CREATED", "FAILED", "EXPIRED"] } }, data: { status: "PAID" } });
+  // A gateway that adds a convenience fee for the customer (Cashfree / Razorpay "customer pays fees") reports
+  // the amount *with* the fee. Only the amount we asked for pays the invoice — the fee belongs to the gateway
+  // and must never turn into account credit.
+  const surcharge = v.amount > intent.amount ? v.amount - intent.amount : 0;
   const r = await applyPayment({
     invoiceId: intent.invoiceId,
-    amount: v.amount,
+    amount: v.amount - surcharge,
     gateway,
     gatewayTxnId: v.gatewayTxnId,
     fee: v.fee,
-    raw: v.raw,
-    description: `${gateway} payment`,
+    raw: surcharge ? { ...((v.raw ?? {}) as object), crappletSurcharge: surcharge, chargedAmount: v.amount } : v.raw,
+    description: surcharge ? `${gateway} payment (customer also paid ${(surcharge / 100).toFixed(2)} ${intent.currency} gateway convenience fee)` : `${gateway} payment`,
   });
   if ((intent.meta as { autopay?: string } | null)?.autopay === "register") {
     await saveMandateFromPayment(intent.id, v.raw as Record<string, unknown>).catch((e) => console.error(`[autopay] couldn't save the mandate for ${intent.id}:`, (e as Error).message));

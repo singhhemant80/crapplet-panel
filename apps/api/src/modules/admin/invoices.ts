@@ -364,6 +364,28 @@ const autopaySchema = z.object({
   autopayDaysBeforeDue: z.coerce.number().int().min(2).max(15),
 });
 
+/** Credit created from gateway convenience fees before they were handled properly — review & reverse. */
+adminInvoices.get(
+  "/billing/surcharge-credits",
+  requireStaff("billing.view"),
+  ah(async (_req, res) => {
+    const { findSurchargeCredits } = await import("../billing/surcharge-credits");
+    res.json({ customers: await findSurchargeCredits() });
+  }),
+);
+
+adminInvoices.post(
+  "/billing/surcharge-credits/reverse",
+  requireStaff("billing.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ userIds: z.array(z.string()).max(5000).optional() }), req.body ?? {});
+    const { reverseSurchargeCredits } = await import("../billing/surcharge-credits");
+    const done = await reverseSurchargeCredits(b.userIds);
+    await audit({ actorId: req.user!.id, action: "credit.surcharge_reversed", entity: "billing", details: { customers: done.length, removed: done.reduce((a, d) => a + d.removed, 0) } });
+    res.json({ done });
+  }),
+);
+
 adminInvoices.get(
   "/gateways/autopay",
   requireStaff("settings.manage"),

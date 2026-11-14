@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, date, money } from "@/lib/api";
 import { Alert, Badge, Button, Card, Copy, Field, Input, Loading, PageHeader, Select, Textarea, Toggle, toast, useApi } from "@/components/ui";
 
 export default function Gateways() {
@@ -9,6 +9,7 @@ export default function Gateways() {
   return (
     <>
       <PageHeader title="Payment gateways" subtitle="Secrets are encrypted at rest. Services are only activated by verified, signed webhooks or server-side verification — never by the browser alone." />
+      <SurchargeCredits />
       <AutopayCard gateways={data.gateways} />
       <div className="grid gap-5 xl:grid-cols-2">{data.gateways.map((g: any) => <GatewayCard key={g.code} g={g} onSaved={reload} />)}</div>
     </>
@@ -57,6 +58,59 @@ function GatewayCard({ g, onSaved }: { g: any; onSaved: () => void }) {
 }
 
 /** UPI AutoPay: customers approve a UPI mandate once; renewals are then charged automatically. */
+/** Convenience fees that were kept as customer credit before the fix — shown only while there are some. */
+function SurchargeCredits() {
+  const { data, reload } = useApi("/admin/billing/surcharge-credits");
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const list: any[] = data?.customers ?? [];
+  if (!list.length) return null;
+  const sum = (k: string) => list.reduce((a, c) => a + c[k], 0);
+  async function reverse() {
+    if (!confirm(`Take back ${money(sum("removable"))} of unspent credit from ${list.filter((c) => c.removable > 0).length} customer(s)? Credit they already used on invoices isn't changed.`)) return;
+    setBusy(true);
+    try {
+      const r = await api("/admin/billing/surcharge-credits/reverse", { body: {} });
+      toast.success(`Reversed ${money(r.done.reduce((a: number, d: any) => a + d.removed, 0))} of convenience-fee credit`);
+      reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card title="Convenience fees kept as credit" className="mb-6">
+      <Alert tone="warn">
+        Before this update, when a customer paid a gateway convenience fee (e.g. Cashfree charging ₹6,035.76 for a ₹5,900 invoice), the extra was added to their account credit.
+        This is fixed for new payments. <b>{list.length}</b> customer{list.length === 1 ? "" : "s"} got <b>{money(sum("total"))}</b> this way: <b>{money(sum("removable"))}</b> is still unused and can be taken back; {money(sum("alreadySpent"))} was already used on invoices.
+      </Alert>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button icon="undo" loading={busy} disabled={sum("removable") <= 0} onClick={reverse}>Take back unused credit</Button>
+        <Button variant="ghost" icon={open ? "expand_less" : "expand_more"} onClick={() => setOpen(!open)}>{open ? "Hide" : "Show"} customers</Button>
+      </div>
+      {open && (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-line">
+          <table className="w-full min-w-[620px] text-[13px]">
+            <thead className="bg-[#faf7ff] text-left text-[11px] font-bold uppercase tracking-wider text-mute"><tr><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Payments</th><th className="px-3 py-2 text-right">Fee credited</th><th className="px-3 py-2 text-right">Still unused</th><th className="px-3 py-2 text-right">Already used</th></tr></thead>
+            <tbody className="divide-y divide-line">
+              {list.map((c) => (
+                <tr key={c.userId}>
+                  <td className="px-3 py-2"><a href={`/admin/clients/${c.userId}?tab=credit`} className="font-semibold text-primary-dark hover:underline">{c.name || c.email}</a><div className="text-xs text-mute">{c.email}</div></td>
+                  <td className="px-3 py-2 text-xs text-mute">{c.entries.map((e: any) => `${date(e.at)} · ${money(e.amount, c.currency)}`).join(", ")}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{money(c.total, c.currency)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-700">{money(c.removable, c.currency)}</td>
+                  <td className="px-3 py-2 text-right text-mute">{money(c.alreadySpent, c.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function AutopayCard({ gateways }: { gateways: any[] }) {
   const { data, reload } = useApi("/admin/gateways/autopay");
   const [v, setV] = useState<any>(null);
