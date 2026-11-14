@@ -24,6 +24,13 @@ export function proxmoxFor(server: Server): ProxmoxClient {
   if (config.provisionDryRun) return new DryRunProxmox() as unknown as ProxmoxClient;
   return new ProxmoxClient({ host: server.hostname, port: server.port, tokenId: server.apiUser ?? "", secret: decrypt(server.apiSecretEnc), verifyTls: server.verifyTls });
 }
+/** The OS login a VPS gets: Administrator on Windows, root on Linux. */
+export function loginUserOf(os: { family?: string | null; name?: string | null; remoteName?: string | null } | null | undefined) {
+  if (!os) return "root";
+  // Virtualizor names Windows images like "win2022-x64"
+  return os.family === "windows" || /windows/i.test(`${os.name ?? ""} ${os.remoteName ?? ""}`) || /^win\d/i.test(os.remoteName ?? "") ? "Administrator" : "root";
+}
+
 export function virtualizorFor(server: Server): VirtualizorClient {
   return new VirtualizorClient({ host: server.hostname, port: server.port || 4085, apiKey: server.apiUser ?? "", apiPass: decrypt(server.apiSecretEnc), verifyTls: server.verifyTls });
 }
@@ -352,7 +359,7 @@ async function virtualizorCreate(svc: FullService) {
   if (!vpsid) {
     const virt = mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm");
     const candidates = await virtualizorNodeCandidates(svc, server, mc, ipNodes, virt);
-    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: "root" } });
+    await prisma.service.update({ where: { id: svc.id }, data: { serverId: server.id, hostname, passwordEnc: encrypt(password), username: loginUserOf(svc.osTemplate) } });
 
     // ── never build twice ──
     // Virtualizor keeps building after an unanswered request. Remember which VPSes already had this
@@ -522,7 +529,7 @@ async function virtualizorCreate(svc: FullService) {
   void import("./virtualizor-ips").then((m) => m.syncVirtualizorIps(server)).catch(() => null);
   await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id } });
   await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
-  return { password, username: "root", hostname, ip: addresses[0] ?? "" };
+  return { password, username: loginUserOf(svc.osTemplate), hostname, ip: addresses[0] ?? "" };
 }
 
 // ───────────────────────── dispatcher ─────────────────────────
@@ -795,8 +802,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
           const { server, remoteId } = requireRemote(svc);
           if (!os.virtualizorOsId) throw new ProvisionError("OS has no Virtualizor id", false);
           await virtualizorFor(server).rebuild(remoteId, os.virtualizorOsId, password);
-          await prisma.service.update({ where: { id: svc.id }, data: { osTemplateId: os.id, passwordEnc: encrypt(password) } });
-          await queueEmail("service.vps_ready", svc.user.email, { ...vars, password, username: "root", ip: svc.ips[0]?.address ?? "", os: os.name }, svc.userId);
+          await prisma.service.update({ where: { id: svc.id }, data: { osTemplateId: os.id, passwordEnc: encrypt(password), username: loginUserOf(os) } });
+          await queueEmail("service.vps_ready", svc.user.email, { ...vars, password, username: loginUserOf(os), ip: svc.ips[0]?.address ?? "", os: os.name }, svc.userId);
         }
         await log(svc.id, action, true, `Reinstalled with ${os.name}`);
         return { ok: true };
@@ -910,7 +917,9 @@ export async function syncVirtualizorService(serviceId: string) {
   if (ips.length) await recordServiceIps(svc.id, svc.server.id, ips);
   const { osTemplateForVps } = await import("./virtualizor-os");
   const osId = await osTemplateForVps(svc.server, row as Record<string, unknown>).catch(() => null);
-  await prisma.service.update({ where: { id: svc.id }, data: { ...(row.serid !== undefined ? { node: String(row.serid) } : {}), ...(row.hostname ? { hostname: String(row.hostname) } : {}), ...(osId ? { osTemplateId: osId } : {}) } });
+  const osRow = osId ? await prisma.osTemplate.findUnique({ where: { id: osId }, select: { family: true, name: true, remoteName: true } }) : null;
+  const user = osRow && (!svc.username || ["root", "Administrator"].includes(svc.username)) ? loginUserOf(osRow) : null;
+  await prisma.service.update({ where: { id: svc.id }, data: { ...(row.serid !== undefined ? { node: String(row.serid) } : {}), ...(row.hostname ? { hostname: String(row.hostname) } : {}), ...(osId ? { osTemplateId: osId } : {}), ...(user && user !== svc.username ? { username: user } : {}) } });
   const osName = osId ? (await prisma.osTemplate.findUnique({ where: { id: osId }, select: { name: true } }))?.name : null;
   const codes = await client.vpsStatus([svc.remoteId]).catch(() => ({}) as Record<string, number>);
   const st = virtualizorState(codes[svc.remoteId], row);

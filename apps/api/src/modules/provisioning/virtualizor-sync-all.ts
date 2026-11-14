@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../../config";
 import { prisma } from "../../db";
-import { recordServiceIps, virtualizorFor } from "./provisioner";
+import { loginUserOf, recordServiceIps, virtualizorFor } from "./provisioner";
 import { osTemplateForVps } from "./virtualizor-os";
 import { vpsIpsOf } from "./virtualizor";
 
@@ -67,7 +67,7 @@ export async function startSyncAll(actorId?: string) {
   return s;
 }
 
-type Svc = { id: string; hostname: string | null; remoteId: string | null; node: string | null; serverId: string | null; osTemplateId: string | null; ips: { address: string; isPrimary: boolean }[]; user: { email: string } };
+type Svc = { id: string; username?: string | null; hostname: string | null; remoteId: string | null; node: string | null; serverId: string | null; osTemplateId: string | null; ips: { address: string; isPrimary: boolean }[]; user: { email: string } };
 
 export async function runSyncAll(s: SyncAllState) {
   let lastSave = 0;
@@ -83,7 +83,7 @@ export async function runSyncAll(s: SyncAllState) {
   const masterIds = new Set(masters.map((m) => m.id));
   const services: Svc[] = await prisma.service.findMany({
     where: { status: { notIn: ["TERMINATED", "CANCELLED"] }, product: { provisioner: "VIRTUALIZOR" } },
-    select: { id: true, hostname: true, remoteId: true, node: true, serverId: true, osTemplateId: true, ips: { select: { address: true, isPrimary: true } }, user: { select: { email: true } } },
+    select: { id: true, username: true, hostname: true, remoteId: true, node: true, serverId: true, osTemplateId: true, ips: { select: { address: true, isPrimary: true } }, user: { select: { email: true } } },
   });
   const linkedOk = (x: Svc) => !!x.remoteId && !!x.serverId && masterIds.has(x.serverId);
   const unlinked = services.filter((x) => !linkedOk(x));
@@ -198,6 +198,7 @@ export async function runSyncAll(s: SyncAllState) {
 
   // 3. bring every linked service in line with its VPS
   const osCache = new Map<string, string | null>();
+  const osFamily = new Map<string, string>();
   const osNames = new Map((await prisma.osTemplate.findMany({ where: { source: "virtualizor" }, select: { id: true, name: true } })).map((o) => [o.id, o.name]));
   for (const m of masters) {
     const mine = services.filter((x) => linkedOk(x) && x.serverId === m.id);
@@ -249,14 +250,21 @@ export async function runSyncAll(s: SyncAllState) {
       const nodeChanged = node !== undefined && node !== svc.node;
       const hostChanged = !!hostname && hostname !== svc.hostname;
       const osChanged = !!osId && osId !== svc.osTemplateId;
-      if (!ipsChanged && !nodeChanged && !hostChanged && !osChanged) {
+      // the login follows the OS: Administrator on Windows, root on Linux (a custom username is left alone)
+      let user: string | null = null;
+      if (osId && (!svc.username || ["root", "Administrator"].includes(svc.username))) {
+        if (!osFamily.has(osId)) osFamily.set(osId, loginUserOf(await prisma.osTemplate.findUnique({ where: { id: osId }, select: { family: true, name: true, remoteName: true } })));
+        user = osFamily.get(osId)!;
+        if (user === svc.username) user = null;
+      }
+      if (!ipsChanged && !nodeChanged && !hostChanged && !osChanged && !user) {
         s.unchanged++;
         await progress();
         continue;
       }
       try {
         if (ipsChanged) await recordServiceIps(svc.id, m.id, after);
-        if (nodeChanged || hostChanged || osChanged) await prisma.service.update({ where: { id: svc.id }, data: { ...(nodeChanged ? { node } : {}), ...(hostChanged ? { hostname } : {}), ...(osChanged ? { osTemplateId: osId } : {}) } });
+        if (nodeChanged || hostChanged || osChanged || user) await prisma.service.update({ where: { id: svc.id }, data: { ...(nodeChanged ? { node } : {}), ...(hostChanged ? { hostname } : {}), ...(osChanged ? { osTemplateId: osId } : {}), ...(user ? { username: user } : {}) } });
         let osName: string | undefined;
         if (osChanged) {
           if (!osNames.has(osId!)) osNames.set(osId!, (await prisma.osTemplate.findUnique({ where: { id: osId! }, select: { name: true } }))?.name ?? "?");

@@ -202,3 +202,28 @@ test("links by the customer's email when that's the only clue; re-links a VPS id
     await prisma.user.delete({ where: { id: emUser } });
   }
 });
+
+test("VPS login follows the OS: Administrator on Windows, root on Linux", async () => {
+  const { loginUserOf } = await import("../src/modules/provisioning/provisioner");
+  assert.equal(loginUserOf({ family: "windows", name: "Windows Server 2022" }), "Administrator");
+  assert.equal(loginUserOf({ family: "linux", name: "Ubuntu 24.04" }), "root");
+  assert.equal(loginUserOf({ family: "linux", name: "Win 2019", remoteName: "win2019-x64" }), "Administrator", "a mis-tagged Windows image");
+  assert.equal(loginUserOf(null), "root");
+
+  await prisma.osTemplate.create({ data: { name: "Windows Server 2022", remoteName: "win2022-x64", source: "virtualizor", virtualizorServerId: serverId, virtualizorOsId: 9022, family: "windows" } });
+  VPS[`${V + 9}`] = { vpsid: `${V + 9}`, hostname: `win-${RUN}`, serid: "1", ips: { "14": ip(14) }, osid: "9022", os_name: "win2022-x64" };
+  const win = await prisma.service.create({ data: { userId, productId, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 1, recurringAmount: 1, currency: "INR", serverId, remoteId: `${V + 9}`, hostname: `win-${RUN}`, username: "root" } });
+  const custom = await prisma.service.create({ data: { userId, productId, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 1, recurringAmount: 1, currency: "INR", serverId, remoteId: `${V + 1}`, hostname: `linked-${RUN}`, username: "deploy" } });
+  svc.win = win.id;
+  try {
+    const st = await runSyncAll(fresh());
+    const w = await prisma.service.findUniqueOrThrow({ where: { id: win.id }, include: { osTemplate: true } });
+    assert.equal(w.username, "Administrator", JSON.stringify({ os: w.osTemplate, ch: st.changes.filter((c) => c.serviceId === win.id), miss: st.missing.filter((c) => c.serviceId === win.id), dup: st.duplicates, servers: st.servers }));
+    assert.equal((await prisma.service.findUniqueOrThrow({ where: { id: custom.id } })).username, "deploy", "a custom username is left alone");
+    assert.equal((await prisma.service.findUniqueOrThrow({ where: { id: svc.linked } })).username ?? "root", "root");
+  } finally {
+    await prisma.provisioningLog.deleteMany({ where: { serviceId: { in: [win.id, custom.id] } } });
+    await prisma.ipAddress.deleteMany({ where: { serviceId: { in: [win.id, custom.id] } } });
+    await prisma.service.deleteMany({ where: { id: { in: [win.id, custom.id] } } });
+  }
+});
