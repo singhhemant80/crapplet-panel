@@ -1,3 +1,4 @@
+import { coloInvoiceDetails } from "../../lib/product-kind";
 import { z } from "zod";
 import { prisma, BillingCycle, type Db } from "../../db";
 import { badRequest } from "../../lib/http";
@@ -165,7 +166,10 @@ export async function priceCart(cart: Cart, opts: { userId?: string | null; db?:
     const recurring = (price.price + cfg.monthly * months) * item.quantity;
     lines.push({
       kind: "product",
-      description: `${p.name} (${CYCLE_LABEL[item.cycle]})${item.hostname ? ` — ${item.hostname}` : ""}${cfg.desc.length ? `\n${cfg.desc.join(", ")}` : ""}`,
+      description: `${p.name} (${CYCLE_LABEL[item.cycle]})${item.hostname ? ` — ${item.hostname}` : ""}${cfg.desc.length ? `\n${cfg.desc.join(", ")}` : ""}${(() => {
+        const colo = coloInvoiceDetails(p, item.equipment ? { equipment: item.equipment } : undefined);
+        return colo ? `\n${colo}` : "";
+      })()}`,
       productId: p.id,
       itemIndex: idx,
       amount: recurring,

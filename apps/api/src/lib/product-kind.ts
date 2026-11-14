@@ -35,3 +35,26 @@ export function qualifiesForFreeDomain(p: FreeDomainRule, cycle: string, domain:
   if (p.freeDomainTlds.length && !p.freeDomainTlds.map((t) => (t.startsWith(".") ? t : `.${t}`).toLowerCase()).includes(tld)) return false;
   return true;
 }
+
+/**
+ * One line describing a colocation service for invoices:
+ * "1U rack space · 300 W power · 1 Gbps port · Noida DC-1 · Rack R12, U21 · Equipment: Dell PowerEdge R640 (S/N ABC123)".
+ */
+export function coloInvoiceDetails(product: { type: string; moduleConfig: unknown; bandwidthGb?: number | null; ipv4Count?: number | null }, serviceConfig?: unknown): string | null {
+  if (!isColoProduct(product)) return null;
+  const sp = coloSpecs(product.moduleConfig);
+  const cfg = (serviceConfig ?? {}) as { colo?: Record<string, string>; equipment?: { device?: string; units?: number; powerW?: number; serial?: string } };
+  const loc = cfg.colo ?? {};
+  const eq = cfg.equipment ?? {};
+  const parts = [
+    sp.rackUnits ? `${sp.rackUnits}U rack space` : null,
+    sp.powerW ? `${sp.powerW} W power` : null,
+    sp.portSpeed ? `${sp.portSpeed} port` : null,
+    product.bandwidthGb ? `${product.bandwidthGb.toLocaleString("en-IN")} GB bandwidth` : product.bandwidthGb === null ? "unmetered bandwidth" : null,
+    product.ipv4Count ? `${product.ipv4Count} × IPv4` : null,
+    loc.datacenter || sp.datacenter,
+    loc.rack || loc.position ? [loc.rack && `Rack ${loc.rack}`, loc.position].filter(Boolean).join(", ") : null,
+    eq.device ? `Equipment: ${eq.device}${eq.units ? ` (${eq.units}U)` : ""}${eq.serial ? ` S/N ${eq.serial}` : ""}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ").slice(0, 500) : null;
+}

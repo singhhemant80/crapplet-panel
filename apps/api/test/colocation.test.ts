@@ -162,3 +162,19 @@ test("invoice lists say which service each invoice is for — staff and customer
   assert.deepEqual(r2.for, []);
   assert.equal(r2.forSummary, "Remote hands — 1 hour");
 });
+
+test("colocation details are written on the invoice — at order time and on each renewal", async () => {
+  const order = await prisma.invoiceItem.findFirstOrThrow({ where: { relId: ids.svc, type: "SERVICE" }, orderBy: { id: "asc" } });
+  assert.match(order.description, /1U rack space · 300 W power · 1 Gbps port/);
+  assert.match(order.description, /Noida DC-1/);
+  assert.match(order.description, /Equipment: Dell PowerEdge R640 \(1U\) S\/N ABC123/);
+
+  await prisma.invoiceItem.updateMany({ where: { relId: ids.svc }, data: { periodStart: new Date("2020-01-01") } }); // don't count the order's line as this period
+  await prisma.service.update({ where: { id: ids.svc }, data: { status: "ACTIVE", nextDueDate: new Date(Date.now() + 2 * 86400_000) } });
+  const g = await staff.req("POST", `/admin/clients/${ids.user}/generate-due`, {});
+  assert.equal(g.status, 200, JSON.stringify(g.json));
+  const renewal = await prisma.invoiceItem.findFirstOrThrow({ where: { relId: ids.svc, type: "SERVICE", description: { contains: "renewal" } } });
+  assert.match(renewal.description, /Colocation 1U .* \(Monthly renewal\) — db1\.example\.com · 1U rack space · 300 W power/);
+  assert.match(renewal.description, /Rack R12, U21/, "staff's rack details");
+  assert.match(renewal.description, /S\/N XYZ999/, "the updated serial");
+});

@@ -1,3 +1,4 @@
+import { coloInvoiceDetails } from "../lib/product-kind";
 /**
  * Daily automation — the panel's equivalent of the WHMCS cron.
  *
@@ -60,7 +61,7 @@ export async function generateRenewalInvoices(opts: { userId?: string; rec?: Rec
       if (exists) continue;
       const periodEnd = addCycle(periodStart, svc.billingCycle);
       const items: NewInvoiceItem[] = [
-        { type: "SERVICE", relId: svc.id, description: `${svc.product.name} (${CYCLE_LABEL[svc.billingCycle]} renewal)${svc.hostname ? ` — ${svc.hostname}` : ""}`, hsnSac: svc.product.hsnSac, unitPrice: svc.recurringAmount, taxable: svc.product.taxable, periodStart, periodEnd },
+        { type: "SERVICE", relId: svc.id, description: `${svc.product.name} (${CYCLE_LABEL[svc.billingCycle]} renewal)${svc.hostname ? ` — ${svc.hostname}` : ""}${((c) => (c ? ` · ${c}` : ""))(coloInvoiceDetails(svc.product, svc.config))}`, hsnSac: svc.product.hsnSac, unitPrice: svc.recurringAmount, taxable: svc.product.taxable, periodStart, periodEnd },
         ...svc.addons.map((x) => ({ type: "ADDON" as const, relId: x.id, description: `${x.addon.name} (renewal)`, unitPrice: x.recurringAmount, taxable: x.addon.taxable, periodStart, periodEnd })),
       ];
       const inv = await prisma.$transaction(async (tx) => {
