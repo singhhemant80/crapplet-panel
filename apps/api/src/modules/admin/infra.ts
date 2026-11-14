@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { parse as parseCsv } from "csv-parse/sync";
-import { prisma, Prisma, IpStatus, ServerType } from "../../db";
+import { prisma, Prisma, IpStatus, ServerType, type Server } from "../../db";
+import { findTwin, importedServerIds, mergeServer } from "../provisioning/server-twins";
 import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { encrypt } from "../../lib/crypto";
@@ -51,7 +52,19 @@ adminInfra.get(
   ah(async (_req, res) => {
     const servers = await prisma.server.findMany({ orderBy: { name: "asc" }, select: { ...serverPublic, apiSecretEnc: true, _count: { select: { services: { where: { status: { in: ["ACTIVE", "SUSPENDED"] } } }, ips: true } } } });
     const free = await prisma.ipAddress.groupBy({ by: ["serverId"], where: { status: "AVAILABLE" }, _count: true });
-    res.json({ servers: servers.map(({ apiSecretEnc, ...s }) => ({ ...s, hasSecret: !!apiSecretEnc, freeIps: free.find((f) => f.serverId === s.id)?._count ?? 0 })) });
+    const allServices = await prisma.service.groupBy({ by: ["serverId"], where: { serverId: { not: null }, status: { notIn: ["TERMINATED", "CANCELLED"] } }, _count: true });
+    // servers imported from WHMCS, and the server here they're a copy of (merge suggestion)
+    const imported = await importedServerIds();
+    const twins = new Map<string, { id: string; name: string }>();
+    await Promise.all(
+      servers
+        .filter((sv) => imported.has(sv.id))
+        .map(async (sv) => {
+          const t = await findTwin(sv as unknown as Server).catch(() => null);
+          if (t) twins.set(sv.id, { id: t.id, name: t.name });
+        }),
+    );
+    res.json({ servers: servers.map(({ apiSecretEnc, ...s }) => ({ ...s, hasSecret: !!apiSecretEnc, freeIps: free.find((f) => f.serverId === s.id)?._count ?? 0, imported: imported.has(s.id), sameAs: twins.get(s.id) ?? null, servicesAll: allServices.find((a) => a.serverId === s.id)?._count ?? 0 })) });
   }),
 );
 
@@ -96,6 +109,23 @@ adminInfra.delete(
     await prisma.ipAddress.updateMany({ where: { serverId: req.params.id, serviceId: null }, data: { serverId: null } });
     await prisma.server.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
+  }),
+);
+
+/** Merge a server (typically one imported from WHMCS) into the same master set up here: its services, IPs and plan links move over. */
+adminInfra.post(
+  "/servers/:id/merge",
+  requireStaff("servers.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ intoId: z.string().min(1) }), req.body);
+    let r;
+    try {
+      r = await mergeServer(req.params.id, b.intoId);
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
+    await audit({ actorId: req.user!.id, action: "server.merged", entity: "server", entityId: b.intoId, details: r });
+    res.json(r);
   }),
 );
 

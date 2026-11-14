@@ -11,9 +11,25 @@ export default function Servers() {
   const locs = useApi("/admin/locations");
   const [f, setF] = useState<any>(null);
   const [testing, setTesting] = useState<string | null>(null);
+  const [merge, setMerge] = useState<{ from: any; intoId: string } | null>(null);
+  const [merging, setMerging] = useState(false);
+  async function doMerge() {
+    if (!merge?.intoId) return;
+    setMerging(true);
+    try {
+      const r = await api(`/admin/servers/${merge.from.id}/merge`, { body: { intoId: merge.intoId } });
+      toast.success(`Merged into ${r.into}: ${r.services} service${r.services === 1 ? "" : "s"}, ${r.ips} IPs, ${r.planLinks} plan links moved`);
+      setMerge(null);
+      reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setMerging(false);
+    }
+  }
   async function save() {
     const body = { ...f, maxServices: Number(f.maxServices) || 0, nameservers: (Array.isArray(f.nameservers) ? f.nameservers : String(f.nameservers ?? "").split(/[\s,]+/)).map((x: string) => x.trim().toLowerCase()).filter(Boolean), port: Number(f.port), maxCpuPct: Number(f.maxCpuPct), maxRamPct: Number(f.maxRamPct), maxDiskPct: Number(f.maxDiskPct), locationId: f.locationId || null, defaultNode: f.defaultNode || null, apiSecret: f.apiSecret || undefined };
-    delete body.id; delete body.nodes; delete body._count; delete body.freeIps; delete body.location; delete body.lastStatus; delete body.lastCheckAt; delete body.createdAt;
+    delete body.id; delete body.nodes; delete body._count; delete body.freeIps; delete body.location; delete body.lastStatus; delete body.lastCheckAt; delete body.createdAt; delete body.imported; delete body.sameAs; delete body.servicesAll;
     try {
       if (f.id) await api(`/admin/servers/${f.id}`, { method: "PUT", body });
       else await api("/admin/servers", { body });
@@ -48,6 +64,15 @@ export default function Servers() {
                 <div className="rounded-xl bg-[#fbf9ff] p-2"><div className="text-xs text-mute">Thresholds</div><b className="text-xs">CPU {s.maxCpuPct}% · RAM {s.maxRamPct}%</b></div>
               </div>
               )}
+              {s.imported && (
+                <Alert tone={s.sameAs ? "warn" : "info"} className="mt-3">
+                  {s.sameAs ? (
+                    <>Imported from WHMCS — this is the same server as <b>{s.sameAs.name}</b>. New VPSes for its services are already built on {s.sameAs.name}; merge to move its {s.servicesAll} service{s.servicesAll === 1 ? "" : "s"} (including failed and pending orders) and its IPs over and remove this copy.</>
+                  ) : (
+                    <>Imported from WHMCS. If it&apos;s the same server as one you set up here, use <b>Merge into</b> so its services use that server&apos;s OS templates, nodes and IPs. Otherwise add its credentials, test the connection, enable it and sync its OS templates.</>
+                  )}
+                </Alert>
+              )}
               {s.lastStatus?.error && <Alert tone="error" className="mt-3">{s.lastStatus.error}</Alert>}
               {s.nodes.length > 0 && (
                 <div className="mt-3 space-y-1.5">
@@ -63,6 +88,9 @@ export default function Servers() {
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" icon="network_check" loading={testing === s.id} onClick={() => { setTesting(s.id); api(`/admin/servers/${s.id}/test`, { body: {} }).then((r) => { r.ok ? toast.success(`Connected${r.version ? ` · ${s.type === "CPANEL" ? "WHM" : s.type === "PROXMOX" ? "PVE" : ""} ${r.version}` : ""}${r.accounts !== undefined && r.accounts !== null ? ` · ${r.accounts} accounts` : ""} · ${r.latencyMs} ms`) : toast.error(r.error); reload(); }).finally(() => setTesting(null)); }}>Test connection</Button>
                 {s.type === "CPANEL" && <Button size="sm" variant="ghost" icon="open_in_new" onClick={() => { const w = window.open("about:blank", "_blank"); api<{ url: string }>(`/admin/servers/${s.id}/whm-login`, { body: {} }).then((r) => { if (w) w.location.href = r.url; else window.location.href = r.url; }).catch((e) => { w?.close(); toast.error(e.message); }); }}>Login to WHM</Button>}
+                {data.servers.some((o: any) => o.id !== s.id && o.type === s.type) && (
+                  <Button size="sm" variant={s.sameAs ? "primary" : "ghost"} icon="merge" onClick={() => setMerge({ from: s, intoId: s.sameAs?.id ?? data.servers.find((o: any) => o.id !== s.id && o.type === s.type && !o.imported)?.id ?? "" })}>Merge into…</Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={() => setF({ ...s, apiSecret: "", locationId: s.locationId ?? "", defaultNode: s.defaultNode ?? "", nameservers: (s.nameservers ?? []).join(", ") })}>Edit</Button>
                 <span className="ml-auto text-xs text-mute">checked {date(s.lastCheckAt, true)}</span>
               </div>
@@ -94,6 +122,27 @@ export default function Servers() {
             </>}
             <div className="flex gap-5 sm:col-span-2"><Toggle checked={f.verifyTls} onChange={(v) => setF({ ...f, verifyTls: v })} label="Verify TLS certificate" /><Toggle checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label="Enabled for new orders" /></div>
             <div className="sm:col-span-2"><Button onClick={save} icon="save">Save server</Button></div>
+          </div>
+        )}
+      </Modal>
+      <Modal open={!!merge} onClose={() => setMerge(null)} title={`Merge ${merge?.from.name ?? ""}`}>
+        {merge && (
+          <div className="space-y-4">
+            <p className="text-sm text-mute">
+              Use this when two records point at the same {merge.from.type === "VIRTUALIZOR" ? "Virtualizor master" : merge.from.type === "CPANEL" ? "WHM server" : "server"} — usually one imported from WHMCS and one you set up here.
+              Its services, IP addresses and plan links move to the server you pick, then <b>{merge.from.name}</b> is removed. Nothing changes on the VPSes themselves.
+            </p>
+            <Field label="Merge into">
+              <Select value={merge.intoId} onChange={(e) => setMerge({ ...merge, intoId: e.target.value })}>
+                <option value="">Choose a server…</option>
+                {data?.servers.filter((o: any) => o.id !== merge.from.id && o.type === merge.from.type).map((o: any) => <option key={o.id} value={o.id}>{o.name} · {o.hostname}{o.id === merge.from.sameAs?.id ? " (same address)" : ""}</option>)}
+              </Select>
+            </Field>
+            {merge.intoId && merge.from.sameAs && merge.intoId !== merge.from.sameAs.id && <Alert tone="warn">That server has a different address from {merge.from.name}. Only merge if they really are the same {merge.from.type === "VIRTUALIZOR" ? "master" : "server"}.</Alert>}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setMerge(null)}>Cancel</Button>
+              <Button icon="merge" loading={merging} disabled={!merge.intoId} onClick={doMerge}>Merge {merge.from.servicesAll} service{merge.from.servicesAll === 1 ? "" : "s"}</Button>
+            </div>
           </div>
         )}
       </Modal>

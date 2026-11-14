@@ -396,6 +396,20 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         const kind = type.includes("proxmox") ? "PROXMOX" : type.includes("virtualizor") ? "VIRTUALIZOR" : type === "cpanel" || type === "whm" ? "CPANEL" : null;
         if (!kind) { warn("servers", s.id, `${s.name}: module "${type}" has no equivalent here — services on it are imported as manual`); c("servers").skipped++; continue; }
         if (get("server", s.id)) { c("servers").skipped++; continue; }
+        // the same master is already set up here (same type and address) → use it, don't make a second record
+        {
+          const { sameMaster } = await import("../provisioning/server-twins");
+          const host = str(s.hostname) || str(s.ipaddress);
+          let twin: { id: string; name: string } | null = null;
+          for (const o of await tx.server.findMany({ where: { type: kind } })) if (await sameMaster({ type: kind, hostname: host }, o)) { twin = o; break; }
+          if (!twin && str(s.ipaddress) && str(s.hostname)) for (const o of await tx.server.findMany({ where: { type: kind } })) if (await sameMaster({ type: kind, hostname: str(s.ipaddress) }, o)) { twin = o; break; }
+          if (twin) {
+            await setMap("server", s.id, twin.id);
+            warn("servers", s.id, `${s.name}: same server as "${twin.name}" — its services were put on "${twin.name}"`);
+            c("servers").skipped++;
+            continue;
+          }
+        }
         // WHM: the access hash / API token works as-is ("WHM root:<key>"); others need the decrypted password
         const accessHash = kind === "CPANEL" ? str(s.accesshash).replace(/\s+/g, "") : "";
         const secret = accessHash || (whmcsDecrypt(s.password, opts.ccEncryptionHash ?? "") ?? "");

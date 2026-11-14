@@ -58,7 +58,21 @@ export function nodeFits(n: PveNode, server: Pick<Server, "maxCpuPct" | "maxRamP
 
 async function pickServer(svc: FullService): Promise<Server> {
   const cfg = (svc.config ?? {}) as { requestedIpId?: string };
-  if (svc.server) return svc.server;
+  if (svc.server) {
+    // a server imported from WHMCS is usually the same master as one set up here (with OS templates,
+    // nodes and IPs synced) — build on that one
+    const { findTwin, importedServerIds } = await import("./server-twins");
+    const imported = (await importedServerIds()).has(svc.server.id);
+    if (!imported && svc.server.enabled) return svc.server;
+    const twin = await findTwin(svc.server);
+    if (twin) {
+      await prisma.service.update({ where: { id: svc.id }, data: { serverId: twin.id } });
+      await log(svc.id, "create", true, `Service was on "${svc.server.name}"${imported ? " (imported from WHMCS)" : ""} — that's the same ${twin.type === "VIRTUALIZOR" ? "Virtualizor master" : "server"} as "${twin.name}", using it. Tip: Servers → ${svc.server.name} → Merge into "${twin.name}" moves every service at once.`);
+      return twin;
+    }
+    if (svc.server.enabled) return svc.server;
+    await log(svc.id, "create", true, `Service was on "${svc.server.name}", which is disabled — choosing a server from the plan instead`);
+  }
   if (cfg.requestedIpId) {
     const ip = await prisma.ipAddress.findUnique({ where: { id: cfg.requestedIpId }, include: { server: true } });
     if (ip?.server?.enabled) return ip.server;
@@ -339,8 +353,20 @@ async function virtualizorCreate(svc: FullService) {
   // a template synced from another master has a different osid there — use the same image on this master
   let osId = svc.osTemplate.virtualizorOsId;
   if (svc.osTemplate.virtualizorServerId && svc.osTemplate.virtualizorServerId !== server.id) {
-    const same = await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, remoteName: svc.osTemplate.remoteName ?? undefined, enabled: true } });
-    if (!same?.virtualizorOsId) throw new ProvisionError(`"${svc.osTemplate.name}" isn't available on ${server.name} — sync OS templates for that master`, false);
+    const t = svc.osTemplate;
+    const same =
+      (t.remoteName ? await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, remoteName: t.remoteName, enabled: true } }) : null) ??
+      (await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, name: { equals: t.name, mode: "insensitive" }, enabled: true } })) ??
+      (t.distro ? await prisma.osTemplate.findFirst({ where: { virtualizorServerId: server.id, family: t.family, distro: t.distro, name: { contains: t.name.replace(/[^\w\s.]/g, " ").trim().split(/\s+/).slice(-1)[0] ?? t.name, mode: "insensitive" }, enabled: true } }) : null);
+    if (!same?.virtualizorOsId) {
+      const synced = await prisma.osTemplate.count({ where: { virtualizorServerId: server.id } });
+      throw new ProvisionError(
+        synced
+          ? `"${t.name}" isn't among the OS templates synced from ${server.name}. Choose an OS that is (Billing & overrides → OS), or add it in Virtualizor and sync OS templates again, then retry.`
+          : `No OS templates have been synced from ${server.name} yet${/\(WHMCS\)$/.test(server.name) ? " — it was imported from WHMCS. If it's the same Virtualizor as a server you already set up, open Servers and use “Merge into” on it" : " — open Servers → OS templates → Sync"}, then retry.`,
+        false,
+      );
+    }
     osId = same.virtualizorOsId;
   }
   // IPs always come from Virtualizor: like its WHMCS module, the panel only asks for how many
@@ -356,6 +382,7 @@ async function virtualizorCreate(svc: FullService) {
   const password = svc.passwordEnc ? decrypt(svc.passwordEnc) : generatePassword(18);
   const hostname = (svc.hostname || `vps-${svc.id.slice(-6)}.crapplet.cloud`).toLowerCase();
   let vpsid = svc.remoteId;
+  let linkedExisting = false;
   if (!vpsid) {
     const virt = mc.virt || (p.virtType === "LXC" ? "lxc" : "kvm");
     const candidates = await virtualizorNodeCandidates(svc, server, mc, ipNodes, virt);
@@ -388,6 +415,17 @@ async function virtualizorCreate(svc: FullService) {
       await log(svc.id, "create", true, `Found VPS ${vpsid} that an earlier attempt already created in Virtualizor — using it instead of building another${adopt.length > 1 ? `. Also found ${adopt.slice(1).map((v) => v.vpsid).join(", ")} with the same hostname — delete them in Virtualizor if they're duplicates` : ""}`);
       const n = adopt[0] as { serid?: string | null };
       await prisma.service.update({ where: { id: svc.id }, data: { remoteId: vpsid, ...(n.serid ? { node: n.serid } : {}) } });
+    } else if (sameName?.length && (await prisma.legacyMap.count({ where: { entity: "service", localId: svc.id } }))) {
+      // a service imported from WHMCS whose VPS already exists (same hostname, same customer): link it, don't build another
+      const email = svc.user.email.toLowerCase();
+      const taken = await takenElsewhere(sameName.map((v) => v.vpsid));
+      const mine = sameName.filter((v) => v.email?.toLowerCase() === email && !taken.has(v.vpsid));
+      if (mine.length) {
+        vpsid = mine[0].vpsid;
+        linkedExisting = true;
+        await log(svc.id, "create", true, `Imported from WHMCS: VPS ${vpsid} (${hostname}, ${email}) already exists in Virtualizor — linked it instead of building a new one`);
+        await prisma.service.update({ where: { id: svc.id }, data: { remoteId: vpsid, ...(mine[0].serid ? { node: mine[0].serid } : {}) } });
+      }
     }
     /** addvs that tolerates Virtualizor answering late: wait for the VPS to show up instead of failing. */
     const createOrAdopt = async (params: Parameters<typeof client.createVps>[0]): Promise<string> => {
@@ -527,9 +565,10 @@ async function virtualizorCreate(svc: FullService) {
   const addresses = actual.length ? actual : ips.map((i) => i.address);
   if (actual.length) await recordServiceIps(svc.id, server.id, actual);
   void import("./virtualizor-ips").then((m) => m.syncVirtualizorIps(server)).catch(() => null);
-  await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id } });
-  await log(svc.id, "create", true, `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
-  return { password, username: loginUserOf(svc.osTemplate), hostname, ip: addresses[0] ?? "" };
+  // linked to the customer's existing VPS: the password made up for this attempt isn't theirs — keep only a known one
+  await prisma.service.update({ where: { id: svc.id }, data: { status: "ACTIVE", remoteId: vpsid, serverId: server.id, ...(linkedExisting && !svc.passwordEnc ? { passwordEnc: null } : {}) } });
+  await log(svc.id, "create", true, linkedExisting ? `Linked to existing Virtualizor VPS ${vpsid} (${addresses.join(", ") || "no IP read yet"}) — no welcome email sent, the customer already has it` : `Virtualizor VPS ${vpsid} created with ${addresses.join(", ") || "IPs assigned by Virtualizor"}`);
+  return { password, username: loginUserOf(svc.osTemplate), hostname, ip: addresses[0] ?? "", linkedExisting };
 }
 
 // ───────────────────────── dispatcher ─────────────────────────
@@ -631,7 +670,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         await prisma.service.update({ where: { id: svc.id }, data: { status: "PROVISIONING" } });
         await log(svc.id, "create", true, `Provisioning started${svc.status === "FAILED" ? " (retry)" : ""}`);
         const r = prov === "PROXMOX" ? await proxmoxCreate(svc) : await virtualizorCreate(svc);
-        await queueEmail("service.vps_ready", svc.user.email, { ...vars, ...r, os: svc.osTemplate?.name ?? "" }, svc.userId);
+        const { linkedExisting, ...details } = r as typeof r & { linkedExisting?: boolean };
+        if (!linkedExisting) await queueEmail("service.vps_ready", svc.user.email, { ...vars, ...details, os: svc.osTemplate?.name ?? "" }, svc.userId);
         return { ok: true, ip: r.ip };
       }
       case "suspend": {
