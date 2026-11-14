@@ -195,3 +195,50 @@ test("services import even when plans weren't ticked; deleted plans go to a plac
 test("default entity list excludes staff", () => {
   assert.ok(!DEFAULT_ENTITIES.includes("staff"));
 });
+
+test("WHMCS 8 logins: password comes from tblusers; Inactive customers can sign in; a re-import fixes accounts imported without it", async () => {
+  const http = await import("node:http");
+  const { createApp } = await import("../src/app");
+  const app = createApp().listen(0);
+  const base = `http://127.0.0.1:${(app.address() as import("node:net").AddressInfo).port}/api`;
+  const login = (email: string, password: string) => fetch(`${base}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "crapplet" }, body: JSON.stringify({ email, password }) }).then((r) => r.status);
+  void http;
+  try {
+    const email = `w8-${RUN}@example.in`;
+    const pw = "Whmcs8-Login!";
+    const base8 = fakeWhmcs();
+    const client = { id: id(90), firstname: "Eight", lastname: "User", email, address1: "1", city: "Noida", state: "Uttar Pradesh", postcode: "201301", country: "IN", phonenumber: "", password: "", status: "Inactive", credit: "0", datecreated: "2023-01-01", currency: 1 };
+    const opts = { entities: ["clients" as const], ccEncryptionHash: CC, overwritePricing: false, dryRun: false };
+
+    // 1) imported the old way (no tblusers read) → nobody knows the password
+    await runWhmcsImport(source({ ...base8, tblclients: [client] }), opts);
+    assert.equal(await login(email, pw), 401);
+
+    // 2) re-import with WHMCS 8's user tables → their WHMCS password works, even though WHMCS marked them Inactive
+    const users8 = {
+      tblusers: [{ id: id(91), first_name: "Eight", last_name: "User", email, password: bcrypt.hashSync(pw, 10).replace(/^\$2a\$/, "$2y$") }],
+      tblusers_clients: [{ auth_user_id: id(91), client_id: id(90), owner: 1 }],
+    };
+    const r = await runWhmcsImport(source({ ...base8, tblclients: [client], ...users8 }), opts);
+    assert.equal(r.counts.clients.updated, 1);
+    const u = await prisma.user.findUniqueOrThrow({ where: { email } });
+    assert.equal(u.status, "INACTIVE");
+    assert.equal(await login(email, pw), 200, "WHMCS 8 password + Inactive account signs in");
+
+    // 3) once they've signed in here, a later re-import doesn't overwrite their password
+    const other = { tblusers: [{ ...users8.tblusers[0], password: bcrypt.hashSync("different-old", 10).replace(/^\$2a\$/, "$2y$") }], tblusers_clients: users8.tblusers_clients };
+    await runWhmcsImport(source({ ...base8, tblclients: [client], ...other }), opts);
+    assert.equal(await login(email, pw), 200);
+
+    // closed accounts stay out
+    await prisma.user.update({ where: { id: u.id }, data: { status: "CLOSED" } });
+    assert.equal(await login(email, pw), 401);
+
+    // a new WHMCS 8 client created by the import gets the tblusers password straight away
+    const email2 = `w8b-${RUN}@example.in`;
+    await runWhmcsImport(source({ ...base8, tblclients: [{ ...client, id: id(92), email: email2 }], tblusers: [{ ...users8.tblusers[0], id: id(93), email: email2 }], tblusers_clients: [{ auth_user_id: id(93), client_id: id(92), owner: 1 }] }), opts);
+    assert.equal(await login(email2, pw), 200);
+  } finally {
+    app.close();
+  }
+});

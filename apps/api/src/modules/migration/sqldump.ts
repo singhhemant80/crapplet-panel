@@ -19,7 +19,11 @@ export const WHMCS_TABLES = [
   "tblcustomfieldsvalues", "tbldomains", "tblhosting", "tblhostingaddons", "tblinvoiceitems", "tblinvoices", "tblknowledgebase", "tblknowledgebasecats",
   "tblknowledgebaselinks", "tblorders", "tblpricing", "tblproductgroups", "tblproducts", "tblpromotions", "tblservergroupsrel", "tblservers",
   "tblticketdepartments", "tblticketnotes", "tblticketreplies", "tbltickets",
+  // WHMCS 8+: logins (email + password) live here, linked to client accounts
+  "tblusers", "tblusers_clients",
 ];
+/** Tables added to WHMCS_TABLES after the first release — dumps prepared before that get them extracted on demand. */
+const ADDED_LATER = ["tblusers", "tblusers_clients"];
 
 export interface DumpScan {
   tables: Map<string, Row[]>;
@@ -306,6 +310,8 @@ export interface DumpMeta {
   counts: Record<string, number>;
   /** every table found in the file */
   tables: string[];
+  /** the tables written out when the dump was prepared (absent = before ADDED_LATER existed) */
+  extracted?: string[];
   bytes: number;
   preparedAt: string;
 }
@@ -349,6 +355,7 @@ export async function prepareDump(file: string, onProgress?: (bytes: number) => 
     company: String(cfg.find((r) => r.setting === "CompanyName")?.value ?? ""),
     counts,
     tables: [...scan.seen].sort(),
+    extracted: [...WHMCS_TABLES],
     bytes: (await fs.promises.stat(file)).size,
     preparedAt: new Date().toISOString(),
   };
@@ -368,6 +375,21 @@ export async function readDumpMeta(file: string): Promise<DumpMeta | null> {
 export async function dumpSource(file: string): Promise<SourceDb & { meta: DumpMeta }> {
   const meta = (await readDumpMeta(file)) ?? (await prepareDump(file));
   const dir = tablesDir(file);
+  // a dump prepared by an older version: pull out the tables the importer reads now (one pass over the file)
+  const done = meta.extracted ?? WHMCS_TABLES.filter((t) => !ADDED_LATER.includes(t));
+  const missing = WHMCS_TABLES.filter((t) => !done.includes(t) && meta.tables.map((x) => x.toLowerCase()).includes(t));
+  if (missing.length && fs.existsSync(file)) {
+    const out = new Map<string, string[]>();
+    await scanDump(file, missing, undefined, undefined, (t, row) => {
+      const l = out.get(t) ?? [];
+      l.push(JSON.stringify(row) + "\n");
+      out.set(t, l);
+    });
+    for (const t of missing) await fs.promises.writeFile(path.join(dir, `${t}.jsonl`), (out.get(t) ?? []).join(""));
+    meta.extracted = [...WHMCS_TABLES];
+    for (const t of missing) meta.counts[t] = out.get(t)?.length ?? 0;
+    await fs.promises.writeFile(path.join(dir, "meta.json"), JSON.stringify(meta));
+  }
   return {
     meta,
     async table<T>(name: string) {

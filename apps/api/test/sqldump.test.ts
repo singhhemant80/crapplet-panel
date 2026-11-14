@@ -105,3 +105,21 @@ test("import dry run from a dump matches a dry run from the live database", asyn
   assert.deepEqual(fromDump.counts, fromDb.counts);
   assert.equal(fromDump.warnings.length, fromDb.warnings.length);
 });
+
+test("a dump prepared before tblusers was read gets the WHMCS 8 login tables pulled out on next use", async () => {
+  const data = { ...fakeWhmcs(), tblusers: [{ id: 7, email: "x@example.in", password: "$2y$10$abc" }], tblusers_clients: [{ auth_user_id: 7, client_id: 1, owner: 1 }] };
+  const file = path.join(dir, "old-prep.sql");
+  fs.writeFileSync(file, writeDump(data, "mysqldump"));
+  const first = await dumpSource(file);
+  assert.equal((await first.table("tblusers")).length, 1);
+  // make it look like an older version prepared it: no "extracted" list, no user tables on disk
+  const tdir = `${file}.tables`;
+  const meta = JSON.parse(fs.readFileSync(path.join(tdir, "meta.json"), "utf8"));
+  delete meta.extracted;
+  fs.writeFileSync(path.join(tdir, "meta.json"), JSON.stringify(meta));
+  fs.rmSync(path.join(tdir, "tblusers.jsonl"));
+  fs.rmSync(path.join(tdir, "tblusers_clients.jsonl"));
+  const again = await dumpSource(file);
+  assert.equal((await again.table("tblusers")).length, 1);
+  assert.equal((await again.table("tblusers_clients")).length, 1);
+});

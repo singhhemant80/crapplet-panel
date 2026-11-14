@@ -54,7 +54,8 @@ async function loadUser(userId: string, sessionId?: string): Promise<AuthUser | 
     prisma.user.findUnique({ where: { id: userId }, include: { role: true, reseller: true } }),
     sessionId ? prisma.session.findUnique({ where: { id: sessionId }, select: { revokedAt: true, expiresAt: true } }) : null,
   ]);
-  if (!user || user.status !== "ACTIVE") return null;
+  // staff must be active; customers can use the client area unless their account is closed
+  if (!user || user.status === "CLOSED" || (user.type === "STAFF" && user.status !== "ACTIVE")) return null;
   // signed out (logout, password reset, "sign out everywhere") takes effect at once, not when the token expires
   if (sessionId && (!session || session.revokedAt || session.expiresAt < new Date())) return null;
   return {

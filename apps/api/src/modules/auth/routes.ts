@@ -194,7 +194,8 @@ authRouter.post(
       throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
     };
     if (!user || !ok) return fail("bad_credentials");
-    if (user.status !== "ACTIVE") return fail("inactive");
+    // Inactive (e.g. no live service — WHMCS sets this automatically) can still sign in, as in WHMCS; Closed can't
+    if (user.status === "CLOSED" || (user.type === "STAFF" && user.status !== "ACTIVE")) return fail("inactive");
     if (body.portal === "admin" && user.type !== "STAFF") return fail("not_staff");
 
     if (user.totpEnabled) {
@@ -222,7 +223,7 @@ authRouter.post(
     }
     if (payload.purpose !== "2fa") throw new HttpError(401, "Invalid challenge");
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || user.status !== "ACTIVE") throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+    if (!user || user.status === "CLOSED" || (user.type === "STAFF" && user.status !== "ACTIVE")) throw new HttpError(401, "Invalid email or password", "INVALID_CREDENTIALS");
     if ((await recentFailures({ userId: user.id }, ["bad_2fa"])) >= 5) throw tooMany();
     if (!user.totpSecretEnc || !authenticator.verify({ token: body.code, secret: decrypt(user.totpSecretEnc) })) {
       await prisma.loginHistory.create({ data: { userId: user.id, email: user.email, ip: clientIp(req), success: false, reason: "bad_2fa" } });
@@ -242,7 +243,7 @@ authRouter.post(
     const token = req.cookies?.cc_rt || req.body?.refreshToken;
     if (!token) throw new HttpError(401, "No refresh token");
     const session = await prisma.session.findUnique({ where: { refreshTokenHash: sha256(token) }, include: { user: true } });
-    if (!session || session.revokedAt || session.expiresAt < new Date() || session.user.status !== "ACTIVE") {
+    if (!session || session.revokedAt || session.expiresAt < new Date() || session.user.status === "CLOSED" || (session.user.type === "STAFF" && session.user.status !== "ACTIVE")) {
       clearAuthCookies(res);
       throw new HttpError(401, "Session expired");
     }
@@ -287,7 +288,7 @@ authRouter.post(
     const { userId } = parse(z.object({ userId: z.string() }), req.body);
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target || target.type !== "CLIENT") throw badRequest("That account isn't a customer");
-    if (target.status !== "ACTIVE") throw badRequest(`The customer's account is ${target.status.toLowerCase()}`);
+    if (target.status === "CLOSED") throw badRequest("The customer's account is closed");
     const staffId = req.user!.id;
     if (req.user!.sessionId) await prisma.session.update({ where: { id: req.user!.sessionId }, data: { revokedAt: new Date() } }).catch(() => null);
     await startSession(req, res, target, { impersonatedById: staffId });
@@ -358,7 +359,7 @@ authRouter.post(
   ah(async (req, res) => {
     const { email } = parse(z.object({ email: z.string().trim().toLowerCase().email() }), req.body);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (user && user.status === "ACTIVE") {
+    if (user && user.status !== "CLOSED") {
       const token = randomToken();
       await prisma.verificationToken.create({
         data: { userId: user.id, type: "PASSWORD_RESET", tokenHash: sha256(token), expiresAt: new Date(Date.now() + 3600000) },

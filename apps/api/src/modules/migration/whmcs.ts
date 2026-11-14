@@ -294,6 +294,14 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
 
     // ── clients ──
     const clientRows = await T("tblclients");
+    // WHMCS 8+: the login (email + password) is a "user" linked to the client account; tblclients.password is blank
+    const [authUsers, authLinks] = await Promise.all([T("tblusers"), T("tblusers_clients")]);
+    const userById = new Map(authUsers.map((u) => [String(u.id), u]));
+    const loginOf = new Map<string, { email: string; password: string }>();
+    for (const l of [...authLinks].sort((a, b) => Number(b.owner ?? 0) - Number(a.owner ?? 0))) {
+      const u = userById.get(String(l.auth_user_id));
+      if (u && !loginOf.has(String(l.client_id))) loginOf.set(String(l.client_id), { email: str(u.email).toLowerCase(), password: str(u.password) });
+    }
     if (want("clients")) {
       let i = 0;
       for (const r of clientRows) {
@@ -316,6 +324,9 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
           currency: currencyCode.get(String(r.currency)) ?? defaultCurrency, notes: nul(r.notes),
         };
         const status = ({ active: "ACTIVE", inactive: "INACTIVE", closed: "CLOSED" } as const)[str(r.status).toLowerCase() as "active"] ?? "ACTIVE";
+        const login = loginOf.get(String(r.id));
+        const whmcsHash = login?.password || str(r.password);
+        if (login && login.email && login.email !== email) warn("clients", r.id, `${email}: signs in to WHMCS as ${login.email} — here they sign in with ${email} (same password)`);
         const credit = paise(r.credit);
         let localId = get("client", r.id);
         if (!localId) {
@@ -328,7 +339,9 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
           }
         }
         if (localId) {
-          await tx.user.update({ where: { id: localId }, data: { firstName: str(r.firstname) || "Customer", lastName: str(r.lastname), phone: nul(r.phonenumber), status, profile: { upsert: { create: { ...profile, creditBalance: credit }, update: profile } } } });
+          // bring the WHMCS password over until they've signed in here (after that, their password here wins)
+          const signedInHere = whmcsHash ? await tx.loginHistory.count({ where: { userId: localId, success: true } }) : 1;
+          await tx.user.update({ where: { id: localId }, data: { ...(whmcsHash && !signedInHere ? { passwordHash: whmcsHash } : {}), firstName: str(r.firstname) || "Customer", lastName: str(r.lastname), phone: nul(r.phonenumber), status, profile: { upsert: { create: { ...profile, creditBalance: credit }, update: profile } } } });
           const prof = await tx.clientProfile.findUniqueOrThrow({ where: { userId: localId } });
           if (prof.creditBalance !== credit) {
             const local = await tx.creditLedger.count({ where: { userId: localId, NOT: { refType: "whmcs" } } });
@@ -344,7 +357,7 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
             data: {
               email, firstName: str(r.firstname) || "Customer", lastName: str(r.lastname), phone: nul(r.phonenumber), status,
               // WHMCS bcrypt/md5 hashes are accepted at login and upgraded automatically
-              passwordHash: str(r.password) || (await bcrypt.hash(randomToken(), 10)),
+              passwordHash: whmcsHash || (await bcrypt.hash(randomToken(), 10)),
               emailVerifiedAt: created, createdAt: created,
               profile: { create: { ...profile, creditBalance: credit } },
             },
