@@ -26,6 +26,8 @@ export const audienceSchema = z.object({
   productIds: z.array(z.string().max(40)).max(200).default([]),
   country: z.enum(["all", "IN", "intl"]).default("all"),
   includeInactive: z.boolean().default(false),
+  /** accounts marked Closed (e.g. closed automatically by WHMCS for inactivity) */
+  includeClosed: z.boolean().default(false),
   signedUpWithinDays: z.number().int().min(1).max(3650).nullable().default(null),
   /** hand-picked customers (overrides the filters above) */
   userIds: z.array(z.string().max(40)).max(5000).default([]),
@@ -43,7 +45,7 @@ export const campaignSchema = z.object({
 });
 
 export function audienceWhere(a: Audience, kind: string): Prisma.UserWhereInput {
-  const and: Prisma.UserWhereInput[] = [{ type: "CLIENT" }, { status: { in: a.includeInactive ? ["ACTIVE", "INACTIVE"] : ["ACTIVE"] } }];
+  const and: Prisma.UserWhereInput[] = [{ type: "CLIENT" }, { status: { in: [ "ACTIVE" as const, ...(a.includeInactive ? ["INACTIVE" as const] : []), ...(a.includeClosed ? ["CLOSED" as const] : []) ] } }];
   if (kind === "OFFER") and.push({ marketingEmails: true });
   if (a.userIds.length) return { AND: [...and, { id: { in: a.userIds } }] };
   const product: Prisma.ProductWhereInput = {};
@@ -66,7 +68,14 @@ export async function audienceCount(a: Audience, kind: string) {
     // how many matching customers are left out because they don't take offers
     kind === "OFFER" ? prisma.user.count({ where: audienceWhere(a, "INFO") }) : Promise.resolve(0),
   ]);
-  return { count, sample, optedOut: kind === "OFFER" ? Math.max(0, optedOut - count) : 0 };
+  // where everyone else went: every registered customer by account status, and how many the filters drop
+  const [byStatus, statusOnly] = await Promise.all([
+    prisma.user.groupBy({ by: ["status"], where: { type: "CLIENT" }, _count: true }),
+    prisma.user.count({ where: audienceWhere({ ...a, clients: "all", productTypes: [], productIds: [], country: "all", signedUpWithinDays: null, userIds: [] }, kind) }),
+  ]);
+  const n = (st: string) => byStatus.find((x) => x.status === st)?._count ?? 0;
+  const breakdown = { total: n("ACTIVE") + n("INACTIVE") + n("CLOSED"), active: n("ACTIVE"), inactive: n("INACTIVE"), closed: n("CLOSED"), byFilters: a.userIds.length ? 0 : Math.max(0, statusOnly - count) };
+  return { count, sample, optedOut: kind === "OFFER" ? Math.max(0, optedOut - count) : 0, breakdown };
 }
 
 const urls = (token: string) => ({
@@ -152,7 +161,7 @@ async function sendBatch(c: Campaign) {
       if (st?.status !== "SENDING") return res;
     }
     const u = r.userId ? users.get(r.userId) : undefined;
-    const skip = (c.kind === "OFFER" && u && !u.marketingEmails) ? "Unsubscribed from offers" : u && u.status === "CLOSED" ? "Account closed" : (await isSuppressed(r.email)) ? "Address bounced recently" : null;
+    const skip = (c.kind === "OFFER" && u && !u.marketingEmails) ? "Unsubscribed from offers" : u && u.status === "CLOSED" && !(c.audience as { includeClosed?: boolean } | null)?.includeClosed ? "Account closed" : (await isSuppressed(r.email)) ? "Address bounced recently" : null;
     if (skip) {
       await prisma.emailCampaignRecipient.update({ where: { id: r.id }, data: { status: "SKIPPED", error: skip } });
       res.skipped++;

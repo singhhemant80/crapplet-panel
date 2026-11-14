@@ -122,6 +122,11 @@ test("audiences: offers skip customers who said no; closed accounts never get ma
   const c = await audienceCount(only({}), "OFFER");
   assert.equal(c.count, 2);
   assert.equal(c.optedOut, 1, "tells staff how many are left out because they don't take offers");
+  // closed accounts (e.g. closed by WHMCS for inactivity) only when staff opt in
+  assert.deepEqual(await who(audienceSchema.parse({ includeClosed: true }), "INFO"), ["asha", "ben", "chen", "dev"]);
+  assert.ok(c.breakdown.total >= 4 && c.breakdown.closed >= 1, "shows how many customers are registered, by status");
+  const filtered = await audienceCount(audienceSchema.parse({ productIds: [productId] }), "INFO");
+  assert.ok(filtered.breakdown.byFilters >= 2, "and how many the filters leave out");
 });
 
 test("sending: personalised, throttled per minute, with unsubscribe headers for offers, then finishes", async () => {
@@ -208,4 +213,18 @@ test("customers can turn offers off and on in their client area", async () => {
   assert.equal(me.user.marketingEmails, false);
   await p.session.deleteMany({ where: { userId: users.asha } });
   await p.loginHistory.deleteMany({ where: { userId: users.asha } });
+});
+
+test("a campaign that includes closed accounts really sends to them", async () => {
+  const { materialise } = await import("../src/modules/campaigns/service");
+  const c = await prisma.emailCampaign.create({ data: { name: "Closed too", kind: "INFO", subject: "Hello {{firstName}}", body: "<p>Hi</p>", audience: audienceSchema.parse({ userIds: [users.dev], includeClosed: true }) as never, perMinute: 10, status: "SENDING", startedAt: new Date() } });
+  campaigns.push(c.id);
+  assert.equal(await materialise(c.id), 1);
+  await campaignTick();
+  const rec = await prisma.emailCampaignRecipient.findFirstOrThrow({ where: { campaignId: c.id } });
+  assert.equal(rec.status, "SENT", rec.error ?? "");
+  // and without the option a closed account is still skipped
+  const c2 = await prisma.emailCampaign.create({ data: { name: "Not closed", kind: "INFO", subject: "Hi", body: "<p>Hi</p>", audience: audienceSchema.parse({ userIds: [users.dev] }) as never, perMinute: 10, status: "SENDING", startedAt: new Date() } });
+  campaigns.push(c2.id);
+  assert.equal(await materialise(c2.id), 0);
 });

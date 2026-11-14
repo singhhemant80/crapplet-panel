@@ -9,10 +9,10 @@ import { CTA, VARIABLES } from "@/lib/campaign-templates";
 import { Alert, Badge, Button, Card, Field, Icon, Input, Modal, PageHeader, Pager, Select, Toggle, cx, toast, useApi } from "@/components/ui";
 import { Ago, Avatar, SearchBox, StatusTabs, initialsOf, type Tab } from "@/components/admin/list-kit";
 
-type Audience = { clients: "all" | "with_active" | "without_active"; productTypes: string[]; productIds: string[]; country: "all" | "IN" | "intl"; includeInactive: boolean; signedUpWithinDays: number | null; userIds: string[] };
+type Audience = { clients: "all" | "with_active" | "without_active"; productTypes: string[]; productIds: string[]; country: "all" | "IN" | "intl"; includeInactive: boolean; includeClosed?: boolean; signedUpWithinDays: number | null; userIds: string[] };
 type Form = { name: string; kind: "OFFER" | "INFO"; subject: string; preheader: string; body: string; audience: Audience; perMinute: number };
 
-const AUD0: Audience = { clients: "all", productTypes: [], productIds: [], country: "all", includeInactive: false, signedUpWithinDays: null, userIds: [] };
+const AUD0: Audience = { clients: "all", productTypes: [], productIds: [], country: "all", includeInactive: false, includeClosed: false, signedUpWithinDays: null, userIds: [] };
 const TYPE_LABEL: Record<string, string> = { VPS: "VPS", VDS: "VDS", DEDICATED: "Dedicated", SHARED_HOSTING: "Shared hosting", RESELLER_HOSTING: "Reseller hosting", WORDPRESS_HOSTING: "WordPress hosting", FOREX_VPS: "Forex VPS", GPU: "GPU", TALLY: "Tally on cloud", COLOCATION: "Colocation", EMAIL: "Email", SSL: "SSL", DOMAIN: "Domains", WINDOWS_VPS: "Windows VPS" };
 const typeLabel = (t: string) => TYPE_LABEL[t] ?? t.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const fmt = (n: number) => n.toLocaleString("en-IN");
@@ -564,16 +564,22 @@ function AudienceBuilder({ kind, value: a, onChange }: { kind: string; value: Au
               </Select>
             </Field>
           </div>
-          <Toggle checked={a.includeInactive} onChange={(v) => set({ includeInactive: v })} label="Also include inactive accounts" />
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <Toggle checked={a.includeInactive} onChange={(v) => set({ includeInactive: v })} label="Also include inactive accounts" />
+            <Toggle checked={!!a.includeClosed} onChange={(v) => set({ includeClosed: v })} label="Also include closed accounts" />
+          </div>
+          <p className="-mt-1 text-[12px] text-slate-500">WHMCS marks customers <b>Inactive</b> when they have no active service, and can <b>Close</b> them after a while — imported customers keep that status. Leave closed accounts out if a customer asked you to close theirs.</p>
         </>
       )}
-      {kind === "OFFER" && <p className="text-[12px] text-slate-500"><Icon name="info" className="mr-1 align-[-3px] text-[15px]" />Offers skip customers who turned offers off. Closed accounts never receive campaigns.</p>}
+      {kind === "OFFER" && <p className="text-[12px] text-slate-500"><Icon name="info" className="mr-1 align-[-3px] text-[15px]" />Offers skip customers who turned offers off.</p>}
     </div>
   );
 }
 
-function AudienceSize({ aud, kind }: { aud: { count: number; optedOut: number; sample: any[] } | null; kind: string }) {
+function AudienceSize({ aud, kind }: { aud: { count: number; optedOut: number; sample: any[]; breakdown?: { total: number; active: number; inactive: number; closed: number; byFilters: number } } | null; kind: string }) {
+  const b = aud?.breakdown;
   return (
+    <>
     <div className={cx("mt-5 flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center", aud?.count ? "bg-[linear-gradient(135deg,#f5f0ff,#ede4ff)]" : "bg-amber-50")}>
       <div className="flex items-center gap-3">
         <div className={cx("grid h-12 w-12 place-items-center rounded-xl text-white", aud?.count ? "bg-primary" : "bg-amber-500")}><Icon name={aud?.count ? "groups" : "group_off"} className="text-[24px]" /></div>
@@ -591,6 +597,16 @@ function AudienceSize({ aud, kind }: { aud: { count: number; optedOut: number; s
         </div>
       </div>
     </div>
+    {b && b.total > 0 && (
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12px] text-slate-500">
+        <span><b className="text-slate-700">{fmt(b.total)}</b> registered customers:</span>
+        <span>{fmt(b.active)} active</span>
+        <span>{fmt(b.inactive)} inactive</span>
+        <span>{fmt(b.closed)} closed</span>
+        {b.byFilters > 0 && <span className="font-semibold text-amber-700">{fmt(b.byFilters)} left out by the filters above (services, plans, country, sign-up date)</span>}
+      </div>
+    )}
+    </>
   );
 }
 
