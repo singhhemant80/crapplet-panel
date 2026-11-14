@@ -66,6 +66,7 @@ export const RULES: Rule[] = [
   { methods: ["POST"], path: /^\/invoices\/bulk$/, label: "Bulk invoice action", when: (req) => ["mark_paid", "cancel", "delete"].includes(String((req.body as { action?: unknown })?.action ?? "")) },
   { methods: ["DELETE"], path: /^\/quotes\/[^/]+$/, label: "Delete a quote" },
   { methods: ["POST"], path: /^\/services\/[^/]+\/change-plan$/, label: "Change a service's plan" },
+  { methods: ["PUT"], path: /^\/numbering$/, label: "Change invoice numbering" },
   { methods: ["POST"], path: /^\/transactions\/[^/]+\/refund$/, label: "Refund" },
   { methods: ["POST"], path: /^\/payment-reviews\/[^/]+$/, label: "Approve a payment" },
   { methods: ["POST"], path: /^\/referrals\/[^/]+\/approve$/, label: "Affiliate payout" },

@@ -329,3 +329,40 @@ test("a paid manual-setup service tells the customer it's being set up, not that
   assert.equal(after.json.unpaidInvoiceId, null, "…but nothing is due any more");
   assert.ok(after.json.service.nextDueDate, "next due date starts from payment");
 });
+
+test("next invoice number: staff set where numbering continues; used numbers are refused; duplicates are skipped", async () => {
+  const st = (await staff.req("GET", "/admin/numbering")).json;
+  const tax = st.series.find((x: any) => x.key === "tax");
+  assert.ok(tax && tax.preview && tax.next >= 1, JSON.stringify(st));
+  const target = tax.next + 37;
+  const fresh = new Agent();
+  await fresh.req("POST", "/auth/login", { email: `it-staff-${RUN}@t.test`, password: PW });
+  assert.equal((await fresh.req("PUT", "/admin/numbering", { key: "tax", next: target })).status, 403, "needs the password re-confirmed");
+  const set = await staff.req("PUT", "/admin/numbering", { key: "tax", next: target });
+  assert.equal(set.status, 200, JSON.stringify(set.json));
+  const id1 = await newInvoice([{ description: "numbering 1", unitPrice: 1000 }]);
+  await staff.req("POST", `/admin/invoices/${id1}/payment`, { amount: 1000, gateway: "bank", reference: `NUM1-${RUN}` });
+  const n1 = (await inv(id1)).number!;
+  assert.equal(n1, set.json.preview, "the paid invoice gets exactly the number staff set");
+
+  // can't go back onto a used number
+  const back = await staff.req("PUT", "/admin/numbering", { key: "tax", next: target });
+  assert.equal(back.status, 409);
+  assert.match(back.json.error?.message ?? back.json.message ?? JSON.stringify(back.json), /already been used/);
+
+  // a series that points at an existing number skips it instead of failing the payment
+  const { financialYear } = await import("../src/lib/money");
+  await prisma.sequence.update({ where: { name: `invoice:${financialYear(new Date())}` }, data: { value: target - 1 } });
+  const id2 = await newInvoice([{ description: "numbering 2", unitPrice: 1000 }]);
+  const pay2 = await staff.req("POST", `/admin/invoices/${id2}/payment`, { amount: 1000, gateway: "bank", reference: `NUM2-${RUN}` });
+  assert.ok(pay2.status < 300, JSON.stringify(pay2.json));
+  const n2 = (await inv(id2)).number!;
+  assert.notEqual(n2, n1);
+  assert.ok(Number(n2.match(/(\d+)$/)![1]) === target + 1, `${n2} follows ${n1}`);
+
+  // proforma + quote series move too
+  const pf = (await staff.req("GET", "/admin/numbering")).json.series.find((x: any) => x.key === "proforma");
+  assert.equal((await staff.req("PUT", "/admin/numbering", { key: "proforma", next: pf.next + 5 })).status, 200);
+  const id3 = await newInvoice([{ description: "numbering 3", unitPrice: 100 }]);
+  assert.ok((await inv(id3)).proformaNumber.endsWith(String(pf.next + 5).padStart(6, "0")));
+});

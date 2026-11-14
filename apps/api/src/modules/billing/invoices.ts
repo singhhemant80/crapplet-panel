@@ -2,7 +2,7 @@ import { inrPerUnit, requireCurrency } from "../../lib/currency";
 import { prisma, type Db, type Tx, InvoiceItemType, Prisma } from "../../db";
 import { HttpError, badRequest, conflict, notFound } from "../../lib/http";
 import { getSettings } from "../../lib/settings";
-import { nextSequence } from "../../lib/sequence";
+import { nextFreeSequence, nextSequence } from "../../lib/sequence";
 import { addDays, financialYear, formatMoney } from "../../lib/money";
 import { computeGst } from "./gst";
 
@@ -43,10 +43,11 @@ export async function createInvoice(
   );
   const discount = -items.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
   const cur = await requireCurrency(args.currency ?? p?.currency ?? "INR", db);
-  const seq = await nextSequence("proforma", db);
+  const pfNo = (n: number) => `${settings.invoice.proformaPrefix}${String(n).padStart(6, "0")}`;
+  const seq = await nextFreeSequence("proforma", async (n) => !!(await db.invoice.findUnique({ where: { proformaNumber: pfNo(n) }, select: { id: true } })), db);
   const invoice = await db.invoice.create({
     data: {
-      proformaNumber: `${settings.invoice.proformaPrefix}${String(seq).padStart(6, "0")}`,
+      proformaNumber: pfNo(seq),
       userId: args.userId,
       currency: cur.code,
       exchangeRate: inrPerUnit(cur),
@@ -158,8 +159,9 @@ export async function assignTaxNumber(db: Db, invoiceId: string) {
   const fy = financialYear(inv.paidAt ?? new Date());
   const prefix = inv.isWalletTopup ? "RV/{FY}/" : s.invoice.taxPrefix;
   const seqName = inv.isWalletTopup ? `receipt:${fy}` : `invoice:${fy}`;
-  const n = await nextSequence(seqName, db);
-  const number = prefix.replace("{FY}", fy) + String(n).padStart(s.invoice.taxNumberPad, "0");
+  const render = (n: number) => prefix.replace("{FY}", fy) + String(n).padStart(s.invoice.taxNumberPad, "0");
+  const n = await nextFreeSequence(seqName, async (k) => !!(await db.invoice.findUnique({ where: { number: render(k) }, select: { id: true } })), db);
+  const number = render(n);
   await db.invoice.update({ where: { id: invoiceId }, data: { number } });
   return number;
 }
@@ -316,10 +318,11 @@ export async function issueCreditNoteTx(tx: Prisma.TransactionClient, args: { in
     if (args.amount <= 0 || args.amount + already > inv.total) throw badRequest("Amount exceeds the invoice total");
     const s = await getSettings(tx);
     const fy = financialYear();
-    const n = await nextSequence(`creditnote:${fy}`, tx);
+    const cnNo = (k: number) => s.invoice.creditNotePrefix.replace("{FY}", fy) + String(k).padStart(5, "0");
+    const n = await nextFreeSequence(`creditnote:${fy}`, async (k) => !!(await tx.creditNote.findUnique({ where: { number: cnNo(k) }, select: { id: true } })), tx);
     const taxShare = inv.total > 0 ? Math.round((inv.taxTotal * args.amount) / inv.total) : 0;
     const cn = await tx.creditNote.create({
-      data: { number: s.invoice.creditNotePrefix.replace("{FY}", fy) + String(n).padStart(5, "0"), invoiceId: inv.id, userId: inv.userId, amount: args.amount, taxAmount: taxShare, reason: args.reason },
+      data: { number: cnNo(n), invoiceId: inv.id, userId: inv.userId, amount: args.amount, taxAmount: taxShare, reason: args.reason },
     });
     if (args.toCredit) await adjustCredit(tx, { userId: inv.userId, amount: args.amount, description: `Credit note ${cn.number}`, refType: "creditNote", refId: cn.id });
     if (args.amount + already >= inv.total) await tx.invoice.update({ where: { id: inv.id }, data: { status: "REFUNDED" } });

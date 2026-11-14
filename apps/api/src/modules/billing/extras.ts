@@ -12,7 +12,7 @@
 import { prisma, type Tx } from "../../db";
 import { badRequest, conflict, notFound } from "../../lib/http";
 import { getSettings } from "../../lib/settings";
-import { nextSequence } from "../../lib/sequence";
+import { nextFreeSequence } from "../../lib/sequence";
 import { addMonths, formatMoney } from "../../lib/money";
 import { config } from "../../config";
 import { queueEmail } from "../email/mailer";
@@ -113,7 +113,8 @@ export async function quoteTotals(userId: string, items: QuoteLine[]) {
 }
 
 export async function nextQuoteNumber() {
-  return `Q-${String(await nextSequence("quote")).padStart(6, "0")}`;
+  const no = (n: number) => `Q-${String(n).padStart(6, "0")}`;
+  return no(await nextFreeSequence("quote", async (n) => !!(await prisma.quote.findUnique({ where: { number: no(n) }, select: { id: true } }))));
 }
 
 const quoteUrl = (id: string) => `${config.appUrl}/client/quotes/${id}`;

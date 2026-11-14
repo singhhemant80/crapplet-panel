@@ -334,3 +334,25 @@ adminInvoices.post(
     res.json({ ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok), results });
   }),
 );
+
+// ───────────── Number series (next invoice / credit note / quote number) ─────────────
+adminInvoices.get(
+  "/numbering",
+  requireStaff("billing.view"),
+  ah(async (_req, res) => {
+    const { numberingStatus } = await import("../billing/numbering");
+    res.json(await numberingStatus());
+  }),
+);
+
+adminInvoices.put(
+  "/numbering",
+  requireStaff("settings.manage"),
+  ah(async (req, res) => {
+    const { SERIES, setNextNumber } = await import("../billing/numbering");
+    const b = parse(z.object({ key: z.enum(SERIES), next: z.number().int().min(1).max(99_999_999) }), req.body);
+    const r = await setNextNumber(b.key, b.next);
+    await audit({ actorId: req.user!.id, action: "settings.numbering", entity: "settings", entityId: b.key, details: { next: r.preview } });
+    res.json(r);
+  }),
+);
