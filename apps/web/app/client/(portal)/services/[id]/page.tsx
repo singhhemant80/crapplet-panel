@@ -25,6 +25,7 @@ export default function ServicePage() {
 
   const svc = data?.service;
   const isVps = svc && (svc.product.provisioner === "PROXMOX" || svc.product.provisioner === "VIRTUALIZOR");
+  const ended = svc && (svc.status === "TERMINATED" || svc.status === "CANCELLED");
   const isHosting = svc?.product.provisioner === "CPANEL";
 
   useEffect(() => {
@@ -82,19 +83,30 @@ export default function ServicePage() {
         </>}
         stats={[
           ["Registered", date(svc.registrationDate), `Service #${String(svc.id).slice(-6).toUpperCase()}`],
-          ["Next due", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
+          ended
+            ? [svc.status === "CANCELLED" ? "Cancelled on" : "Terminated on", svc.terminationDate ? date(svc.terminationDate) : "—", svc.terminationReason ? <span key="r" className="line-clamp-1" title={svc.terminationReason}>{svc.terminationReason}</span> : undefined]
+            : ["Next due", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
           ["Billing cycle", CYCLES[svc.billingCycle] ?? svc.billingCycle],
           ["Recurring", money(svc.recurringAmount, svc.currency), svc.currency === "INR" ? "+ GST" : undefined],
-          [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
+          [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status === "PENDING" ? (data.unpaidInvoiceId ? "Awaiting payment" : "Being set up") : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
         ]}
       />
 
       {(isVps || isHosting) && (["PENDING", "PROVISIONING", "FAILED"].includes(svc.status) || (svc.status === "ACTIVE" && Date.now() - new Date(svc.createdAt).getTime() < 3 * 3600_000)) && (
         <ProvisioningTracker path={`/client/services/${id}/provisioning`} audience="client" onChange={() => reload()} />
       )}
-      {!isVps && !isHosting && svc.status === "PENDING" && (
+      {!isVps && !isHosting && svc.status === "PENDING" && (data.unpaidInvoiceId ? (
         <Alert tone="warn" className="mb-5">
-          This service is awaiting payment. <Link href="/client/invoices?status=UNPAID" className="font-bold underline">Pay the invoice</Link> to activate it.
+          This service is awaiting payment. <Link href={`/client/invoices/${data.unpaidInvoiceId}`} className="font-bold underline">Pay the invoice</Link> to activate it.
+        </Alert>
+      ) : (
+        <Alert tone="info" className="mb-5">
+          Payment received — thank you. Our team is setting up this service and you'll get an email as soon as it's ready.
+        </Alert>
+      ))}
+      {ended && (
+        <Alert tone="info" className="mb-5">
+          This service was {svc.status === "CANCELLED" ? "cancelled" : "terminated"}{svc.terminationDate ? <> on <b>{date(svc.terminationDate)}</b></> : ""}.{svc.terminationReason ? <> Reason: <b>{svc.terminationReason}</b>.</> : ""} It's no longer billed. <Link href="/client/tickets/new" className="font-bold underline">Contact support</Link> if you think this is a mistake, or <Link href="/order" className="font-bold underline">order a new one</Link>.
         </Alert>
       )}
       {svc.status === "SUSPENDED" && (
@@ -220,8 +232,15 @@ export default function ServicePage() {
             <dd className="font-semibold text-ink">{CYCLES[svc.billingCycle]}</dd>
             <dt className="text-mute">Recurring</dt>
             <dd className="font-semibold text-ink">{money(svc.recurringAmount, svc.currency)}{svc.currency === "INR" ? " + GST" : ""}</dd>
-            <dt className="text-mute">Next due date</dt>
-            <dd className="font-semibold text-ink">{date(svc.nextDueDate)}</dd>
+            {ended ? <>
+              <dt className="text-mute">{svc.status === "CANCELLED" ? "Cancelled on" : "Terminated on"}</dt>
+              <dd className="font-semibold text-ink">{svc.terminationDate ? date(svc.terminationDate) : "—"}</dd>
+              <dt className="text-mute">Reason</dt>
+              <dd className="font-semibold text-ink">{svc.terminationReason ?? "—"}</dd>
+            </> : <>
+              <dt className="text-mute">Next due date</dt>
+              <dd className="font-semibold text-ink">{date(svc.nextDueDate)}</dd>
+            </>}
           </dl>
           {data.invoices.length > 0 && (
             <ul className="mt-4 divide-y divide-[#f3effb] border-t border-line">

@@ -175,9 +175,13 @@ function ServiceCard({ s, st }: { s: any; st?: { state: string; reason?: string 
         </div>
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 px-5 py-4">
-        <div className="text-xs">
+        <div className="min-w-0 text-xs [&>div]:truncate">
           <div className="font-bold text-ink">{money(s.recurringAmount, s.currency)} <span className="font-medium text-mute">/ {CYCLES[s.billingCycle]?.toLowerCase()}</span></div>
-          <div className={cx(days !== null && days <= 7 && s.status === "ACTIVE" ? "font-semibold text-rose-600" : "text-mute")}>{s.nextDueDate ? `Renews ${date(s.nextDueDate)}${days !== null && days >= 0 && days <= 30 ? ` · ${days}d` : ""}` : "—"}</div>
+          {["TERMINATED", "CANCELLED"].includes(s.status) ? (
+            <div className="text-mute" title={s.terminationReason ?? undefined}>{s.status === "CANCELLED" ? "Cancelled" : "Terminated"}{s.terminationDate ? ` ${date(s.terminationDate)}` : ""}{s.terminationReason ? ` · ${s.terminationReason}` : ""}</div>
+          ) : (
+            <div className={cx(days !== null && days <= 7 && s.status === "ACTIVE" ? "font-semibold text-rose-600" : "text-mute")}>{s.nextDueDate ? `Renews ${date(s.nextDueDate)}${days !== null && days >= 0 && days <= 30 ? ` · ${days}d` : ""}` : "—"}</div>
+          )}
         </div>
         <Link href={`/client/services/${s.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary-tint px-3.5 text-[13px] font-bold text-primary-dark transition group-hover:bg-primary-dark group-hover:text-white">
           Manage <Icon name="arrow_forward" className="text-[16px]" />

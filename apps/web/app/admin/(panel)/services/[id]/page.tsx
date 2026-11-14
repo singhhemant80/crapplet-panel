@@ -24,9 +24,10 @@ export default function AdminService() {
   const [resetPw, setResetPw] = useState(false);
   const [reinstall, setReinstall] = useState(false);
   const [edit, setEdit] = useState<any>(null);
+  const [terminating, setTerminating] = useState(false);
   useEffect(() => {
     if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
-    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "" });
+    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "", terminationDate: data.service.terminationDate?.slice(0, 10) ?? "", terminationReason: data.service.terminationReason ?? "" });
   }, [data, id]);
   if (loading || !data || !edit) return <Loading />;
   const s = data.service;
@@ -99,6 +100,8 @@ export default function AdminService() {
       )}
       {s.status === "FAILED" && <FailurePanel s={s} />}
       {s.status === "SUSPENDED" && <Alert tone="warn" className="mb-6"><b>Suspended</b>{s.suspendReason ? ` — ${s.suspendReason}` : ""}</Alert>}
+      {["TERMINATED", "CANCELLED"].includes(s.status) && <Alert tone="info" className="mb-6"><b>{s.status === "CANCELLED" ? "Cancelled" : "Terminated"}{s.terminationDate ? ` on ${date(s.terminationDate)}` : ""}</b>{s.terminationReason ? ` — ${s.terminationReason}` : " — no reason recorded (add one under Billing & overrides)"}</Alert>}
+      {terminating && <TerminateModal hosting={isHosting} username={s.username} onClose={() => setTerminating(false)} onConfirm={(reason) => { setTerminating(false); act("terminate", { reason }); }} />}
       {isVps && ended && <RecreatePanel s={s} onDone={reload} />}
 
       {/* ── actions ── */}
@@ -131,7 +134,7 @@ export default function AdminService() {
               <Group label="Account">
                 {s.status === "ACTIVE" && <Button variant="outline" size="sm" icon="pause" onClick={() => { const reason = prompt("Suspension reason", "Suspended by administrator"); if (reason) act("suspend", { reason }); }}>Suspend</Button>}
                 {s.status === "SUSPENDED" && <Button variant="secondary" size="sm" icon="play_circle" onClick={() => act("unsuspend")}>Unsuspend</Button>}
-                <Button variant="danger" size="sm" icon="delete_forever" onClick={() => confirm(isHosting ? `TERMINATE this hosting account? The cPanel account ${s.username ?? ""} and all its files, email and databases are deleted on the server.` : "TERMINATE this service? The VM will be destroyed and IPs released.") && act("terminate")}>Terminate</Button>
+                <Button variant="danger" size="sm" icon="delete_forever" onClick={() => setTerminating(true)}>Terminate</Button>
               </Group>
             </div>
           </div>
@@ -309,9 +312,13 @@ export default function AdminService() {
               )}
               <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>
               <div className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Toggle checked={edit.overrideAutoSuspend} onChange={(v) => setEdit({ ...edit, overrideAutoSuspend: v })} label="Exempt from automatic suspension" /></div>
+              {["TERMINATED", "CANCELLED"].includes(s.status) && <>
+                <Field label={s.status === "CANCELLED" ? "Cancelled on" : "Terminated on"}><Input type="date" value={edit.terminationDate} onChange={(e) => setEdit({ ...edit, terminationDate: e.target.value })} /></Field>
+                <Field label="Reason (the customer sees it)" className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Input value={edit.terminationReason} maxLength={300} placeholder="e.g. Non-payment, Cancelled at customer's request" onChange={(e) => setEdit({ ...edit, terminationReason: e.target.value })} /></Field>
+              </>}
               <Field label="Staff notes" className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Textarea rows={3} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
             </div>
-            <Button className="mt-4 w-full" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, osTemplateId: s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? undefined : edit.osTemplateId || null, hostname: edit.hostname || undefined, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null } }).then((r) => { const iv = r?.invoices; toast.success(iv && iv.cancelled.length + iv.trimmed.length ? `Saved — ${iv.cancelled.length} unpaid invoice(s) cancelled${iv.trimmed.length ? `, ${iv.trimmed.length} adjusted` : ""}${iv.skipped.length ? `, ${iv.skipped.length} part-paid left for review` : ""}` : "Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save changes</Button>
+            <Button className="mt-4 w-full" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, osTemplateId: s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? undefined : edit.osTemplateId || null, hostname: edit.hostname || undefined, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null, ...(["TERMINATED", "CANCELLED"].includes(s.status) ? { terminationDate: edit.terminationDate || null, terminationReason: edit.terminationReason.trim() || null } : { terminationDate: undefined, terminationReason: undefined }) } }).then((r) => { const iv = r?.invoices; toast.success(iv && iv.cancelled.length + iv.trimmed.length ? `Saved — ${iv.cancelled.length} unpaid invoice(s) cancelled${iv.trimmed.length ? `, ${iv.trimmed.length} adjusted` : ""}${iv.skipped.length ? `, ${iv.skipped.length} part-paid left for review` : ""}` : "Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save changes</Button>
           </Card>
 
           <Card title="Support tickets" action={<Link href={`/admin/tickets?userId=${s.user.id}`} className="text-[13px] font-bold text-primary-dark hover:underline">All tickets</Link>} pad={false}>
@@ -583,5 +590,30 @@ function HostingCard({ s, live, id }: { s: any; live: any; id: string }) {
         <dt className="text-mute">Credentials</dt><dd>{s.hasPassword || s.username ? <Credentials id={id} username={s.username} hasPassword={s.hasPassword} /> : "—"}</dd>
       </dl>
     </Card>
+  );
+}
+
+const TERMINATE_REASONS = ["Non-payment", "Cancelled at the customer's request", "Abuse / terms of service violation", "Fraudulent order", "Migrated to another service"];
+function TerminateModal({ hosting, username, onClose, onConfirm }: { hosting: boolean; username?: string | null; onClose: () => void; onConfirm: (reason: string) => void }) {
+  const [pick, setPick] = useState(TERMINATE_REASONS[1]);
+  const [other, setOther] = useState("");
+  const reason = pick === "other" ? other.trim() : pick;
+  return (
+    <Modal open onClose={onClose} title="Terminate this service?">
+      <Alert tone="error" className="mb-4">{hosting ? `The cPanel account ${username ?? ""} and all its files, email and databases are deleted on the server.` : "The VM is destroyed and its IPs are released."} This can't be undone.</Alert>
+      <div className="mb-2 text-[13px] font-bold text-slate-700">Reason — the customer sees this</div>
+      <div className="space-y-1.5">
+        {[...TERMINATE_REASONS, "other"].map((r) => (
+          <label key={r} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-primary-tint">
+            <input type="radio" className="accent-primary" checked={pick === r} onChange={() => setPick(r)} />{r === "other" ? "Other…" : r}
+          </label>
+        ))}
+      </div>
+      {pick === "other" && <Input className="mt-2" autoFocus maxLength={300} value={other} onChange={(e) => setOther(e.target.value)} placeholder="Write the reason" />}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>Keep it</Button>
+        <Button variant="danger" icon="delete_forever" disabled={!reason} onClick={() => onConfirm(reason)}>Terminate</Button>
+      </div>
+    </Modal>
   );
 }

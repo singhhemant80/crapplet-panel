@@ -708,6 +708,8 @@ model Service {
   nextDueDate      DateTime?
   nextInvoiceDate  DateTime?
   terminationDate  DateTime?
+  /// why it was terminated / cancelled (shown to the customer and staff)
+  terminationReason String?
   hostname         String?
   username         String?
   passwordEnc      String?

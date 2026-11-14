@@ -653,7 +653,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         }
         await prisma.$transaction(async (tx) => {
           await releaseServiceIps(tx, svc.id, { quarantine: params.quarantine !== false });
-          await tx.service.update({ where: { id: svc.id }, data: { status: "TERMINATED", terminationDate: new Date() } });
+          const reason = typeof params.reason === "string" && params.reason.trim() ? params.reason.trim().slice(0, 300) : null;
+          await tx.service.update({ where: { id: svc.id }, data: { status: "TERMINATED", terminationDate: new Date(), ...(reason ? { terminationReason: reason } : {}) } });
         });
         await log(svc.id, action, true);
         // the service is gone — stop billing for it

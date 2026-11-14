@@ -286,3 +286,46 @@ test("daily sweep cancels leftover unpaid invoices of services that ended earlie
   assert.ok(r.cancelled >= 1);
   assert.equal((await inv(i.id)).status, "CANCELLED");
 });
+
+test("termination records date + reason; customers see them, never staff notes; staff can edit the reason", async () => {
+  const { runProvisionAction } = await import("../src/modules/provisioning/provisioner");
+  const s = await prisma.service.create({ data: { userId: ids.user, productId: ids.product, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 1000, recurringAmount: 1000, currency: "INR", hostname: `term-${RUN}`, notes: "internal: watch this customer", nextDueDate: new Date(Date.now() - 37 * 86400_000) } });
+  await runProvisionAction(s.id, "terminate", { notify: false, reason: "Non-payment — unpaid since 08 Oct 2026" });
+  const t = await prisma.service.findUniqueOrThrow({ where: { id: s.id } });
+  assert.equal(t.status, "TERMINATED");
+  assert.ok(t.terminationDate && Date.now() - t.terminationDate.getTime() < 60_000);
+  assert.equal(t.terminationReason, "Non-payment — unpaid since 08 Oct 2026");
+
+  const list = await client.req("GET", "/client/services?status=TERMINATED");
+  const mine = list.json.services.find((x: any) => x.id === s.id);
+  assert.equal(mine.terminationReason, "Non-payment — unpaid since 08 Oct 2026");
+  assert.equal(mine.notes, undefined, "staff notes never reach the customer");
+  const one = await client.req("GET", `/client/services/${s.id}`);
+  assert.equal(one.json.service.notes, undefined);
+  assert.ok(one.json.service.terminationDate);
+
+  const r = await staff.req("PUT", `/admin/services/${s.id}`, { terminationReason: "Cancelled at the customer's request", terminationDate: "2026-11-01" });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const e = await prisma.service.findUniqueOrThrow({ where: { id: s.id } });
+  assert.equal(e.terminationReason, "Cancelled at the customer's request");
+  assert.equal(e.terminationDate?.toISOString().slice(0, 10), "2026-11-01");
+
+  // staff marking a service Cancelled by hand stamps the date
+  const c = await prisma.service.create({ data: { userId: ids.user, productId: ids.product, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 1000, recurringAmount: 1000, currency: "INR" } });
+  await staff.req("PUT", `/admin/services/${c.id}`, { status: "CANCELLED", terminationReason: "Duplicate order" });
+  const cc = await prisma.service.findUniqueOrThrow({ where: { id: c.id } });
+  assert.ok(cc.terminationDate);
+  assert.equal(cc.terminationReason, "Duplicate order");
+});
+
+test("a paid manual-setup service tells the customer it's being set up, not that payment is due", async () => {
+  const { createInvoice } = await import("../src/modules/billing/invoices");
+  const s = await prisma.service.create({ data: { userId: ids.user, productId: ids.product, status: "PENDING", billingCycle: "MONTHLY", firstAmount: 4900, recurringAmount: 4900, currency: "INR", hostname: `manual-${RUN}.com` } });
+  const i = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [{ type: "SERVICE", relId: s.id, description: "Shared Basic", unitPrice: 4900, taxable: false }] }));
+  assert.equal((await client.req("GET", `/client/services/${s.id}`)).json.unpaidInvoiceId, i.id, "before payment: points at the invoice");
+  assert.ok((await staff.req("POST", `/admin/invoices/${i.id}/payment`, { amount: 4900, gateway: "bank", reference: `MS-${RUN}` })).status < 300);
+  const after = await client.req("GET", `/client/services/${s.id}`);
+  assert.equal(after.json.service.status, "PENDING", "manual plan waits for staff");
+  assert.equal(after.json.unpaidInvoiceId, null, "…but nothing is due any more");
+  assert.ok(after.json.service.nextDueDate, "next due date starts from payment");
+});

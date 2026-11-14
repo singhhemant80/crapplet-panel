@@ -427,11 +427,11 @@ adminCore.post(
       } else if (b.action === "suspend") {
         if (s.status === "ACTIVE") await queue(s.id, "suspend", { reason: b.reason || "Suspended by administrator" });
       } else if (b.action === "terminate") {
-        if (s.status === "ACTIVE" || s.status === "SUSPENDED") await queue(s.id, "terminate");
-        else if (["PENDING", "FAILED", "PROVISIONING"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED" } });
+        if (s.status === "ACTIVE" || s.status === "SUSPENDED") await queue(s.id, "terminate", { reason: b.reason || "Terminated by administrator" });
+        else if (["PENDING", "FAILED", "PROVISIONING"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED", terminationDate: new Date(), terminationReason: b.reason || "Order terminated before setup" } });
       } else if (b.action === "cancel") {
-        if (["PENDING", "FAILED"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED" } });
-        else if (b.terminateDelivered && (s.status === "ACTIVE" || s.status === "SUSPENDED")) await queue(s.id, "terminate");
+        if (["PENDING", "FAILED"].includes(s.status)) await prisma.service.update({ where: { id: s.id }, data: { status: "CANCELLED", terminationDate: new Date(), terminationReason: b.reason || "Order cancelled" } });
+        else if (b.terminateDelivered && (s.status === "ACTIVE" || s.status === "SUSPENDED")) await queue(s.id, "terminate", { reason: b.reason || "Order cancelled" });
       }
     }
     if (b.action === "cancel" || b.action === "terminate") {
@@ -750,13 +750,16 @@ adminCore.put(
         password: z.string().min(6).optional(),
         overrideAutoSuspend: z.boolean().optional(),
         notes: z.string().max(5000).optional(),
+        terminationDate: z.coerce.date().nullable().optional(),
+        terminationReason: z.string().trim().max(300).nullable().optional(),
       }),
       req.body,
     );
     const { password, ...data } = b;
+    if (data.terminationReason === "") data.terminationReason = null;
     if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
     const before = b.status ? await prisma.service.findUnique({ where: { id: req.params.id }, select: { status: true } }) : null;
-    await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...(b.status === "TERMINATED" && before?.status !== "TERMINATED" ? { terminationDate: new Date() } : {}), ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
+    await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...((b.status === "TERMINATED" || b.status === "CANCELLED") && before?.status !== b.status && b.terminationDate === undefined ? { terminationDate: new Date() } : {}), ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
     await audit({ actorId: req.user!.id, action: "service.updated", entity: "service", entityId: req.params.id, details: Object.keys(b) });
     if (b.status) await syncOrderForService(req.params.id);
     // marked terminated / cancelled by hand → its unpaid invoices go too

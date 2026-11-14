@@ -222,7 +222,8 @@ clientRouter.get(
       orderBy: { createdAt: "desc" },
       include: svcInclude,
     });
-    res.json({ services: services.map(({ passwordEnc, config, ...s }) => ({ ...s, hasPassword: !!passwordEnc })) });
+    // staff notes are internal
+    res.json({ services: services.map(({ passwordEnc, config, notes: _notes, ...s }) => ({ ...s, hasPassword: !!passwordEnc })) });
   }),
 );
 
@@ -235,7 +236,7 @@ async function ownService(userId: string, id: string) {
 clientRouter.get(
   "/services/:id",
   ah(async (req, res) => {
-    const { passwordEnc, config, ...s } = await ownService(req.user!.id, req.params.id);
+    const { passwordEnc, config, notes: _notes, ...s } = await ownService(req.user!.id, req.params.id);
     const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, proformaNumber: true, total: true, status: true, dueDate: true } });
     // a build writes several "create" steps (started, node chosen, created…) — customers only see the outcome
     const logs = (
@@ -245,7 +246,9 @@ clientRouter.get(
       .slice(0, 10)
       .map(({ message: _m, ...l }) => l);
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });
-    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy });
+    // is anything for this service still to be paid? (a paid manual-setup service is "being set up", not "awaiting payment")
+    const unpaid = await prisma.invoice.findFirst({ where: { userId: req.user!.id, status: "UNPAID", items: { some: { relId: s.id, type: { in: ["SERVICE", "SETUP"] } } } }, select: { id: true } });
+    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy, unpaidInvoiceId: unpaid?.id ?? null });
   }),
 );
 

@@ -239,7 +239,7 @@ resellerRouter.delete(
   ah(async (req, res) => {
     const s = await ownVps(req.user!.resellerId!, req.params.id);
     if (s.status === "TERMINATED") return res.json({ ok: true });
-    await enqueueProvision({ serviceId: s.id, action: "terminate", params: { notify: false }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: "terminate", params: { notify: false, reason: "Terminated by the reseller" }, actorId: req.user!.id });
     res.status(202).json({ queued: true });
   }),
 );

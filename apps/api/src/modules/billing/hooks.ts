@@ -30,8 +30,14 @@ export async function onInvoicePaid(invoiceId: string) {
           await prisma.service.update({ where: { id: svc.id }, data: { status: "PROVISIONING", nextDueDate: due, nextInvoiceDate: due } });
           await enqueueProvision({ serviceId: svc.id, action: "create" });
         } else {
-          // manual products stay PENDING until staff activates them (Admin → Orders)
+          // manual products stay PENDING until staff activates them (Admin → Orders) — tell staff it's paid
           await prisma.service.update({ where: { id: svc.id }, data: { nextDueDate: due, nextInvoiceDate: due } });
+          const to = settings.company.billingEmail;
+          if (to) {
+            const u = await prisma.user.findUnique({ where: { id: svc.userId }, select: { email: true } });
+            const { config } = await import("../../config");
+            await queueEmail("admin.manual_setup", to, { productName: svc.product.name, clientEmail: u?.email ?? "", hostname: svc.hostname ?? "", adminUrl: `${config.appUrl}/admin/services/${svc.id}` }).catch(() => undefined);
+          }
         }
       } else if (item.periodEnd) {
         const newDue = item.periodEnd > (svc.nextDueDate ?? new Date(0)) ? item.periodEnd : svc.nextDueDate;

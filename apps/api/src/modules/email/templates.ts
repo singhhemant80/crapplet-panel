@@ -135,6 +135,11 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
     subject: "[Action needed] Provisioning failed for service {{serviceId}}",
     body: `<p>Provisioning of <b>{{productName}}</b> for {{clientEmail}} failed.</p><pre style="white-space:pre-wrap">{{error}}</pre>`,
   },
+  "admin.manual_setup": {
+    name: "Admin: paid order needs manual setup",
+    subject: "[Action needed] Set up {{productName}} for {{clientEmail}}",
+    body: `<p><b>{{clientEmail}}</b> has paid for <b>{{productName}}</b> {{hostname}}. This plan is set up by hand, so the service is waiting for you.</p><p><a href="{{adminUrl}}">Open the service</a> — set it up, then click <b>Activate</b> on its order.</p>`,
+  },
   "staff.message": {
     name: "Message from staff (Send Email on the client page)",
     subject: "{{subject}}",

@@ -21,9 +21,11 @@ export const WHMCS_TABLES = [
   "tblticketdepartments", "tblticketnotes", "tblticketreplies", "tbltickets",
   // WHMCS 8+: logins (email + password) live here, linked to client accounts
   "tblusers", "tblusers_clients",
+  // customers' cancellation requests (reason for terminated services)
+  "tblcancelrequests",
 ];
 /** Tables added to WHMCS_TABLES after the first release — dumps prepared before that get them extracted on demand. */
-const ADDED_LATER = ["tblusers", "tblusers_clients"];
+const ADDED_LATER = ["tblusers", "tblusers_clients", "tblcancelrequests"];
 
 export interface DumpScan {
   tables: Map<string, Row[]>;

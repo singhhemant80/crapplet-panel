@@ -217,7 +217,7 @@ export async function processSuspensions(rec: Recorder = noop) {
       done.add(svc.id);
       if (await queuedRecently("terminated", svc.id)) continue;
       try {
-        await enqueueProvision({ serviceId: svc.id, action: "terminate", params: { reason: "Non-payment", notify: a.terminateEmail } });
+        await enqueueProvision({ serviceId: svc.id, action: "terminate", params: { reason: `Non-payment — unpaid since ${svc.nextDueDate ? svc.nextDueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "the due date"}`, notify: a.terminateEmail } });
         if (item.invoice.amountPaid === 0) await cancelInvoice(item.invoice.id, "Service terminated for non-payment").catch(() => undefined);
         terminated++;
         await rec({ action: "terminated", entity: "service", entityId: svc.id, userId: svc.userId, label: svc.hostname ?? svc.product.name, message: `Non-payment of ${invNo(item.invoice)}` });

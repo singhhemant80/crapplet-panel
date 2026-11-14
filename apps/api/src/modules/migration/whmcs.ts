@@ -539,6 +539,10 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
 
     // ── services (tblhosting) ──
     const hosting = await T("tblhosting");
+    // the customer's own cancellation request (latest per service) — becomes the termination reason
+    const cancelReq = new Map<string, { reason: string; date: Date | null }>();
+    for (const r of [...(await T("tblcancelrequests"))].sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? ""))))
+      cancelReq.set(String(r.relid), { reason: str(r.reason), date: dt(r.date) });
     if (want("services")) {
       const vmFields = new Map<string, Set<string>>();
       const nodeFields = new Map<string, Set<string>>();
@@ -597,7 +601,8 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
           serverId: get("server", h.server) ?? null,
           suspendReason: status === "SUSPENDED" ? nul(h.suspendreason) ?? "Suspended in WHMCS" : null,
           overrideAutoSuspend: !!Number(h.overideautosuspend),
-          terminationDate: dt(h.termination_date),
+          terminationDate: dt(h.termination_date) ?? (["TERMINATED", "CANCELLED"].includes(status) ? cancelReq.get(String(h.id))?.date ?? null : null),
+          ...(["TERMINATED", "CANCELLED"].includes(status) && cancelReq.get(String(h.id)) ? { terminationReason: `Cancellation requested by the customer${cancelReq.get(String(h.id))!.reason ? `: ${cancelReq.get(String(h.id))!.reason.slice(0, 250)}` : ""}` } : {}),
           notes: nul(h.notes),
           ...(remoteId ? { remoteId } : {}),
           ...(node ? { node } : {}),
