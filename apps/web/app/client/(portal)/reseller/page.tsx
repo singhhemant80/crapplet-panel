@@ -24,7 +24,7 @@ function Apply({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState({ brandName: "", website: "", notes: "" });
   return (
     <>
-      <PageHeader title="Become a VPS reseller" subtitle="Wholesale pricing, a prepaid wallet and a REST API to deploy VPS for your own customers." />
+      <PageHeader title="Become a reseller" subtitle="Wholesale pricing, a prepaid wallet and a REST API to sell our VPS and hosting from your own website." actions={<Button variant="outline" icon="code" onClick={() => window.open("/api-docs", "_blank", "noopener")}>Read the API docs</Button>} />
       <Card>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Brand / company name"><Input value={v.brandName} onChange={(e) => setV({ ...v, brandName: e.target.value })} /></Field>
@@ -50,7 +50,7 @@ function Dashboard() {
   const d = dash.data;
   return (
     <>
-      <PageHeader title={`${d.reseller.brandName} · Reseller`} subtitle={`Wholesale discount ${d.reseller.discountPct}% on top of wholesale prices`} actions={<><Button variant="outline" href="/client/wallet" icon="account_balance_wallet">Top up wallet</Button><Button icon="rocket_launch" onClick={() => setDeploy(true)}>Deploy VPS</Button></>} />
+      <PageHeader title={`${d.reseller.brandName} · Reseller`} subtitle={`Wholesale discount ${d.reseller.discountPct}% on top of wholesale prices`} actions={<><Button variant="outline" icon="code" onClick={() => window.open("/api-docs", "_blank", "noopener")}>API docs</Button><Button variant="outline" href="/client/wallet" icon="account_balance_wallet">Top up wallet</Button><Button icon="rocket_launch" onClick={() => setDeploy(true)}>Deploy VPS</Button></>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Wallet balance" value={money(d.wallet)} icon="account_balance_wallet" tone="green" />
         <Stat label="Active VPS" value={d.stats.active} icon="dns" />

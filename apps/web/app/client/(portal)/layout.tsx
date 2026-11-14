@@ -8,7 +8,7 @@ import { readCart } from "@/lib/cart";
 import { Alert, Button, Icon, Loading, cx, toast } from "@/components/ui";
 
 type Shell = { unpaidInvoices: number; overdueInvoices: number; outstanding: number; ticketsAwaitingReply: number; services: number; creditBalance: number; currency: string };
-type NavItem = { href: string; label: string; icon: string; exact?: boolean; badge?: (s: Shell) => number | string | null; tone?: "rose" | "amber" | "violet" };
+type NavItem = { href: string; label: string; icon: string; exact?: boolean; external?: boolean; badge?: (s: Shell) => number | string | null; tone?: "rose" | "amber" | "violet" };
 
 const SECTIONS: { title: string; items: NavItem[] }[] = [
   { title: "Overview", items: [{ href: "/client", label: "Dashboard", icon: "space_dashboard", exact: true }] },
@@ -44,6 +44,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { href: "/client/security", label: "Security", icon: "shield_lock" },
       { href: "/client/affiliates", label: "Affiliates", icon: "handshake" },
       { href: "/client/reseller", label: "VPS reseller", icon: "storefront" },
+      { href: "/api-docs", label: "API documentation", icon: "code", external: true },
     ],
   },
 ];
@@ -137,6 +138,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   <Link
                     key={n.href}
                     href={n.href}
+                    {...(n.external ? { target: "_blank", rel: "noreferrer", prefetch: false } : {})}
                     className={cx(
                       "group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-[13.5px] font-semibold transition",
                       on ? "bg-white/[.08] text-white ring-1 ring-white/10" : "text-slate-300/85 hover:bg-white/[.05] hover:text-white",
@@ -147,6 +149,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                       <Icon name={n.icon} className="text-[18px]" fill={on} />
                     </span>
                     <span className="min-w-0 flex-1 truncate">{n.label}</span>
+                    {n.external && <Icon name="open_in_new" className="text-[15px] text-slate-500" />}
                     {b ? <span className={cx("min-w-[22px] rounded-full px-1.5 text-center text-[11px] font-extrabold leading-5", n.tone === "rose" ? "bg-rose-500 text-white" : n.tone === "amber" ? "bg-amber-400 text-amber-950" : "bg-white/15 text-white")}>{b}</span> : null}
                   </Link>
                 );
