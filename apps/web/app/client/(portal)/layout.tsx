@@ -62,6 +62,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     if (!loading && (!me || me.type !== "CLIENT")) router.replace(`/client/login?next=${encodeURIComponent(path)}`);
   }, [loading, me, path, router]);
   useEffect(() => setDrawer(false), [path]);
+  // "online now" heartbeat for the admin dashboard: on each page change, then every minute while the tab is visible
+  useEffect(() => {
+    if (!me || me.type !== "CLIENT" || me.impersonatedBy) return;
+    const ping = () => document.visibilityState === "visible" && api("/auth/ping", { body: { path: location.pathname } }).catch(() => {});
+    ping();
+    const t = setInterval(ping, 60_000);
+    document.addEventListener("visibilitychange", ping);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", ping);
+    };
+  }, [me, path]);
 
   const loadShell = useCallback(() => {
     api<Shell>("/client/shell").then(setShell).catch(() => {});

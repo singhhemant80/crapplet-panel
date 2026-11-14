@@ -47,7 +47,7 @@ adminDashboard.get(
     const month = istMonthStart(now);
     const lastMonth = istMonthStart(now, -1);
     const fy = fyStart(now);
-    const online = new Date(Date.now() - 15 * 60_000);
+    const online = new Date(Date.now() - ONLINE_MINUTES * 60_000);
 
     const [incToday, incYesterday, incMonth, incLastMonth, incFy, incAll, refMonth] = await Promise.all([
       sumTxn("PAYMENT", today),
@@ -83,8 +83,8 @@ adminDashboard.get(
       prisma.user.count({ where: { type: "CLIENT", services: { some: { status: "ACTIVE" } } } }),
       prisma.user.count({ where: { type: "CLIENT", createdAt: { gte: today } } }),
       prisma.user.count({ where: { type: "CLIENT", createdAt: { gte: month } } }),
-      prisma.user.count({ where: { type: "CLIENT", sessions: { some: { lastUsedAt: { gte: online }, revokedAt: null } } } }),
-      prisma.user.findMany({ where: { type: "STAFF", sessions: { some: { lastUsedAt: { gte: online }, revokedAt: null } } }, select: { id: true, firstName: true, lastName: true, email: true } }),
+      prisma.user.count({ where: { type: "CLIENT", sessions: { some: { lastSeenAt: { gte: online }, revokedAt: null, impersonatedById: null } } } }),
+      prisma.user.findMany({ where: { type: "STAFF", sessions: { some: { lastSeenAt: { gte: online }, revokedAt: null } } }, select: { id: true, firstName: true, lastName: true, email: true } }),
       prisma.service.groupBy({ by: ["status"], _count: true }),
       prisma.domain.count({ where: { status: "ACTIVE" } }),
       prisma.domain.findMany({ where: { status: "ACTIVE", expiryDate: { gte: now, lte: addDays(now, 30) } }, orderBy: { expiryDate: "asc" }, take: 6, select: { id: true, name: true, expiryDate: true, autoRenew: true, user: { select: { id: true, email: true } } } }),
@@ -174,5 +174,63 @@ adminDashboard.get(
       prisma.service.count({ where: { status: "FAILED" } }),
     ]);
     res.json({ orders, tickets, paymentReviews, failedSetup });
+  }),
+);
+
+
+// ───────────── Clients online now ─────────────
+const ONLINE_MINUTES = 5;
+
+function deviceOf(ua: string | null) {
+  if (!ua) return null;
+  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\/|Opera/.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  return { label: os ? `${browser} on ${os}` : browser, mobile: /Mobile|iPhone|Android/.test(ua) };
+}
+const PAGE_NAMES: [RegExp, string][] = [
+  [/^\/client\/?$/, "Dashboard"], [/^\/client\/services\/[^/]+\/console/, "VPS console"], [/^\/client\/services\/[^/]+\/upgrade/, "Upgrade / downgrade"], [/^\/client\/services\/[^/]+/, "A service"], [/^\/client\/services/, "My services"],
+  [/^\/client\/invoices\/[^/]+/, "An invoice"], [/^\/client\/invoices/, "Invoices"], [/^\/client\/quotes/, "Quotes"], [/^\/client\/payments/, "Payments"], [/^\/client\/wallet/, "Wallet"],
+  [/^\/client\/tickets\/new/, "Opening a ticket"], [/^\/client\/tickets/, "Support tickets"], [/^\/client\/domains/, "Domains"], [/^\/client\/knowledgebase/, "Knowledgebase"], [/^\/client\/profile/, "Profile"], [/^\/client\/security/, "Security"],
+  [/^\/client\/reseller/, "Reseller dashboard"], [/^\/client\/affiliates/, "Affiliates"], [/^\/order\/checkout|^\/order\/cart|^\/cart/, "Checkout"], [/^\/order/, "Ordering"],
+];
+const pageName = (p: string | null) => (p ? PAGE_NAMES.find(([re]) => re.test(p))?.[1] ?? p : null);
+
+adminDashboard.get(
+  "/dashboard/online",
+  requireStaff("clients.view"),
+  ah(async (_req, res) => {
+    const since = new Date(Date.now() - ONLINE_MINUTES * 60_000);
+    const sessions = await prisma.session.findMany({
+      where: { lastSeenAt: { gte: since }, revokedAt: null, expiresAt: { gt: new Date() }, user: { type: "CLIENT" } },
+      orderBy: { lastSeenAt: "desc" },
+      take: 500,
+      select: { userId: true, ip: true, userAgent: true, lastSeenAt: true, lastPath: true, impersonatedById: true, user: { select: { id: true, firstName: true, lastName: true, email: true, profile: { select: { companyName: true, city: true, country: true } }, _count: { select: { services: { where: { status: "ACTIVE" } } } } } } },
+    });
+    // one row per client (their most recent tab); staff "login as client" sessions are flagged, not counted
+    const seen = new Set<string>();
+    const clients = [];
+    let viewedByStaff = 0;
+    for (const s of sessions) {
+      if (s.impersonatedById) {
+        viewedByStaff++;
+        continue;
+      }
+      if (seen.has(s.userId)) continue;
+      seen.add(s.userId);
+      clients.push({
+        id: s.user.id,
+        name: `${s.user.firstName ?? ""} ${s.user.lastName ?? ""}`.trim() || s.user.email,
+        email: s.user.email,
+        company: s.user.profile?.companyName ?? null,
+        location: [s.user.profile?.city, s.user.profile?.country].filter(Boolean).join(", ") || null,
+        activeServices: s.user._count.services,
+        lastSeenAt: s.lastSeenAt,
+        page: pageName(s.lastPath),
+        path: s.lastPath,
+        ip: s.ip,
+        device: deviceOf(s.userAgent),
+      });
+    }
+    res.json({ windowMinutes: ONLINE_MINUTES, count: clients.length, clients, viewedByStaff });
   }),
 );

@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, date, money } from "@/lib/api";
-import { useSession } from "@/lib/session";
+import { can, useSession } from "@/lib/session";
 import { Badge, Button, Icon, Loading, PageHeader, cx, toast, useApi } from "@/components/ui";
 
 /** ₹1,26,930 → "₹1.27L"; ₹2.4 cr → "₹2.42Cr" — for big tiles and chart labels */
@@ -107,6 +107,88 @@ const TODO: { key: string; label: string; icon: string; href: string; tone: "ros
   { key: "serversDown", label: "Servers with errors", icon: "dns", href: "/admin/servers", tone: "rose" },
 ];
 const TONE = { rose: "bg-rose-50 text-rose-600", amber: "bg-amber-50 text-amber-600", sky: "bg-sky-50 text-sky-600", violet: "bg-primary-soft text-primary-dark" };
+
+/** Clients with the client area open right now (activity in the last few minutes), refreshed every 30 s. */
+function OnlineNow() {
+  const [d, setD] = useState<any>(null);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const load = () => api("/admin/dashboard/online").then((r) => live && setD(r)).catch(() => {});
+    load();
+    const t = setInterval(() => document.visibilityState === "visible" && load(), 30_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, []);
+  const ago = (t: string) => {
+    const s = Math.max(0, Math.round((Date.now() - new Date(t).getTime()) / 1000));
+    return s < 60 ? "just now" : `${Math.floor(s / 60)} min ago`;
+  };
+  const rows: any[] = d?.clients ?? [];
+  const shown = all ? rows : rows.slice(0, 8);
+  return (
+    <Panel
+      title="Clients online now"
+      icon="sensors"
+      className="mb-6"
+      flush
+      action={
+        <span className="inline-flex items-center gap-2 text-xs font-semibold text-mute">
+          <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" /></span>
+          {d ? `${d.count} online · last ${d.windowMinutes} min` : "Loading…"}
+        </span>
+      }
+    >
+      {!d ? (
+        <div className="px-5 py-6 text-sm text-mute">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="px-5 py-8 text-center text-sm text-mute">
+          <Icon name="bedtime" className="mb-1 block text-[28px] text-slate-300" />
+          No clients are using the client area right now.
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-[13px]">
+              <thead className="bg-[#faf7ff] text-[11px] font-bold uppercase tracking-wider text-mute">
+                <tr><th className="px-5 py-2.5">Client</th><th className="px-3 py-2.5">Viewing</th><th className="px-3 py-2.5">Device · IP</th><th className="px-5 py-2.5 text-right">Last active</th></tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {shown.map((c) => (
+                  <tr key={c.id} className="hover:bg-[#fcfaff]">
+                    <td className="px-5 py-2.5">
+                      <Link href={`/admin/clients/${c.id}`} className="flex items-center gap-2.5">
+                        <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary-dark text-[11px] font-extrabold text-white">
+                          {c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                        </span>
+                        <span className="min-w-0"><span className="block truncate font-bold text-ink hover:text-primary-dark">{c.name}</span><span className="block truncate text-xs text-mute">{c.company ?? c.email}{c.activeServices ? ` · ${c.activeServices} active service${c.activeServices > 1 ? "s" : ""}` : ""}</span></span>
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5">{c.page ? <span title={c.path ?? ""} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary-dark">{c.page}</span> : <span className="text-xs text-mute">—</span>}</td>
+                    <td className="px-3 py-2.5 text-xs text-mute">
+                      <span className="flex items-center gap-1">{c.device && <Icon name={c.device.mobile ? "smartphone" : "computer"} className="text-[15px]" />}{c.device?.label ?? "—"}</span>
+                      <span><span className="font-mono text-[11px]">{c.ip ?? ""}</span>{c.location ? ` · ${c.location}` : ""}</span>
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-xs font-semibold text-mute">{ago(c.lastSeenAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(rows.length > 8 || d.viewedByStaff > 0) && (
+            <div className="flex items-center justify-between border-t border-line px-5 py-2.5 text-xs text-mute">
+              <span>{d.viewedByStaff > 0 ? `+ ${d.viewedByStaff} client area${d.viewedByStaff > 1 ? "s" : ""} opened by staff (login as client) — not counted` : ""}</span>
+              {rows.length > 8 && <button onClick={() => setAll(!all)} className="font-bold text-primary-dark hover:underline">{all ? "Show fewer" : `Show all ${rows.length}`}</button>}
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
 
 export default function AdminDashboard() {
   const { me } = useSession();
@@ -242,6 +324,8 @@ export default function AdminDashboard() {
           </dl>
         </Panel>
       </div>
+
+      {can(me, "clients.view") && <OnlineNow />}
 
       {/* ── chart + automation ── */}
       <div className="mb-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

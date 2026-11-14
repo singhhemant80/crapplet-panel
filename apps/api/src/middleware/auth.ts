@@ -68,6 +68,16 @@ async function loadUser(userId: string, sessionId?: string): Promise<AuthUser | 
   };
 }
 
+/** "Online now": a session's last activity, written at most once a minute per session. */
+const touched = new Map<string, number>();
+export function touchSession(sessionId: string, path?: string) {
+  const now = Date.now();
+  if (!path && now - (touched.get(sessionId) ?? 0) < 60_000) return;
+  touched.set(sessionId, now);
+  if (touched.size > 50_000) touched.clear();
+  prisma.session.update({ where: { id: sessionId }, data: { lastSeenAt: new Date(now), ...(path ? { lastPath: path.slice(0, 200) } : {}) } }).catch(() => undefined);
+}
+
 /** Populates req.user from the access-token cookie, Bearer JWT, or `ck_` API key. Never throws. */
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   try {
@@ -93,7 +103,10 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       const payload = jwt.verify(token, config.jwtSecret, { issuer: "crapplet", algorithms: ["HS256"] }) as { sub: string; sid: string; purpose?: string };
       if (!payload.purpose) {
         const u = await loadUser(payload.sub, payload.sid);
-        if (u) req.user = u;
+        if (u) {
+          req.user = u;
+          if (payload.sid) touchSession(payload.sid);
+        }
       }
     }
   } catch {

@@ -176,6 +176,9 @@ model Session {
   ip               String?
   createdAt        DateTime  @default(now())
   lastUsedAt       DateTime  @default(now())
+  /// last request / heartbeat from this session (for "online now"), and the page it was on
+  lastSeenAt       DateTime?
+  lastPath         String?
   expiresAt        DateTime
   revokedAt        DateTime?
   /** staff user who opened this client session with "Login as client" */
@@ -185,6 +188,8 @@ model Session {
   sudoFailures     Int       @default(0)
 
   @@index([userId])
+
+  @@index([lastSeenAt])
 }
 
 model LoginHistory {

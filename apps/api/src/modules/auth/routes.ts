@@ -489,6 +489,20 @@ authRouter.get(
   }),
 );
 
+/** Heartbeat from an open client-area / admin tab: keeps "online now" accurate and records the page. */
+authRouter.post(
+  "/ping",
+  requireAuth,
+  ah(async (req, res) => {
+    const b = parse(z.object({ path: z.string().max(300).regex(/^\/[\w\-/.%?=&]*$/).optional() }), req.body ?? {});
+    if (req.user!.sessionId && !req.user!.viaApiKey) {
+      const { touchSession } = await import("../../middleware/auth");
+      touchSession(req.user!.sessionId, b.path?.split("?")[0] ?? undefined);
+    }
+    res.json({ ok: true });
+  }),
+);
+
 // ── API keys (resellers / automation) ──
 authRouter.get(
   "/api-keys",
