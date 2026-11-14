@@ -7,6 +7,15 @@ import { adjustCredit, invoiceEmailVars, invoiceLabel } from "./invoices";
 
 /** Everything that should happen once an invoice is fully paid. Safe to call more than once. */
 export async function onInvoicePaid(invoiceId: string) {
+  // resellers: their website hears about every paid invoice (renewals, new orders, top-ups)
+  void (async () => {
+    const inv0 = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { id: true, number: true, proformaNumber: true, total: true, currency: true, userId: true, paidAt: true, items: { select: { relId: true, type: true, description: true } } } });
+    const r = inv0 ? await prisma.reseller.findUnique({ where: { userId: inv0.userId }, select: { id: true } }) : null;
+    if (inv0 && r) {
+      const { notifyReseller } = await import("../reseller/webhooks");
+      await notifyReseller(r.id, "invoice.paid", { id: inv0.id, number: inv0.number ?? inv0.proformaNumber, total: inv0.total, currency: inv0.currency, paidAt: inv0.paidAt, serviceIds: [...new Set(inv0.items.filter((x) => x.relId && x.type === "SERVICE").map((x) => x.relId))] });
+    }
+  })().catch(() => undefined);
   const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true, user: true, order: true } });
   if (inv.status !== "PAID") return;
   const settings = await getSettings();

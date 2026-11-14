@@ -710,6 +710,8 @@ model Service {
   terminationDate  DateTime?
   /// why it was terminated / cancelled (shown to the customer and staff)
   terminationReason String?
+  /// the reseller's own order reference (API idempotency — one service per reference)
+  resellerRef      String?
   hostname         String?
   username         String?
   passwordEnc      String?
@@ -736,6 +738,8 @@ model Service {
 
   @@index([status, nextDueDate])
   @@index([userId])
+
+  @@unique([resellerId, resellerRef])
 }
 
 model ServiceAddon {
@@ -1192,6 +1196,11 @@ model Reseller {
   website     String?
   discountPct Int             @default(0) // extra discount on top of wholesale
   notes       String?
+  /// the reseller's endpoint for signed event notifications (service.active, invoice.paid, …)
+  webhookUrl        String?
+  webhookSecretEnc  String?
+  webhookLastAt     DateTime?
+  webhookLastStatus String?
   approvedAt  DateTime?
   createdAt   DateTime        @default(now())
   customers   User[]          @relation("ResellerCustomers")

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reseller API | Crapplet Cloud</title>
+<meta name="description" content="Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices.">
+<link rel="icon" href="/Crapplet_Icon.png">
+<style>
+  :root{--p:#7c3aed;--p2:#a365fe;--pt:#f5f0ff;--ink:#14102a;--txt:#374151;--mute:#6b7280;--line:#ece7f6;--bg:#ffffff;--code:#17122b;--codetxt:#ede9fe;--ok:#047857;--okbg:#ecfdf5;--warn:#92400e;--warnbg:#fffbeb}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:76px}
+  body{margin:0;font:15px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:var(--bg)}
+  a{color:var(--p);text-decoration:none}a:hover{text-decoration:underline}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  :not(pre)>code{background:var(--pt);color:#5b21b6;padding:1px 6px;border-radius:6px;font-size:.88em;word-break:break-word}
+  .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;height:64px;padding:0 20px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .top img{height:34px}.top .sp{flex:1}.top a.btn{background:var(--p);color:#fff;padding:8px 14px;border-radius:10px;font-weight:700;font-size:14px}
+  .top a.lnk{color:var(--ink);font-weight:600;font-size:14px}
+  .menu{display:none;background:none;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-weight:700;color:var(--ink)}
+  .wrap{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1240px;margin:0 auto}
+  nav.side{position:sticky;top:64px;align-self:start;height:calc(100vh - 64px);overflow:auto;padding:24px 16px 40px;border-right:1px solid var(--line)}
+  nav.side h4{margin:18px 8px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  nav.side a{display:block;padding:5px 10px;border-radius:8px;color:var(--txt);font-size:14px}
+  nav.side a:hover{background:var(--pt);text-decoration:none;color:var(--p)}
+  nav.side a .m{display:inline-block;width:46px;font:700 10.5px ui-monospace,monospace;color:var(--p)}
+  main{padding:32px 40px 80px;min-width:0}
+  h1{font-size:34px;line-height:1.2;color:var(--ink);margin:0 0 8px;letter-spacing:-.02em}
+  h2{font-size:24px;color:var(--ink);margin:56px 0 12px;padding-top:8px;border-top:1px solid var(--line);letter-spacing:-.01em}
+  h3{font-size:17px;color:var(--ink);margin:30px 0 8px}
+  .lead{font-size:17px;color:var(--mute);max-width:760px}
+  .hero{background:linear-gradient(135deg,#2e1065,#6d28d9 60%,#a365fe);color:#fff;border-radius:20px;padding:28px 28px 24px;margin-bottom:28px}
+  .hero h1{color:#fff}.hero p{color:#ede9fe;margin:0;max-width:760px}
+  .hero .base{margin-top:16px;display:inline-flex;flex-wrap:wrap;max-width:100%;overflow-wrap:anywhere;gap:8px;align-items:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 12px;font:600 13.5px ui-monospace,monospace}
+  .ep{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:28px 0 8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fcfbff}
+  .ep code{background:none;color:var(--ink);font-size:14.5px;padding:0}
+  .verb{font:800 11.5px ui-monospace,monospace;padding:3px 8px;border-radius:6px;letter-spacing:.03em}
+  .GET{background:#e0f2fe;color:#0369a1}.POST{background:#dcfce7;color:#15803d}.PUT{background:#fef3c7;color:#b45309}.DELETE{background:#fee2e2;color:#b91c1c}
+  pre{position:relative;background:var(--code);color:var(--codetxt);border-radius:12px;padding:16px 18px;overflow:auto;font-size:13px;line-height:1.6;margin:10px 0 16px}
+  pre .c{color:#a78bfa}pre .s{color:#86efac}pre .k{color:#fda4af}
+  .copy{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.1);color:#ddd6fe;border:0;border-radius:7px;padding:4px 9px;font:600 11.5px Inter,sans-serif;cursor:pointer}
+  .copy:hover{background:rgba(255,255,255,.2)}
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:14px}
+  th{text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:#faf8ff;padding:9px 12px;border-bottom:1px solid var(--line)}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  td:first-child{white-space:nowrap}
+  .tw{overflow-x:auto}
+  .req{font:700 10.5px Inter,sans-serif;color:#b91c1c;margin-left:6px;text-transform:uppercase}
+  .note{border-radius:12px;padding:12px 14px;margin:14px 0;font-size:14px;background:var(--pt);border:1px solid #e4d7ff}
+  .note.ok{background:var(--okbg);border-color:#a7f3d0;color:#065f46}.note.warn{background:var(--warnbg);border-color:#fde68a;color:var(--warn)}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+  .steps li{counter-increment:s;position:relative;padding:4px 0 12px 44px}
+  .steps li:before{content:counter(s);position:absolute;left:0;top:2px;width:30px;height:30px;border-radius:50%;background:var(--p);color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px}
+  .tabs{display:flex;gap:6px;margin:12px 0 -4px}.tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 12px;font-weight:700;font-size:13px;cursor:pointer;color:var(--txt)}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tabpane{display:none}.tabpane.on{display:block}
+  footer{margin-top:60px;color:var(--mute);font-size:13px}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr}
+    nav.side{position:fixed;inset:64px 0 0 0;height:auto;background:#fff;z-index:15;display:none;border:0}
+    nav.side.open{display:block}
+    .menu{display:inline-block}
+    main{padding:20px 16px 60px}
+    h1{font-size:27px}
+    .top a.lnk{display:none}
+    .top{gap:10px;padding:0 12px}.top img{height:28px}.top a.btn{padding:7px 10px;font-size:13px;white-space:nowrap}
+    .hero{padding:22px 18px}
+    td:first-child{white-space:normal}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="menu" onclick="document.querySelector('nav.side').classList.toggle('open')" aria-label="Contents">☰</button>
+  <a href="/"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+  <span class="sp"></span>
+  <a class="lnk" href="/">Website</a>
+  <a class="btn" href="/client/reseller">Dashboard</a>
+</header>
+
+<div class="wrap">
+<nav class="side" onclick="if(event.target.tagName==='A')this.classList.remove('open')">
+  <h4>Start</h4>
+  <a href="#intro">Overview</a>
+  <a href="#quickstart">Quick start</a>
+  <a href="#auth">Authentication</a>
+  <a href="#conventions">Amounts, errors, limits</a>
+  <a href="#flow">Selling on your website</a>
+  <h4>Account</h4>
+  <a href="#me"><span class="m">GET</span>/me</a>
+  <a href="#plans"><span class="m">GET</span>/plans</a>
+  <h4>Orders &amp; services</h4>
+  <a href="#orders"><span class="m">POST</span>/orders</a>
+  <a href="#services-list"><span class="m">GET</span>/services</a>
+  <a href="#service"><span class="m">GET</span>/services/{id}</a>
+  <a href="#action"><span class="m">POST</span>/services/{id}/action</a>
+  <a href="#login"><span class="m">POST</span>/services/{id}/login</a>
+  <a href="#terminate"><span class="m">DEL</span>/services/{id}</a>
+  <a href="#ips"><span class="m">GET</span>/ips</a>
+  <a href="#customers"><span class="m">POST</span>/customers</a>
+  <h4>Billing</h4>
+  <a href="#wallet"><span class="m">GET</span>/wallet</a>
+  <a href="#invoices"><span class="m">GET</span>/invoices</a>
+  <a href="#pay"><span class="m">POST</span>/invoices/{id}/pay</a>
+  <h4>Webhooks</h4>
+  <a href="#webhooks">Events &amp; signatures</a>
+  <a href="#webhook-api"><span class="m">PUT</span>/webhook</a>
+  <h4>More</h4>
+  <a href="#statuses">Status values</a>
+  <a href="#legacy">Older /vps endpoints</a>
+</nav>
+
+<main>
+<section id="intro" class="hero">
+  <h1>Reseller API</h1>
+  <p>Sell Crapplet VPS, hosting and servers on your own website under your own brand. Your site calls this API; orders are paid from your Crapplet wallet at your wholesale price; we set the service up and tell your site when it's ready.</p>
+  <div class="base">Base URL&nbsp; <span id="base">https://crapplet.co.in/api/v1/reseller</span></div>
+</section>
+
+<p>Everything is JSON over HTTPS. Your customers never see Crapplet — they buy from you, and you manage their services through this API or your reseller dashboard.</p>
+<div class="note"><b>Before you start:</b> you need an approved reseller account (apply in the client area under <b>Reseller</b>) and money in your wallet (client area → <b>Wallet &amp; credit</b> → Add funds).</div>
+
+<h2 id="quickstart">Quick start</h2>
+<ol class="steps">
+  <li>Open your <a href="/client/reseller">reseller dashboard</a> → <b>API</b> tab → <b>Create API key</b>. Copy the key (it starts with <code>ck_</code>) — it's shown once.</li>
+  <li>List the plans you can sell and their wholesale prices:
+<pre>curl -H "Authorization: Bearer ck_YOUR_KEY" \
+  <span class="base-url">https://crapplet.co.in/api/v1/reseller</span>/plans</pre></li>
+  <li>Place an order when your customer pays you:
+<pre>curl -X POST -H "Authorization: Bearer ck_YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"planId":"PLAN_ID","cycle":"MONTHLY","hostname":"vps1.customer.com","osTemplateId":"OS_ID","reference":"ORDER-1001"}' \
+  <span class="base-url">https://crapplet.co.in/api/v1/reseller</span>/orders</pre></li>
+  <li>Set a <a href="#webhooks">webhook</a> to hear when the server is ready, or poll <code>GET /services/{id}</code> until <code>status</code> is <code>ACTIVE</code>, then give your customer the IP and login.</li>
+</ol>
+
+<h2 id="auth">Authentication</h2>
+<p>Send your API key as a Bearer token on every request:</p>
+<pre>Authorization: Bearer ck_ab12cd34_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</pre>
+<ul>
+  <li>Keys are created and revoked in your reseller dashboard. A key only ever sees <b>your</b> customers, services and invoices.</li>
+  <li><b>Keep keys on your server.</b> Never put a key in browser JavaScript or a mobile app — anyone could read it.</li>
+  <li>When creating a key you can limit it to your web server's IP addresses; requests from anywhere else are refused.</li>
+  <li>A missing, wrong or revoked key gets <code>401</code>.</li>
+</ul>
+
+<h2 id="conventions">Amounts, errors and limits</h2>
+<h3>Money</h3>
+<p>All amounts are <b>integers in paise</b> (₹1 = 100). <code>45000</code> means ₹450.00. Prices are before GST; invoices show the GST added.</p>
+<h3>Billing cycles</h3>
+<p><code>MONTHLY</code>, <code>QUARTERLY</code>, <code>SEMIANNUAL</code>, <code>ANNUAL</code>, <code>BIENNIAL</code>, <code>TRIENNIAL</code> — only the cycles a plan lists in <code>prices</code> can be ordered.</p>
+<h3>Errors</h3>
+<p>Errors return a non-2xx status and a JSON body:</p>
+<pre>{ "error": "Plan not found — list plans with GET /plans", "code": "NOT_FOUND" }</pre>
+<div class="tw"><table>
+  <tr><th>Status</th><th>Meaning</th></tr>
+  <tr><td><code>400</code></td><td>Invalid request. Validation errors include <code>details</code> with the field problems.</td></tr>
+  <tr><td><code>401</code></td><td>No key, a wrong key, or a revoked key.</td></tr>
+  <tr><td><code>402</code></td><td><code>INSUFFICIENT_FUNDS</code> — your wallet can't cover it. Top up, then pay the invoice.</td></tr>
+  <tr><td><code>403</code></td><td>Your reseller account isn't approved (or is suspended).</td></tr>
+  <tr><td><code>404</code></td><td>Not found — or not yours.</td></tr>
+  <tr><td><code>409</code></td><td>Conflict, e.g. that domain already has a hosting account.</td></tr>
+  <tr><td><code>429</code></td><td><code>RATE_LIMITED</code> — more than 300 requests a minute on one key. Wait for the time in the <code>RateLimit-Reset</code> header.</td></tr>
+  <tr><td><code>5xx</code></td><td>Our side. Safe to retry orders when you send a <code>reference</code> (see below).</td></tr>
+</table></div>
+
+<h2 id="flow">Selling on your website — the full flow</h2>
+<ol class="steps">
+  <li><b>Show plans.</b> Call <code>GET /plans</code> (cache it for a few minutes). Show <i>your</i> price — <code>wholesale</code> is what you pay us.</li>
+  <li><b>Customer pays you</b> on your website, with your own payment gateway.</li>
+  <li><b>Order from us</b> with <code>POST /orders</code>, passing your own order number as <code>reference</code>. If your request times out, send it again with the same <code>reference</code> — you'll get the same order back, never a second one.</li>
+  <li><b>Wait for setup.</b> The service goes <code>PROVISIONING</code> → <code>ACTIVE</code> (usually 1–5 minutes for a VPS). The <code>service.active</code> webhook tells you; or poll <code>GET /services/{id}</code>.</li>
+  <li><b>Hand over.</b> <code>GET /services/{id}</code> returns the IP, username and password. Email them to your customer.</li>
+  <li><b>Renewals.</b> Before each due date we create a renewal invoice for you. It's paid from your wallet automatically when the balance covers it — keep your wallet topped up. If not, pay it with <code>POST /invoices/{id}/pay</code>. Unpaid renewals are suspended and later terminated, as for any customer.</li>
+</ol>
+
+<h2 id="me">Account</h2>
+<div class="ep"><span class="verb GET">GET</span><code>/me</code></div>
+<p>Your reseller account and wallet balance.</p>
+<pre>{
+  "reseller": { "id": "cm…", "brandName": "HostBiz", "status": "APPROVED", "discountPct": 10 },
+  "wallet": { "balance": 250000, "currency": "INR" }
+}</pre>
+
+<div class="ep" id="plans"><span class="verb GET">GET</span><code>/plans</code></div>
+<p>Every plan you can sell, with your wholesale price per billing cycle.</p>
+<pre>{
+  "plans": [
+    {
+      "id": "cmplan123",
+      "name": "Linux VPS G2",
+      "type": "VPS_LINUX",
+      "category": "vps",                         <span class="c">// vps | hosting | other</span>
+      "requires": ["hostname", "osTemplateId"],    <span class="c">// what POST /orders needs for this plan</span>
+      "specs": { "cpuCores": 2, "ramMb": 4096, "diskGb": 80, "bandwidthGb": 10240, "ipv4": 1, "virtType": "KVM" },
+      "allowIpSelection": false,
+      "locations": [ { "serverId": "cmsrv1", "name": "Noida" } ],
+      "os": [ { "id": "cmos1", "name": "Ubuntu 24.04" }, { "id": "cmos2", "name": "Windows Server 2022" } ],
+      "prices": [
+        { "cycle": "MONTHLY", "retailList": 54900, "wholesale": 44910, "yourRetail": null },
+        { "cycle": "ANNUAL",  "retailList": 658800, "wholesale": 538920, "yourRetail": null }
+      ]
+    }
+  ]
+}</pre>
+<div class="tw"><table>
+  <tr><th>Field</th><th>Meaning</th></tr>
+  <tr><td><code>wholesale</code></td><td>What you pay us per cycle, after your reseller discount.</td></tr>
+  <tr><td><code>retailList</code></td><td>Our own public price, for reference.</td></tr>
+  <tr><td><code>yourRetail</code></td><td>The retail price you saved in your dashboard (optional, for your records).</td></tr>
+  <tr><td><code>requires</code></td><td><code>hostname</code> + <code>osTemplateId</code> for VPS, <code>domain</code> for hosting.</td></tr>
+</table></div>
+
+<h2 id="orders">Orders</h2>
+<div class="ep"><span class="verb POST">POST</span><code>/orders</code></div>
+<p>Order any plan. Paid from your wallet; the service is set up as soon as it's paid.</p>
+<div class="tw"><table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>planId</code><span class="req">required</span></td><td>string</td><td>From <code>GET /plans</code>.</td></tr>
+  <tr><td><code>cycle</code></td><td>string</td><td>Default <code>MONTHLY</code>.</td></tr>
+  <tr><td><code>hostname</code></td><td>string</td><td>VPS hostname, e.g. <code>vps1.customer.com</code>. Required for VPS.</td></tr>
+  <tr><td><code>domain</code></td><td>string</td><td>The website domain for hosting plans, e.g. <code>customer.com</code>. Required for hosting.</td></tr>
+  <tr><td><code>osTemplateId</code></td><td>string</td><td>Operating system from the plan's <code>os</code> list. Required for VPS.</td></tr>
+  <tr><td><code>serverId</code></td><td>string</td><td>Location from the plan's <code>locations</code> (optional).</td></tr>
+  <tr><td><code>ipId</code></td><td>string</td><td>A specific IP from <code>GET /ips</code> — only for plans with <code>allowIpSelection</code>.</td></tr>
+  <tr><td><code>customerId</code></td><td>string</td><td>Your end customer from <code>POST /customers</code> (optional, for your records).</td></tr>
+  <tr><td><code>retailAmount</code></td><td>integer</td><td>What you charge your customer, in paise (optional, for your reports).</td></tr>
+  <tr><td><code>reference</code></td><td>string</td><td><b>Your own order number.</b> Strongly recommended: repeating a request with the same reference returns the original order instead of creating another. The <code>Idempotency-Key</code> header works the same way.</td></tr>
+</table></div>
+<div class="tabs" data-for="ord"><button class="on" data-t="curl">curl</button><button data-t="php">PHP</button><button data-t="node">Node.js</button></div>
+<div class="tabpane on" data-g="ord" data-t="curl"><pre>curl -X POST <span class="base-url">https://crapplet.co.in/api/v1/reseller</span>/orders \
+  -H "Authorization: Bearer ck_YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{
+    "planId": "cmplan123",
+    "cycle": "MONTHLY",
+    "hostname": "vps1.customer.com",
+    "osTemplateId": "cmos1",
+    "reference": "ORDER-1001",
+    "retailAmount": 79900
+  }'</pre></div>
+<div class="tabpane" data-g="ord" data-t="php"><pre>&lt;?php
+$ch = curl_init('<span class="base-url">https://crapplet.co.in/api/v1/reseller</span>/orders');
+curl_setopt_array($ch, [
+  CURLOPT_POST =&gt; true,
+  CURLOPT_RETURNTRANSFER =&gt; true,
+  CURLOPT_TIMEOUT =&gt; 30,
+  CURLOPT_HTTPHEADER =&gt; ['Authorization: Bearer ' . getenv('CRAPPLET_KEY'), 'Content-Type: application/json'],
+  CURLOPT_POSTFIELDS =&gt; json_encode([
+    'planId' =&gt; 'cmplan123', 'cycle' =&gt; 'MONTHLY',
+    'hostname' =&gt; 'vps1.customer.com', 'osTemplateId' =&gt; 'cmos1',
+    'reference' =&gt; 'ORDER-' . $orderId,   <span class="c">// your order number — makes retries safe</span>
+  ]),
+]);
+$body = json_decode(curl_exec($ch), true);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+if ($status === 402) { <span class="c">/* top up your wallet, then POST /invoices/{$body['invoiceId']}/pay */</span> }
+$serviceId = $body['serviceId'];</pre></div>
+<div class="tabpane" data-g="ord" data-t="node"><pre>const r = await fetch("<span class="base-url">https://crapplet.co.in/api/v1/reseller</span>/orders", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${process.env.CRAPPLET_KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ planId: "cmplan123", cycle: "MONTHLY", hostname: "vps1.customer.com", osTemplateId: "cmos1", reference: `ORDER-${orderId}` }),
+});
+const body = await r.json();
+if (r.status === 402) { <span class="c">/* top up, then POST /invoices/${body.invoiceId}/pay */</span> }
+const { serviceId } = body;</pre></div>
+<h3>Responses</h3>
+<p><code>201</code> — paid and being set up:</p>
+<pre>{ "serviceId": "cmsvc1", "orderId": "cmord1", "invoiceId": "cminv1", "amount": 44910, "paid": true, "status": "PROVISIONING" }</pre>
+<p><code>200</code> — the same <code>reference</code> was ordered before (nothing new is created):</p>
+<pre>{ "serviceId": "cmsvc1", "invoiceId": "cminv1", "status": "ACTIVE", "duplicate": true }</pre>
+<p><code>402</code> — your wallet is short. The order and invoice exist but nothing is set up until it's paid:</p>
+<pre>{ "serviceId": "cmsvc1", "orderId": "cmord1", "invoiceId": "cminv1", "amount": 44910, "paid": false, "status": "PENDING",
+  "error": "Insufficient wallet balance — top up, then POST /invoices/{invoiceId}/pay", "code": "INSUFFICIENT_FUNDS" }</pre>
+
+<h2 id="services-list">Services</h2>
+<div class="ep"><span class="verb GET">GET</span><code>/services?status=ACTIVE&amp;reference=ORDER-1001&amp;page=1&amp;limit=50</code></div>
+<p>Your services, newest first. All filters are optional: <code>status</code>, <code>reference</code>, <code>customerId</code>, <code>page</code>, <code>limit</code> (max 200).</p>
+<pre>{
+  "services": [
+    { "id": "cmsvc1", "reference": "ORDER-1001", "plan": "Linux VPS G2", "planId": "cmplan123", "status": "ACTIVE",
+      "hostname": "vps1.customer.com", "ip": "103.0.0.10", "ips": ["103.0.0.10"], "os": "Ubuntu 24.04",
+      "customerId": null, "suspendReason": null, "terminationReason": null }
+  ],
+  "page": 1, "limit": 50, "total": 1
+}</pre>
+
+<div class="ep" id="service"><span class="verb GET">GET</span><code>/services/{id}</code></div>
+<p>One service with its login details, billing and — for a running VPS — live state.</p>
+<pre>{
+  "service": {
+    "id": "cmsvc1", "reference": "ORDER-1001", "plan": "Linux VPS G2", "status": "ACTIVE",
+    "hostname": "vps1.customer.com", "ip": "103.0.0.10", "ips": ["103.0.0.10"], "os": "Ubuntu 24.04",
+    "username": "root", "password": "Xy7#…",
+    "billingCycle": "MONTHLY", "nextDueDate": "2026-12-14T00:00:00.000Z",
+    "wholesaleAmount": 44910, "retailAmount": 79900, "createdAt": "2026-11-14T12:00:00.000Z",
+    "live": { "state": "running", "cpuPct": 3.2, "memUsedMb": 612, "memTotalMb": 4096, "diskTotalGb": 80 }
+  }
+}</pre>
+<div class="note">Windows VPS log in as <code>Administrator</code>, Linux as <code>root</code>. The password changes after <code>reset_password</code> or <code>reinstall</code> — read it again afterwards.</div>
+
+<div class="ep" id="action"><span class="verb POST">POST</span><code>/services/{id}/action</code></div>
+<p>Queue an action. Returns <code>202 { "queued": true }</code>; the result shows in <code>GET /services/{id}</code> and as a webhook.</p>
+<div class="tw"><table>
+  <tr><th>action</th><th>For</th><th>Notes</th></tr>
+  <tr><td><code>start</code> · <code>stop</code> · <code>shutdown</code> · <code>reboot</code></td><td>VPS</td><td><code>stop</code> is a hard power-off; <code>shutdown</code> asks the OS.</td></tr>
+  <tr><td><code>reinstall</code></td><td>VPS</td><td>Pass <code>osTemplateId</code>. <b>Erases the disk.</b> New password.</td></tr>
+  <tr><td><code>reset_password</code></td><td>VPS, hosting</td><td>New root / Administrator / cPanel password.</td></tr>
+  <tr><td><code>suspend</code> · <code>unsuspend</code></td><td>All</td><td>Optional <code>reason</code>. Services we suspended for non-payment unsuspend only when the invoice is paid.</td></tr>
+</table></div>
+<pre>{ "action": "reinstall", "osTemplateId": "cmos2" }</pre>
+
+<div class="ep" id="login"><span class="verb POST">POST</span><code>/services/{id}/login</code></div>
+<p>For hosting: a one-time link that logs your customer straight into cPanel (or webmail with <code>{"service":"webmaild"}</code>). Valid for 60 seconds — redirect to it immediately.</p>
+<pre>{ "url": "https://server.example.com:2083/cpsess…/login/?session=…", "expiresInSeconds": 60 }</pre>
+
+<div class="ep" id="terminate"><span class="verb DELETE">DELETE</span><code>/services/{id}</code></div>
+<p>Cancel or terminate. A service not yet set up is cancelled at once (<code>200 {"ok":true,"status":"CANCELLED"}</code>). A live one is terminated — <b>the server and its data are deleted</b> (<code>202 {"queued":true}</code>, then the <code>service.terminated</code> webhook). It stops renewing.</p>
+
+<div class="ep" id="ips"><span class="verb GET">GET</span><code>/ips?productId=PLAN_ID&amp;serverId=&amp;search=</code></div>
+<p>Free IPs for plans with <code>allowIpSelection</code>, so your customer can pick one. Hold one for checkout with <span class="verb POST">POST</span> <code>/ips/{ipId}/reserve</code> <code>{"productId":"…"}</code>, then pass it as <code>ipId</code> in the order.</p>
+
+<div class="ep" id="customers"><span class="verb POST">POST</span><code>/customers</code></div>
+<p>Optional: keep a record of your end customers here and attach services to them with <code>customerId</code>. They are yours — we never email them or let them log in to Crapplet.</p>
+<pre>{ "email": "asha@customer.com", "firstName": "Asha", "lastName": "Rao", "phone": "+919900000000", "companyName": "Asha Designs", "country": "IN" }</pre>
+<p>Returns <code>201 { "customer": { "id": "cmcus1", "email": "asha@customer.com" } }</code>. <span class="verb GET">GET</span> <code>/customers</code> lists them.</p>
+
+<h2 id="wallet">Wallet &amp; invoices</h2>
+<div class="ep"><span class="verb GET">GET</span><code>/wallet</code></div>
+<p>Balance and the last 100 wallet movements. Add funds in the client area (<b>Wallet &amp; credit</b>).</p>
+<pre>{ "balance": 155000, "currency": "INR",
+  "transactions": [ { "amount": -44910, "balanceAfter": 155000, "description": "Applied to invoice PF-000412", "createdAt": "…" } ] }</pre>
+
+<div class="ep" id="invoices"><span class="verb GET">GET</span><code>/invoices?status=UNPAID&amp;page=1&amp;limit=50</code></div>
+<p>Your invoices (orders and renewals). <span class="verb GET">GET</span> <code>/invoices/{id}</code> adds the lines.</p>
+<pre>{
+  "invoice": {
+    "id": "cminv1", "number": "CIPL/2026-27/00042", "status": "PAID", "currency": "INR",
+    "subtotal": 44910, "tax": 8084, "total": 52994, "amountDue": 0,
+    "issueDate": "…", "dueDate": "…", "paidAt": "…",
+    "items": [ { "description": "Linux VPS G2 — vps1.customer.com (14 Nov – 14 Dec 2026)", "quantity": 1, "unitPrice": 44910, "amount": 44910, "serviceId": "cmsvc1" } ]
+  }
+}</pre>
+
+<div class="ep" id="pay"><span class="verb POST">POST</span><code>/invoices/{id}/pay</code></div>
+<p>Pay an unpaid invoice from your wallet. <code>200 {"paid":true,"applied":52994}</code>, or <code>402</code> if the balance is short. Paying an order's invoice starts the setup; paying an overdue renewal restores a suspended service.</p>
+
+<h2 id="webhooks">Webhooks</h2>
+<p>Instead of polling, give us a URL and we POST a signed JSON event to it whenever something changes.</p>
+<div class="tw"><table>
+  <tr><th>Event</th><th>When</th></tr>
+  <tr><td><code>service.active</code></td><td>A new service is ready (IP and login are in <code>GET /services/{id}</code>).</td></tr>
+  <tr><td><code>service.failed</code></td><td>Setup failed. Our team is alerted and will retry or refund.</td></tr>
+  <tr><td><code>service.suspended</code></td><td>Suspended — by you, by us, or for an overdue renewal (<code>suspendReason</code>).</td></tr>
+  <tr><td><code>service.unsuspended</code></td><td>Running again.</td></tr>
+  <tr><td><code>service.terminated</code></td><td>Terminated; the server is gone (<code>terminationReason</code>).</td></tr>
+  <tr><td><code>service.reinstalled</code></td><td>Reinstall finished — fetch the new password.</td></tr>
+  <tr><td><code>invoice.paid</code></td><td>An order, renewal or top-up invoice was paid.</td></tr>
+</table></div>
+<h3>What we send</h3>
+<pre>POST https://yourwebsite.com/crapplet-webhook
+Content-Type: application/json
+X-Crapplet-Event: service.active
+X-Crapplet-Timestamp: 1763112345
+X-Crapplet-Signature: sha256=5f0c…
+
+{
+  "id": "evt_9c2f…",
+  "event": "service.active",
+  "createdAt": "2026-11-14T12:03:10.000Z",
+  "data": { "id": "cmsvc1", "reference": "ORDER-1001", "plan": "Linux VPS G2", "status": "ACTIVE",
+            "hostname": "vps1.customer.com", "ip": "103.0.0.10", "ips": ["103.0.0.10"], "os": "Ubuntu 24.04", … }
+}</pre>
+<p><code>invoice.paid</code> carries <code>{ id, number, total, currency, paidAt, serviceIds }</code>.</p>
+<h3>Verify every request</h3>
+<p>Compute HMAC-SHA256 of <code>timestamp + "." + raw body</code> with your signing secret and compare it to the header. Reject requests older than 5 minutes.</p>
+<div class="tabs" data-for="sig"><button class="on" data-t="php">PHP</button><button data-t="node">Node.js</button></div>
+<div class="tabpane on" data-g="sig" data-t="php"><pre>&lt;?php
+$secret = getenv('CRAPPLET_WEBHOOK_SECRET');            <span class="c">// whsec_…</span>
+$body   = file_get_contents('php://input');              <span class="c">// the raw body, before json_decode</span>
+$ts     = $_SERVER['HTTP_X_CRAPPLET_TIMESTAMP'] ?? '';
+$sig    = $_SERVER['HTTP_X_CRAPPLET_SIGNATURE'] ?? '';
+$expect = 'sha256=' . hash_hmac('sha256', $ts . '.' . $body, $secret);
+if (!hash_equals($expect, $sig) || abs(time() - (int)$ts) &gt; 300) { http_response_code(400); exit; }
+
+$event = json_decode($body, true);
+<span class="c">// ignore events you've already processed: store $event['id']</span>
+if ($event['event'] === 'service.active') {
+  <span class="c">// look up your order by $event['data']['reference'], then fetch login details:</span>
+  <span class="c">// GET /services/{$event['data']['id']} → email IP + password to your customer</span>
+}
+http_response_code(200);</pre></div>
+<div class="tabpane" data-g="sig" data-t="node"><pre>import crypto from "node:crypto";
+import express from "express";
+const app = express();
+app.post("/crapplet-webhook", express.raw({ type: "application/json" }), (req, res) =&gt; {
+  const ts = req.get("X-Crapplet-Timestamp") ?? "";
+  const expect = "sha256=" + crypto.createHmac("sha256", process.env.CRAPPLET_WEBHOOK_SECRET).update(`${ts}.${req.body}`).digest("hex");
+  const sig = req.get("X-Crapplet-Signature") ?? "";
+  const fresh = Math.abs(Date.now() / 1000 - Number(ts)) &lt; 300;
+  if (!fresh || sig.length !== expect.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return res.sendStatus(400);
+  const event = JSON.parse(req.body.toString());
+  <span class="c">// dedupe on event.id, then handle event.event</span>
+  res.sendStatus(200);
+});</pre></div>
+<h3>Delivery</h3>
+<ul>
+  <li>Reply with any <code>2xx</code> within 10 seconds. Do slow work after replying.</li>
+  <li>If we don't get a <code>2xx</code>, we retry twice: after 10 seconds and after a minute. Your dashboard shows the last delivery result.</li>
+  <li>An event can arrive more than once — use <code>id</code> to ignore repeats. Webhooks are a signal; <code>GET /services/{id}</code> is always the truth.</li>
+  <li>The URL must be public <code>https://</code>.</li>
+</ul>
+
+<div class="ep" id="webhook-api"><span class="verb PUT">PUT</span><code>/webhook</code></div>
+<p>Set or change your URL (you can also do this in the dashboard). The response contains a <b>new signing secret, shown once</b>.</p>
+<pre>{ "url": "https://yourwebsite.com/crapplet-webhook" }
+→ { "url": "https://yourwebsite.com/crapplet-webhook", "secret": "whsec_…", "note": "Store this secret now…" }</pre>
+<p><span class="verb GET">GET</span> <code>/webhook</code> shows the URL and the last delivery · <span class="verb POST">POST</span> <code>/webhook/test</code> sends a test <code>service.active</code> event (with <code>"test": true</code>) and returns the result · <span class="verb DELETE">DELETE</span> <code>/webhook</code> stops events.</p>
+
+<h2 id="statuses">Status values</h2>
+<div class="tw"><table>
+  <tr><th>Service status</th><th>Meaning</th></tr>
+  <tr><td><code>PENDING</code></td><td>Ordered, waiting for payment (or for our team on a manually set-up plan).</td></tr>
+  <tr><td><code>PROVISIONING</code></td><td>Paid; being set up.</td></tr>
+  <tr><td><code>ACTIVE</code></td><td>Running.</td></tr>
+  <tr><td><code>SUSPENDED</code></td><td>Suspended (see <code>suspendReason</code>).</td></tr>
+  <tr><td><code>FAILED</code></td><td>Setup failed; our team is on it.</td></tr>
+  <tr><td><code>TERMINATED</code> · <code>CANCELLED</code></td><td>Ended (see <code>terminationReason</code>).</td></tr>
+</table></div>
+<p>Invoice status: <code>UNPAID</code>, <code>PAID</code>, <code>CANCELLED</code>, <code>REFUNDED</code>.</p>
+
+<h2 id="legacy">Older /vps endpoints</h2>
+<p>Integrations built before <code>/orders</code> keep working: <code>GET /vps</code>, <code>GET /vps/{id}</code>, <code>POST /vps</code> (VPS only), <code>POST /vps/{id}/action</code>, <code>DELETE /vps/{id}</code>. New integrations should use <code>/orders</code> and <code>/services</code>, which cover every product and support <code>reference</code>.</p>
+
+<footer>Questions? Open a ticket from your client area or write to <a href="/contact.html">support</a>. · © Crapplet Infotech</footer>
+</main>
+</div>
+
+<script>
+  // show this site's own address in every example
+  (function () {
+    var base = location.origin + "/api/v1/reseller";
+    document.getElementById("base").textContent = base;
+    document.querySelectorAll(".base-url").forEach(function (el) { el.textContent = base; });
+  })();
+  // tabs
+  document.querySelectorAll(".tabs").forEach(function (t) {
+    t.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var g = t.getAttribute("data-for");
+      t.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      document.querySelectorAll('.tabpane[data-g="' + g + '"]').forEach(function (p) { p.classList.toggle("on", p.getAttribute("data-t") === b.getAttribute("data-t")); });
+    });
+  });
+  // copy buttons
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var btn = document.createElement("button"); btn.className = "copy"; btn.textContent = "Copy"; btn.type = "button";
+    btn.onclick = function () { var c = pre.cloneNode(true); c.querySelectorAll(".copy").forEach(function (x) { x.remove(); }); navigator.clipboard.writeText(c.innerText).then(function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1200); }); };
+    pre.appendChild(btn);
+  });
+</script>
+</body>
+</html>

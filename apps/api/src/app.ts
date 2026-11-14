@@ -13,6 +13,7 @@ import { catalogRouter } from "./modules/catalog/routes";
 import { clientRouter } from "./modules/client/routes";
 import { paymentsRouter, webhooksRouter } from "./modules/payments/routes";
 import { resellerRouter } from "./modules/reseller/routes";
+import rateLimit from "express-rate-limit";
 import { adminCore } from "./modules/admin/core";
 import { adminClients } from "./modules/admin/clients";
 import { adminCatalog } from "./modules/admin/catalog";
@@ -63,7 +64,12 @@ export function createApp() {
   api.use("/payments", paymentsRouter);
   api.use("/webhooks", webhooksRouter);
   api.use("/reseller", resellerRouter);
-  api.use("/v1/reseller", resellerRouter); // API-key access for resellers
+  // API-key access for resellers' websites: 300 requests a minute per key (per IP without a key)
+  api.use(
+    "/v1/reseller",
+    rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => (String(req.headers.authorization ?? "").match(/^Bearer (ck_[^_]+)_/)?.[1] ?? `ip:${req.ip ?? ""}`), message: { error: "Too many requests — max 300 a minute per API key", code: "RATE_LIMITED" } }),
+    resellerRouter,
+  );
   api.use("/admin", reauthGuard, customerTargetGuard, adminInvoices, adminUpgrades, adminVirtualizorCheck, adminBillingExtras, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency, adminCampaigns);
 
   // public content

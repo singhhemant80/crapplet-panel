@@ -87,26 +87,7 @@ function Dashboard() {
       )}
       {tab === "plans" && <Plans plans={plans.data?.plans ?? []} onSaved={plans.reload} />}
       {tab === "customers" && <Customers list={customers.data?.customers ?? []} reload={customers.reload} />}
-      {tab === "api" && (
-        <Card title="API keys">
-          {newKey && <Alert tone="success" className="mb-4"><div className="font-bold">Copy your key now — it won't be shown again.</div><div className="mt-1 flex items-center gap-2 break-all font-mono text-xs">{newKey}<Copy text={newKey} /></div></Alert>}
-          <Table head={["Name", "Prefix", "Last used", ""]}>
-            {keys.data?.keys.map((k: any) => (
-              <tr key={k.id}><Td className="font-semibold">{k.name}</Td><Td className="font-mono text-xs">ck_{k.keyPrefix}_…</Td><Td className="whitespace-nowrap text-mute">{date(k.lastUsedAt, true)}</Td><Td className="text-right"><button className="text-xs font-bold text-rose-600" onClick={() => api(`/auth/api-keys/${k.id}`, { method: "DELETE" }).then(keys.reload)}>Revoke</button></Td></tr>
-            ))}
-          </Table>
-          <Button className="mt-4" icon="key" onClick={() => { const name = prompt("Key name", "automation"); if (name) api("/auth/api-keys", { body: { name, scopes: ["reseller"] } }).then((r) => { setNewKey(r.key); keys.reload(); }).catch((e) => toast.error(e.message)); }}>Create API key</Button>
-          <div className="mt-6 rounded-xl bg-ink p-4 font-mono text-[12.5px] leading-relaxed text-violet-100">
-            <div className="text-violet-300"># List plans</div>
-            curl -H &quot;Authorization: Bearer ck_…&quot; {typeof window !== "undefined" ? window.location.origin : ""}/api/v1/reseller/plans<br /><br />
-            <div className="text-violet-300"># Available IPs for a plan, then deploy</div>
-            curl -H &quot;Authorization: Bearer ck_…&quot; &quot;…/api/v1/reseller/ips?productId=PLAN_ID&quot;<br />
-            curl -X POST -H &quot;Authorization: Bearer ck_…&quot; -H &quot;Content-Type: application/json&quot; \<br />
-            &nbsp;&nbsp;-d &apos;{`{"planId":"PLAN_ID","osTemplateId":"OS_ID","hostname":"vps1.example.com","ipId":"IP_ID"}`}&apos; …/api/v1/reseller/vps<br /><br />
-            <div className="text-violet-300"># Manage: GET /vps, GET /vps/:id, POST /vps/:id/action {`{"action":"reboot|suspend|unsuspend|reinstall|start|stop"}`}, DELETE /vps/:id</div>
-          </div>
-        </Card>
-      )}
+      {tab === "api" && <ApiTab keys={keys} newKey={newKey} setNewKey={setNewKey} />}
       <DeployModal open={deploy} onClose={() => setDeploy(false)} plans={plans.data?.plans ?? []} customers={customers.data?.customers ?? []} onDone={() => { setDeploy(false); vps.reload(); dash.reload(); }} />
     </>
   );
@@ -188,5 +169,94 @@ function DeployModal({ open, onClose, plans, customers, onDone }: { open: boolea
         } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
       }}>Deploy &amp; pay from wallet</Button>
     </Modal>
+  );
+}
+
+
+/** API keys, webhook and docs — everything a reseller's website needs to sell our plans. */
+function ApiTab({ keys, newKey, setNewKey }: { keys: any; newKey: string | null; setNewKey: (k: string | null) => void }) {
+  const hook = useApi("/reseller/webhook");
+  const [url, setUrl] = useState("");
+  const [secret, setSecret] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  async function createKey() {
+    const name = prompt("Key name (e.g. my website)", "website");
+    if (!name) return;
+    const ips = prompt("Only allow these server IPs (comma-separated) — leave empty to allow any", "") ?? "";
+    try {
+      const r = await api("/auth/api-keys", { body: { name, scopes: ["reseller"], allowedIps: ips.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean) } });
+      setNewKey(r.key);
+      keys.reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+  async function saveHook() {
+    setBusy("save");
+    try {
+      const r = await api("/reseller/webhook", { method: "PUT", body: { url } });
+      setSecret(r.secret);
+      setUrl("");
+      hook.reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(null);
+  }
+  return (
+    <div className="space-y-5">
+      <Alert tone="info">
+        Sell our plans on your own website: your site calls our API with a key, the order is paid from your wallet at your wholesale price, and we notify your site when the server is ready.{" "}
+        <a href="/api-docs" target="_blank" rel="noreferrer" className="font-bold underline">Read the API documentation →</a>
+      </Alert>
+      <Card title="API keys">
+        {newKey && <Alert tone="success" className="mb-4"><div className="font-bold">Copy your key now — it won't be shown again.</div><div className="mt-1 flex items-center gap-2 break-all font-mono text-xs">{newKey}<Copy text={newKey} /></div></Alert>}
+        <Table head={["Name", "Key", "Allowed IPs", "Last used", ""]}>
+          {keys.data?.keys.map((k: any) => (
+            <tr key={k.id}>
+              <Td className="font-semibold">{k.name}</Td>
+              <Td className="font-mono text-xs">ck_{k.keyPrefix}_…</Td>
+              <Td className="text-xs text-mute">{k.allowedIps?.length ? k.allowedIps.join(", ") : "any"}</Td>
+              <Td className="whitespace-nowrap text-mute">{date(k.lastUsedAt, true)}</Td>
+              <Td className="text-right"><button className="text-xs font-bold text-rose-600" onClick={() => confirm(`Revoke ${k.name}? Anything using it stops working.`) && api(`/auth/api-keys/${k.id}`, { method: "DELETE" }).then(keys.reload)}>Revoke</button></Td>
+            </tr>
+          ))}
+        </Table>
+        <Button className="mt-4" icon="key" onClick={createKey}>Create API key</Button>
+        <p className="mt-2 text-xs text-mute">Keep keys on your server only — never in browser JavaScript. Limit a key to your web server's IP for extra safety.</p>
+      </Card>
+      <Card title="Webhook — get told when things change">
+        {secret && <Alert tone="success" className="mb-4"><div className="font-bold">Signing secret — copy it now, it won't be shown again.</div><div className="mt-1 flex items-center gap-2 break-all font-mono text-xs">{secret}<Copy text={secret} /></div></Alert>}
+        <p className="mb-3 text-sm text-slate-600">We POST signed JSON to your URL when a service becomes active, fails, is suspended, unsuspended, terminated or reinstalled, and when an invoice is paid.</p>
+        {hook.data?.url ? (
+          <div className="mb-4 rounded-xl border border-line p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2"><span className="break-all font-mono text-xs">{hook.data.url}</span>
+              <span className="flex gap-2">
+                <Button size="sm" variant="secondary" loading={busy === "test"} onClick={async () => { setBusy("test"); try { const r = await api("/reseller/webhook/test", { body: {} }); toast[/delivered/.test(r.lastDelivery ?? "") ? "success" : "error"](r.lastDelivery ?? "No answer"); hook.reload(); } catch (e: any) { toast.error(e.message); } setBusy(null); }}>Send test</Button>
+                <Button size="sm" variant="ghost" onClick={() => confirm("Stop sending events?") && api("/reseller/webhook", { method: "DELETE" }).then(() => hook.reload())}>Remove</Button>
+              </span>
+            </div>
+            {hook.data.lastDelivery && <div className="mt-1 text-xs text-mute">Last: {hook.data.lastDelivery} · {date(hook.data.lastDeliveryAt, true)}</div>}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Input className="min-w-0 flex-1" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://yourwebsite.com/crapplet-webhook" />
+          <Button icon="save" loading={busy === "save"} disabled={!url.trim()} onClick={saveHook}>{hook.data?.url ? "Change URL" : "Save URL"}</Button>
+        </div>
+        <p className="mt-2 text-xs text-mute">https only. Saving a URL creates a new signing secret.</p>
+      </Card>
+      <Card title="Quick start">
+        <div className="rounded-xl bg-ink p-4 font-mono text-[12.5px] leading-relaxed text-violet-100">
+          <div className="text-violet-300"># Plans you can sell, with your wholesale prices</div>
+          curl -H &quot;Authorization: Bearer ck_…&quot; {origin}/api/v1/reseller/plans<br /><br />
+          <div className="text-violet-300"># Order (paid from your wallet; reference makes retries safe)</div>
+          curl -X POST -H &quot;Authorization: Bearer ck_…&quot; -H &quot;Content-Type: application/json&quot; \<br />
+          &nbsp;&nbsp;-d &apos;{`{"planId":"PLAN_ID","cycle":"MONTHLY","hostname":"vps1.example.com","osTemplateId":"OS_ID","reference":"YOUR-ORDER-1001"}`}&apos; \<br />
+          &nbsp;&nbsp;{origin}/api/v1/reseller/orders<br /><br />
+          <div className="text-violet-300"># Then: GET /services/:id · POST /services/:id/action · GET /invoices · POST /invoices/:id/pay</div>
+        </div>
+      </Card>
+    </div>
   );
 }

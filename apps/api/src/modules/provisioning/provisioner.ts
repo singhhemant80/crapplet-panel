@@ -558,12 +558,32 @@ async function withServiceLock<T>(serviceId: string, fn: () => Promise<T>): Prom
 
 export async function runProvisionAction(serviceId: string, action: ProvisionAction, params: Record<string, unknown> = {}) {
   if (action === "sync") return runProvisionActionUnlocked(serviceId, action, params);
+  const before = await prisma.service.findUnique({ where: { id: serviceId }, select: { status: true, resellerId: true } });
+  let ok = false;
   try {
-    return await withServiceLock(serviceId, () => runProvisionActionUnlocked(serviceId, action, params));
+    const r = await withServiceLock(serviceId, () => runProvisionActionUnlocked(serviceId, action, params));
+    ok = true;
+    return r;
   } finally {
     // the order's status follows its services (pending → active → suspended → terminated)
     const { syncOrderForService } = await import("../orders/status");
     await syncOrderForService(serviceId);
+    // tell the reseller's website what changed
+    if (before?.resellerId) {
+      const after = await prisma.service.findUnique({ where: { id: serviceId }, select: { status: true } });
+      const event =
+        after?.status === "ACTIVE" && before.status === "SUSPENDED" ? "service.unsuspended"
+        : after?.status === "ACTIVE" && before.status !== "ACTIVE" ? "service.active"
+        : after?.status === "SUSPENDED" && before.status !== "SUSPENDED" ? "service.suspended"
+        : after?.status === "TERMINATED" && before.status !== "TERMINATED" ? "service.terminated"
+        : ok && action === "reinstall" ? "service.reinstalled"
+        : null;
+      if (event) {
+        const { notifyReseller, serviceEventData } = await import("../reseller/webhooks");
+        const data = await serviceEventData(serviceId);
+        if (data) await notifyReseller(before.resellerId, event, data);
+      }
+    }
   }
 }
 
@@ -829,6 +849,11 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
 
 export async function markCreateFailed(serviceId: string, error: string) {
   const svc = await prisma.service.update({ where: { id: serviceId }, data: { status: "FAILED" }, include: { product: true, user: true } });
+  if (svc.resellerId) {
+    const { notifyReseller, serviceEventData } = await import("../reseller/webhooks");
+    const data = await serviceEventData(serviceId);
+    if (data) await notifyReseller(svc.resellerId, "service.failed", { ...data, error: "Setup failed — our team has been alerted and will retry or refund." });
+  }
   const s = await getSettings();
   await queueEmail("admin.provisioning_failed", s.company.billingEmail, { serviceId, productName: svc.product.name, clientEmail: svc.user.email, error });
 }

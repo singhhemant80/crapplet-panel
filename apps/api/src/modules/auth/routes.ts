@@ -196,6 +196,8 @@ authRouter.post(
     if (!user || !ok) return fail("bad_credentials");
     // Inactive (e.g. no live service — WHMCS sets this automatically) can still sign in, as in WHMCS; Closed can't
     if (user.status === "CLOSED" || (user.type === "STAFF" && user.status !== "ACTIVE")) return fail("inactive");
+    // a reseller's own end customers are the reseller's — they never sign in here (white-label)
+    if (user.ownerResellerId) return fail("reseller_customer");
     if (body.portal === "admin" && user.type !== "STAFF") return fail("not_staff");
 
     if (user.totpEnabled) {
@@ -359,7 +361,7 @@ authRouter.post(
   ah(async (req, res) => {
     const { email } = parse(z.object({ email: z.string().trim().toLowerCase().email() }), req.body);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (user && user.status !== "CLOSED") {
+    if (user && user.status !== "CLOSED" && !user.ownerResellerId) {
       const token = randomToken();
       await prisma.verificationToken.create({
         data: { userId: user.id, type: "PASSWORD_RESET", tokenHash: sha256(token), expiresAt: new Date(Date.now() + 3600000) },

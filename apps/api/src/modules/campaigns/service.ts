@@ -45,7 +45,8 @@ export const campaignSchema = z.object({
 });
 
 export function audienceWhere(a: Audience, kind: string): Prisma.UserWhereInput {
-  const and: Prisma.UserWhereInput[] = [{ type: "CLIENT" }, { status: { in: [ "ACTIVE" as const, ...(a.includeInactive ? ["INACTIVE" as const] : []), ...(a.includeClosed ? ["CLOSED" as const] : []) ] } }];
+  // a reseller's end customers belong to the reseller (white-label) — never mailed by us
+  const and: Prisma.UserWhereInput[] = [{ type: "CLIENT" }, { ownerResellerId: null }, { status: { in: [ "ACTIVE" as const, ...(a.includeInactive ? ["INACTIVE" as const] : []), ...(a.includeClosed ? ["CLOSED" as const] : []) ] } }];
   if (kind === "OFFER") and.push({ marketingEmails: true });
   if (a.userIds.length) return { AND: [...and, { id: { in: a.userIds } }] };
   const product: Prisma.ProductWhereInput = {};
