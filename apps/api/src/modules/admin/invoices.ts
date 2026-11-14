@@ -356,3 +356,45 @@ adminInvoices.put(
     res.json(r);
   }),
 );
+
+// ───────────── UPI AutoPay (shown on the Payment Gateways page) ─────────────
+const autopaySchema = z.object({
+  upiAutopay: z.boolean(),
+  autopayGateway: z.enum(["auto", "razorpay", "cashfree"]),
+  autopayDaysBeforeDue: z.coerce.number().int().min(2).max(15),
+});
+
+adminInvoices.get(
+  "/gateways/autopay",
+  requireStaff("settings.manage"),
+  ah(async (_req, res) => {
+    const { getSettings } = await import("../../lib/settings");
+    const { autopayProvider } = await import("../payments/autopay");
+    const a = (await getSettings()).automation;
+    const provider = await autopayProvider();
+    const [mandates, lastFailure] = await Promise.all([
+      prisma.payMethod.groupBy({ by: ["gateway", "status"], where: { autopay: true, type: "UPI" }, _count: true }).catch(() => []),
+      prisma.paymentIntent.findFirst({ where: { gateway: { in: ["razorpay_autopay", "cashfree_autopay"] }, status: "FAILED" }, orderBy: { createdAt: "desc" }, select: { createdAt: true, gateway: true, meta: true } }),
+    ]);
+    res.json({
+      upiAutopay: a.upiAutopay,
+      autopayGateway: a.autopayGateway ?? "auto",
+      autopayDaysBeforeDue: a.autopayDaysBeforeDue,
+      provider: provider?.code ?? null,
+      mandates,
+      lastFailure: lastFailure ? { at: lastFailure.createdAt, gateway: lastFailure.gateway, error: String((lastFailure.meta as { error?: string } | null)?.error ?? "").slice(0, 400) } : null,
+    });
+  }),
+);
+
+adminInvoices.put(
+  "/gateways/autopay",
+  requireStaff("settings.manage"),
+  ah(async (req, res) => {
+    const b = parse(autopaySchema, req.body);
+    const { updateSettings } = await import("../../lib/settings");
+    await updateSettings("automation", b as never);
+    await audit({ actorId: req.user!.id, action: "settings.updated", entity: "settings", entityId: "autopay", details: b });
+    res.json({ ok: true });
+  }),
+);

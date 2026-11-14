@@ -43,6 +43,8 @@ export async function startPayment(args: { userId: string; invoiceId: string; ga
     return { intentId: intent.id, ...r.client };
   } catch (e) {
     await prisma.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED", meta: { error: String(e) } } });
+    // a mandate the gateway won't create (e.g. AutoPay not activated on the account): a clear way out for the customer
+    if (autopay) throw badRequest("UPI AutoPay couldn't be started right now — please pay with UPI, card or netbanking instead.");
     throw e;
   }
 }
