@@ -67,7 +67,7 @@ export async function startSyncAll(actorId?: string) {
   return s;
 }
 
-type Svc = { id: string; hostname: string | null; remoteId: string | null; node: string | null; serverId: string | null; osTemplateId: string | null; ips: { address: string; isPrimary: boolean }[] };
+type Svc = { id: string; hostname: string | null; remoteId: string | null; node: string | null; serverId: string | null; osTemplateId: string | null; ips: { address: string; isPrimary: boolean }[]; user: { email: string } };
 
 export async function runSyncAll(s: SyncAllState) {
   let lastSave = 0;
@@ -83,7 +83,7 @@ export async function runSyncAll(s: SyncAllState) {
   const masterIds = new Set(masters.map((m) => m.id));
   const services: Svc[] = await prisma.service.findMany({
     where: { status: { notIn: ["TERMINATED", "CANCELLED"] }, product: { provisioner: "VIRTUALIZOR" } },
-    select: { id: true, hostname: true, remoteId: true, node: true, serverId: true, osTemplateId: true, ips: { select: { address: true, isPrimary: true } } },
+    select: { id: true, hostname: true, remoteId: true, node: true, serverId: true, osTemplateId: true, ips: { select: { address: true, isPrimary: true } }, user: { select: { email: true } } },
   });
   const linkedOk = (x: Svc) => !!x.remoteId && !!x.serverId && masterIds.has(x.serverId);
   const unlinked = services.filter((x) => !linkedOk(x));
@@ -111,6 +111,11 @@ export async function runSyncAll(s: SyncAllState) {
         const byVps = await client.ipsByVps().catch(() => null);
         if (byVps) for (const [vpsid, r] of rows) if (!ipsOf(r).length && byVps.get(vpsid)?.length) r.ips = byVps.get(vpsid);
       }
+      // the VPS owner's email (WHMCS creates the Virtualizor user with the customer's email) — to link by customer
+      if (unlinked.length && [...rows.values()].some((r) => !r.email && r.uid !== undefined)) {
+        const emails = await client.userEmails().catch(() => null);
+        if (emails) for (const r of rows.values()) if (!r.email && r.uid !== undefined) r.email = emails.get(String(r.uid));
+      }
       rowsBy.set(m.id, rows);
       s.servers.push({ name: m.name, vps: rows.size });
     } catch (e) {
@@ -118,11 +123,17 @@ export async function runSyncAll(s: SyncAllState) {
     }
   }
 
+  // services linked to a VPS id their master doesn't have (deleted, or a wrong id carried over from WHMCS):
+  // try to find their real VPS the same way as unlinked ones
+  const stale = services.filter((x) => linkedOk(x) && rowsBy.has(x.serverId!) && !rowsBy.get(x.serverId!)!.has(String(x.remoteId)));
+  const staleIds = new Set(stale.map((x) => x.id));
+  unlinked.push(...stale);
+
   // 2. link services that have no VPS yet: by IP first, then by a hostname only one VPS has
   if (unlinked.length) {
     s.phase = "Linking services to their VPS";
     await progress(true);
-    const taken = new Set(services.filter(linkedOk).map((x) => `${x.serverId}|${x.remoteId}`));
+    const taken = new Set(services.filter((x) => linkedOk(x) && !staleIds.has(x.id)).map((x) => `${x.serverId}|${x.remoteId}`));
     const byIp = new Map<string, string[]>();
     const byHost = new Map<string, string[]>();
     for (const [mid, rows] of rowsBy)
@@ -132,12 +143,21 @@ export async function runSyncAll(s: SyncAllState) {
         const h = String(row.hostname ?? "").trim().toLowerCase();
         if (h) byHost.set(h, [...(byHost.get(h) ?? []), ref]);
       }
+    // customer email → VPSes owned by that email, and → that customer's unlinked services
+    const byEmail = new Map<string, string[]>();
+    for (const [mid, rows] of rowsBy)
+      for (const [vpsid, row] of rows) {
+        const e = String(row.email ?? "").trim().toLowerCase();
+        if (e) byEmail.set(e, [...(byEmail.get(e) ?? []), `${mid}|${vpsid}`]);
+      }
+    const unlinkedPerEmail = new Map<string, number>();
+    for (const x of unlinked) unlinkedPerEmail.set(x.user.email.toLowerCase(), (unlinkedPerEmail.get(x.user.email.toLowerCase()) ?? 0) + 1);
     const hostCount = new Map<string, number>();
     for (const x of services) if (x.hostname) hostCount.set(x.hostname.trim().toLowerCase(), (hostCount.get(x.hostname.trim().toLowerCase()) ?? 0) + 1);
     for (const svc of unlinked) {
       let ref: string | null = null;
       let how = "";
-      if (svc.remoteId) {
+      if (svc.remoteId && !staleIds.has(svc.id)) {
         // has a VPS id but no (known) master: the master whose list has that VPS
         const hits = [...rowsBy.entries()].filter(([, rows]) => rows.has(String(svc.remoteId))).map(([mid]) => `${mid}|${svc.remoteId}`);
         if (hits.length === 1) { ref = hits[0]; how = "VPS id"; }
@@ -151,16 +171,23 @@ export async function runSyncAll(s: SyncAllState) {
         const hits = byHost.get(h) ?? [];
         if (hits.length === 1) { ref = hits[0]; how = `hostname ${svc.hostname}`; }
       }
+      // the customer's only VPS in Virtualizor, and this is their only service without one
+      const em = svc.user.email.toLowerCase();
+      if (!ref && unlinkedPerEmail.get(em) === 1) {
+        const free = (byEmail.get(em) ?? []).filter((r) => !taken.has(r));
+        if (free.length === 1) { ref = free[0]; how = `customer email ${svc.user.email}`; }
+      }
       if (!ref || taken.has(ref)) {
+        if (staleIds.has(svc.id)) continue; // keeps its old link; reported as missing below
         s.checked++;
         if (s.notLinked.length < 1000)
-          s.notLinked.push({ serviceId: svc.id, hostname: svc.hostname, reason: ref ? "Its matching VPS already belongs to another service" : svc.ips.length || h ? "No VPS in Virtualizor has this IP or hostname" : "No IP or hostname to match on" });
+          s.notLinked.push({ serviceId: svc.id, hostname: svc.hostname, reason: ref ? "Its matching VPS already belongs to another service" : svc.ips.length || h ? "No VPS in Virtualizor has this IP, hostname or customer email" : "No IP or hostname to match on, and the customer's email isn't on exactly one free VPS" });
         continue;
       }
       taken.add(ref);
       const [mid, vpsid] = ref.split("|");
       await prisma.service.update({ where: { id: svc.id }, data: { remoteId: vpsid, serverId: mid } });
-      await prisma.provisioningLog.create({ data: { serviceId: svc.id, action: "sync", success: true, message: `Linked to Virtualizor VPS ${vpsid} on ${masters.find((m) => m.id === mid)?.name} (matched by ${how})` } });
+      await prisma.provisioningLog.create({ data: { serviceId: svc.id, action: "sync", success: true, message: `${staleIds.has(svc.id) ? `Re-linked (VPS ${svc.remoteId} isn't on its master any more) to` : "Linked to"} Virtualizor VPS ${vpsid} on ${masters.find((m) => m.id === mid)?.name} (matched by ${how})` } });
       svc.remoteId = vpsid;
       svc.serverId = mid;
       s.linked++;

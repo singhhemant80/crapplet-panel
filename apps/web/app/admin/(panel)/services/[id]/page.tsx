@@ -6,6 +6,7 @@ import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { ChangePlanButton } from "@/components/admin/change-plan";
+import { VirtualizorCheck } from "@/components/admin/virtualizor-check";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge } from "@/components/live-state";
 import { PasswordField, generatePassword, passwordProblem } from "@/components/password-field";
@@ -208,10 +209,17 @@ export default function AdminService() {
                   <Credentials id={id} username={s.username} hasPassword={s.hasPassword} />
                 </div>
               )}
+              {s.product?.provisioner === "VIRTUALIZOR" && !(s.server?.type === "VIRTUALIZOR" && s.remoteId) && (
+                <div className="mt-5 border-t border-line pt-4">
+                  <p className="mb-2 text-xs font-semibold text-amber-700">This service isn't linked to a VPS in Virtualizor, so it can't show IPs or live status.</p>
+                  <VirtualizorCheck serviceId={id} onLinked={() => { reload(); refreshLive(); }} />
+                </div>
+              )}
               {s.server?.type === "VIRTUALIZOR" && s.remoteId && (
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
                   <Button size="sm" variant="outline" icon="sync" onClick={async () => { try { const r = await api(`/admin/services/${id}/virtualizor-sync`, { body: {} }); toast.success(`Synced: ${r.ips.join(", ") || "no IPs"} · ${r.state}`); reload(); refreshLive(); } catch (e: any) { toast.error(e.message); } }}>Sync from Virtualizor</Button>
                   <Button size="sm" variant="outline" icon="swap_horiz" onClick={async () => { if (!confirm("Replace this VPS's IPs with free IPs from Virtualizor's pool for its node? The VPS will get new addresses — tell the customer.")) return; try { const r = await api(`/admin/services/${id}/replace-ips`, { body: {} }); toast.success(`IPs changed: ${r.before.join(", ") || "—"} → ${r.after.join(", ")}`); reload(); } catch (e: any) { toast.error(e.message); } }}>Use Virtualizor's free IPs</Button>
+                  <VirtualizorCheck serviceId={id} onLinked={() => { reload(); refreshLive(); }} />
                 </div>
               )}
             </Card>

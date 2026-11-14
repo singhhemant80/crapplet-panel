@@ -125,3 +125,80 @@ test("a second run changes nothing", async () => {
   assert.equal(s.linked, 0);
   assert.equal(s.unchanged, 5);
 });
+
+test("links by the customer's email when that's the only clue; re-links a VPS id that no longer exists; admin check + Link", async () => {
+  const bcrypt = (await import("bcryptjs")).default;
+  // a customer whose service only says hostname "ip" — their VPS is under their email in Virtualizor
+  const email = `em-${RUN}@t.test`;
+  const emUser = (await prisma.user.create({ data: { email, passwordHash: "x", firstName: "E", lastName: "M", type: "CLIENT", status: "ACTIVE" } })).id;
+  const mk = async (data: Record<string, unknown>, uid = emUser) => (await prisma.service.create({ data: { userId: uid, productId, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 39900, recurringAmount: 39900, currency: "INR", ...data } })).id;
+  const byEmail = await mk({ hostname: "ip" });
+  // a service carried over with a VPS id the master doesn't have; its real VPS has the same hostname
+  const stale = await mk({ serverId, remoteId: "999999", hostname: `moved-${RUN}` }, userId);
+  svc.byEmail = byEmail;
+  svc.stale = stale;
+  VPS[`${V + 7}`] = { vpsid: `${V + 7}`, hostname: `vps-${RUN}.example`, serid: "1", uid: "5501", ips: { "12": ip(12) } };
+  VPS[`${V + 8}`] = { vpsid: `${V + 8}`, hostname: `moved-${RUN}`, serid: "1", ips: { "13": ip(13) } };
+  const prev = VirtualizorClient.prototype.call;
+  VirtualizorClient.prototype.call = async function (this: { creds: { host: string } }, act: string, params: Record<string, unknown> = {}) {
+    if (this.creds.host === "virt.invalid" && act === "users") return { users: { "5501": { uid: "5501", email } } };
+    if (this.creds.host === "virt.invalid" && act === "vs" && params.vpsid && VPS[String(params.vpsid)]) return { vs: { [String(params.vpsid)]: VPS[String(params.vpsid)] } };
+    return (prev as any).call(this, act, params);
+  } as never;
+  try {
+    const s = await runSyncAll(fresh());
+    assert.equal(s.status, "done");
+    const e = await look(byEmail);
+    assert.equal(e.remoteId, `${V + 7}`, "matched by the customer's email");
+    assert.deepEqual(e.ips.map((i) => i.address), [ip(12)]);
+    const st = await look(stale);
+    assert.equal(st.remoteId, `${V + 8}`, "re-linked from a VPS id the master doesn't have");
+    assert.deepEqual(st.ips.map((i) => i.address), [ip(13)]);
+
+    // the admin check: a service with nothing linked shows the candidate, and Link fixes it
+    await prisma.service.update({ where: { id: byEmail }, data: { remoteId: null, serverId: null } });
+    await prisma.ipAddress.updateMany({ where: { serviceId: byEmail }, data: { serviceId: null, status: "AVAILABLE" } });
+    const { createApp } = await import("../src/app");
+    const app = createApp().listen(0);
+    const base = `http://127.0.0.1:${(app.address() as import("node:net").AddressInfo).port}/api`;
+    const role = await prisma.role.create({ data: { name: `QA vz ${RUN}`, permissions: ["*"] } });
+    const staff = await prisma.user.create({ data: { email: `vz-staff-${RUN}@t.test`, passwordHash: await bcrypt.hash("Staff@12345", 10), firstName: "S", lastName: "T", type: "STAFF", status: "ACTIVE", roleId: role.id } });
+    try {
+      const login = await fetch(`${base}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "crapplet" }, body: JSON.stringify({ email: staff.email, password: "Staff@12345", portal: "admin" }) });
+      const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+      const h = { "Content-Type": "application/json", "X-Requested-With": "crapplet", Cookie: cookie };
+      const chk = await (await fetch(`${base}/admin/services/${byEmail}/virtualizor-check`, { headers: h })).json();
+      assert.equal(chk.linked, false);
+      const cand = chk.candidates.find((c: any) => c.vpsid === `${V + 7}`);
+      assert.ok(cand, JSON.stringify(chk));
+      assert.ok(cand.why.includes("customer's email"));
+      assert.equal(cand.inUse, false);
+      const linked = await fetch(`${base}/admin/services/${byEmail}/virtualizor-link`, { method: "POST", headers: h, body: JSON.stringify({ serverId: cand.serverId, vpsid: cand.vpsid }) });
+      assert.equal(linked.status, 200, await linked.clone().text());
+      const after = await look(byEmail);
+      assert.equal(after.remoteId, `${V + 7}`);
+      assert.deepEqual(after.ips.map((i) => i.address), [ip(12)], "IPs arrive with the link");
+      // and for a linked one, the check reports what the panel reads
+      const chk2 = await (await fetch(`${base}/admin/services/${byEmail}/virtualizor-check`, { headers: h })).json();
+      assert.equal(chk2.found, true);
+      assert.deepEqual(chk2.ipsRead, [ip(12)]);
+      // a VPS already used by another service can't be linked twice
+      const dup = await fetch(`${base}/admin/services/${stale}/virtualizor-link`, { method: "POST", headers: h, body: JSON.stringify({ serverId, vpsid: `${V + 7}` }) });
+      assert.equal(dup.status, 400);
+    } finally {
+      app.close();
+      await prisma.loginHistory.deleteMany({ where: { userId: staff.id } });
+      await prisma.session.deleteMany({ where: { userId: staff.id } });
+      await prisma.activityLog.deleteMany({ where: { OR: [{ actorId: staff.id }, { userId: staff.id }] } }).catch(() => undefined);
+      await prisma.user.delete({ where: { id: staff.id } });
+      await prisma.role.delete({ where: { id: role.id } });
+    }
+  } finally {
+    VirtualizorClient.prototype.call = prev;
+    await prisma.provisioningLog.deleteMany({ where: { serviceId: { in: [byEmail, stale] } } });
+    await prisma.ipAddress.deleteMany({ where: { serviceId: { in: [byEmail, stale] } } });
+    await prisma.service.deleteMany({ where: { id: { in: [byEmail, stale] } } });
+    await prisma.activityLog.deleteMany({ where: { userId: emUser } }).catch(() => undefined);
+    await prisma.user.delete({ where: { id: emUser } });
+  }
+});

@@ -109,6 +109,20 @@ export class VirtualizorClient {
   listVps(page = 1, reslen = 50) {
     return this.call<{ vs: Record<string, Record<string, unknown>> }>("vs", { page, reslen });
   }
+  /** Virtualizor user accounts (uid → email) — the owner of each VPS, for matching VPSes to customers. */
+  async userEmails(): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    for (let page = 1; page <= 100; page++) {
+      const r = await this.call<{ users?: Record<string, Record<string, unknown>> }>("users", { page, reslen: 500 });
+      const list = Object.entries(r.users ?? {});
+      for (const [k, u] of list) {
+        const email = String(u.email ?? "").trim().toLowerCase();
+        if (email.includes("@")) out.set(String(u.uid ?? k), email);
+      }
+      if (list.length < 500) break;
+    }
+    return out;
+  }
   /**
    * VPSes on the master with this hostname (Virtualizor's list search). Used to find a VPS an earlier,
    * unanswered create request already built, so a retry never builds a second one.
