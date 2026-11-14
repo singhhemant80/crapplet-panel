@@ -248,7 +248,11 @@ clientRouter.get(
     const busy = await prisma.provisioningLog.count({ where: { serviceId: s.id, createdAt: { gt: new Date(Date.now() - 20000) } } });
     // is anything for this service still to be paid? (a paid manual-setup service is "being set up", not "awaiting payment")
     const unpaid = await prisma.invoice.findFirst({ where: { userId: req.user!.id, status: "UNPAID", items: { some: { relId: s.id, type: { in: ["SERVICE", "SETUP"] } } } }, select: { id: true } });
-    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: (config as Record<string, unknown>)?.requestedIpId ? true : false } }, invoices, logs, busy: !!busy, unpaidInvoiceId: unpaid?.id ?? null });
+    const cfg = (config ?? {}) as Record<string, unknown>;
+    const { coloSpecs, isColoProduct } = await import("../../lib/product-kind");
+    // colocation: what the plan includes, where the equipment is racked (filled in by staff) and the equipment itself
+    const colo = isColoProduct(s.product) ? { specs: coloSpecs((await prisma.product.findUnique({ where: { id: s.productId }, select: { moduleConfig: true } }))?.moduleConfig),  location: cfg.colo ?? null, equipment: cfg.equipment ?? null } : null;
+    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: cfg.requestedIpId ? true : false }, colo }, invoices, logs, busy: !!busy, unpaidInvoiceId: unpaid?.id ?? null });
   }),
 );
 

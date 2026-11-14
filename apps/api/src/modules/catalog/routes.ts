@@ -7,7 +7,7 @@ import { listAvailableIps, releaseIpReservation, reserveIp } from "../ipam/servi
 import { cartSchema, priceCart } from "../orders/pricing";
 import { checkout } from "../orders/checkout";
 import { checkDomain } from "../domains/service";
-import { isHostingProduct, isVpsProduct } from "../../lib/product-kind";
+import { coloSpecs, isColoProduct, isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 import { BASE_CURRENCY, jsonPrice, listCurrencies, priceResolver } from "../../lib/currency";
 
 type Resolvers = Awaited<ReturnType<typeof priceResolver>>[];
@@ -63,6 +63,9 @@ function publicProduct(p: Awaited<ReturnType<typeof findProduct>>, rs: Resolvers
     group: p.group ? { name: p.group.name, slug: p.group.slug } : undefined,
     specs: { cpuCores: p.cpuCores, ramMb: p.ramMb, diskGb: p.diskGb, bandwidthGb: p.bandwidthGb, ipv4Count: p.ipv4Count, ipv6: p.ipv6Enabled, virtType: p.virtType },
     isVps: isVpsProduct(p),
+    // colocation: customer's own hardware — the order asks about the equipment, not an OS
+    isColo: isColoProduct(p),
+    colo: isColoProduct(p) ? coloSpecs(p.moduleConfig) : null,
     // shared / reseller / WordPress plans are ordered with a domain first, whichever way they're set up
     isHosting: isHostingProduct(p),
     freeDomain: p.freeDomain === "once" || p.freeDomain === "recurring" ? { type: p.freeDomain, cycles: p.freeDomainCycles, tlds: p.freeDomainTlds } : null,

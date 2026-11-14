@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, CYCLES, CYCLE_MONTHS, gb, money } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { readCart, writeCart, type CartItem } from "@/lib/cart";
-import { Alert, Button, Field, Icon, Input, Loading, Select, Spinner, cx, toast, useApi } from "@/components/ui";
+import { Alert, Button, Field, Icon, Input, Loading, Select, Spinner, Textarea, cx, toast, useApi } from "@/components/ui";
 import { OrderSteps } from "@/components/order-steps";
 import { OsChooser } from "@/components/os-chooser";
 import { CurrencySwitch, pick, priceRow, rowsIn, useCurrency } from "@/lib/currency";
@@ -66,6 +66,7 @@ function Configure() {
   const [serverId, setServerId] = useState<string>("");
   const [os, setOs] = useState("");
   const [hostname, setHostname] = useState("");
+  const [equip, setEquip] = useState<{ device: string; units: string; powerW: string; psus: string; serial: string; notes: string }>({ device: "", units: "", powerW: "", psus: "", serial: "", notes: "" });
   const [cfg, setCfg] = useState<Record<string, any>>({});
   const [addons, setAddons] = useState<string[]>([]);
   const [ips, setIps] = useState<any[]>([]);
@@ -190,7 +191,11 @@ function Configure() {
     if (p.outOfStock) return toast.error(`${p.name} is out of stock right now`);
     if (p.isVps && p.osTemplates.length && !os) return toast.error("Choose an operating system");
     if (p.isHosting && !dom) { setPickingDomain(true); return toast.error("Choose a domain for your hosting first"); }
-    if (!p.isHosting && p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
+    const units = Number(equip.units || p.colo?.rackUnits || 1);
+    if (p.isColo && equip.device.trim().length < 2) return toast.error("Tell us about your equipment — make and model (e.g. Dell PowerEdge R640)");
+    if (p.isColo && p.colo?.rackUnits && units > p.colo.rackUnits) return toast.error(`This plan includes ${p.colo.rackUnits}U of rack space — your equipment is ${units}U`);
+    if (p.isColo && hostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(hostname)) return toast.error("The server name can only use letters, numbers, dots and dashes");
+    if (!p.isHosting && !p.isColo && p.requireHostname && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(hostname)) return toast.error("Enter a valid hostname like server1.example.com");
     const loc = locs.data?.locations.find((l: any) => l.serverId === serverId);
     const key = `${p.id}-${Date.now()}`;
     const item: CartItem = {
@@ -210,6 +215,7 @@ function Configure() {
       config: cfg,
       addonIds: addons,
       quantity: 1,
+      ...(p.isColo ? { equipment: { device: equip.device.trim(), units, powerW: equip.powerW ? Number(equip.powerW) : null, psus: equip.psus ? Number(equip.psus) : null, serial: equip.serial.trim() || null, notes: equip.notes.trim() || null } } : {}),
     };
     const c = readCart();
     // a domain registered / transferred for this hosting goes in the cart with it (replacing any earlier copy)
@@ -222,7 +228,7 @@ function Configure() {
 
   const filtered = ips;
   // number the steps that are shown
-  const order = [p.isHosting && "domain", "cycle", p.isVps && "location", p.allowIpSelection && serverId && "ip", !p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && "setup", (p.configOptions.length > 0 || p.addons.length > 0) && "extras"].filter(Boolean) as string[];
+  const order = [p.isHosting && "domain", "cycle", p.isVps && "location", p.allowIpSelection && serverId && "ip", p.isColo && "equipment", !p.isHosting && !p.isColo && (p.osTemplates.length > 0 || p.requireHostname) && "setup", (p.configOptions.length > 0 || p.addons.length > 0) && "extras"].filter(Boolean) as string[];
   const domainStep = p.isHosting && (!dom || pickingDomain);
   let seed: DomainChoice | null = dom;
   if (!seed) try { seed = JSON.parse(sessionStorage.getItem(`cc_dom_seed_${p.slug}`) ?? "null"); } catch { /* ignore */ }
@@ -257,6 +263,13 @@ function Configure() {
               <ul className="mt-4 flex flex-wrap gap-2 text-[12.5px] font-semibold text-slate-700">
                 {p.features.slice(0, 6).map((f: string) => <li key={f} className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf7ff] px-2.5 py-1 ring-1 ring-[#ede4ff]"><Icon name="check" className="text-[16px] text-primary-dark" />{f}</li>)}
               </ul>
+            )}
+            {p.isColo && (
+              <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
+                {[["dns", `${p.colo?.rackUnits ?? 1}U rack space`], ["bolt", p.colo?.powerW ? `${p.colo.powerW} W power` : "Power as agreed"], ["settings_ethernet", p.colo?.portSpeed ?? "1 Gbps port"], ["swap_vert", `${bandwidth(p.specs.bandwidthGb)} bandwidth`], ["public", `${p.specs.ipv4Count || 1} × IPv4`], ...(p.colo?.datacenter ? [["location_on", p.colo.datacenter]] : [])].map(([i, t]) => (
+                  <span key={t} className="inline-flex items-center gap-1.5 rounded-lg bg-[#faf7ff] px-3 py-1.5 ring-1 ring-[#ede4ff]"><Icon name={i} className="text-[18px] text-primary-dark" />{t}</span>
+                ))}
+              </div>
             )}
             {p.isVps && (
               <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
@@ -336,7 +349,21 @@ function Configure() {
             </Step>
           )}
 
-          {!p.isHosting && (p.osTemplates.length > 0 || p.requireHostname) && (
+          {p.isColo && (
+            <Step n={num("equipment")} title="Your equipment" sub="The server or device you'll bring to our data centre — we use this to plan rack space and power.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Make & model" className="sm:col-span-2"><Input value={equip.device} maxLength={120} onChange={(e) => setEquip({ ...equip, device: e.target.value })} placeholder="e.g. Dell PowerEdge R640, HPE DL360 Gen10" /></Field>
+                <Field label="Height (U)" hint={p.colo?.rackUnits ? `This plan includes ${p.colo.rackUnits}U` : undefined}><Input type="number" min={1} max={48} value={equip.units} onChange={(e) => setEquip({ ...equip, units: e.target.value })} placeholder={String(p.colo?.rackUnits ?? 1)} /></Field>
+                <Field label="Expected power draw (watts)" hint={p.colo?.powerW ? `${p.colo.powerW} W included` : "Optional"}><Input type="number" min={0} value={equip.powerW} onChange={(e) => setEquip({ ...equip, powerW: e.target.value })} placeholder="e.g. 250" /></Field>
+                <Field label="Power supplies"><Select value={equip.psus} onChange={(e) => setEquip({ ...equip, psus: e.target.value })}><option value="">Not sure</option><option value="1">1 (single PSU)</option><option value="2">2 (redundant)</option></Select></Field>
+                <Field label="Server name / hostname" hint="Optional — how you'd like it labelled"><Input value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim())} placeholder="e.g. db1.example.com" /></Field>
+                <Field label="Serial number" hint="Optional — helps us identify it on arrival"><Input value={equip.serial} maxLength={80} onChange={(e) => setEquip({ ...equip, serial: e.target.value })} /></Field>
+                <Field label="Anything else we should know?" className="sm:col-span-2"><Textarea rows={2} maxLength={500} value={equip.notes} onChange={(e) => setEquip({ ...equip, notes: e.target.value })} placeholder="Delivery date, extra network needs, KVM/IPMI access…" /></Field>
+              </div>
+            </Step>
+          )}
+
+          {!p.isHosting && !p.isColo && (p.osTemplates.length > 0 || p.requireHostname) && (
             <Step n={num("setup")} title="Server setup" sub="Operating system and hostname — you can reinstall another OS later.">
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.osTemplates.length > 0 && (
@@ -391,11 +418,13 @@ function Configure() {
             <div className="p-5">
               <dl className="space-y-2.5 text-[13px]">
                 {p.isVps && <div className="flex justify-between gap-3"><dt className="text-mute">Resources</dt><dd className="text-right font-semibold text-ink">{p.specs.cpuCores} vCPU · {gb(p.specs.ramMb)} · {p.specs.diskGb} GB{p.specs.bandwidthGb != null && <> · {bandwidth(p.specs.bandwidthGb)}</>}</dd></div>}
+                {p.isColo && <div className="flex justify-between gap-3"><dt className="text-mute">Includes</dt><dd className="text-right font-semibold text-ink">{p.colo?.rackUnits ?? 1}U{p.colo?.powerW ? ` · ${p.colo.powerW} W` : ""} · {p.colo?.portSpeed ?? "1 Gbps"}</dd></div>}
+                {p.isColo && equip.device && <div className="flex justify-between gap-3"><dt className="text-mute">Equipment</dt><dd className="min-w-0 truncate text-right font-semibold text-ink">{equip.device}{equip.units ? ` · ${equip.units}U` : ""}</dd></div>}
                 {loc && <div className="flex justify-between gap-3"><dt className="text-mute">Location</dt><dd className="font-semibold text-ink">{loc.name}</dd></div>}
                 {osName && <div className="flex justify-between gap-3"><dt className="text-mute">OS</dt><dd className="truncate font-semibold text-ink">{osName}</dd></div>}
-                {!p.isHosting && hostname && <div className="flex justify-between gap-3"><dt className="text-mute">Hostname</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
+                {!p.isHosting && hostname && <div className="flex justify-between gap-3"><dt className="text-mute">{p.isColo ? "Server name" : "Hostname"}</dt><dd className="truncate font-semibold text-ink">{hostname}</dd></div>}
                 {p.isHosting && <div className="flex justify-between gap-3"><dt className="text-mute">Domain</dt><dd className="min-w-0 truncate font-semibold text-ink">{dom?.name ?? <span className="text-mute">not chosen yet</span>}</dd></div>}
-                {!p.isHosting && <div className="flex justify-between gap-3"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold text-ink">{reservation?.address ?? (p.isVps ? "Auto-assigned" : "Shared")}</dd></div>}
+                {!p.isHosting && <div className="flex justify-between gap-3"><dt className="text-mute">IPv4</dt><dd className="font-mono font-semibold text-ink">{reservation?.address ?? (p.isVps ? "Auto-assigned" : p.isColo ? `${p.specs.ipv4Count || 1} dedicated` : "Shared")}</dd></div>}
               </dl>
               <div className="my-4 border-t border-dashed border-line" />
               <dl className="space-y-2 text-[13px]">
@@ -422,7 +451,7 @@ function Configure() {
               )}
               <p className="mt-2 text-center text-[11.5px] text-mute">Review your cart and apply a promo code next.</p>
               <ul className="mt-4 space-y-2 border-t border-line pt-4 text-xs font-semibold text-slate-600">
-                <li className="flex items-center gap-2"><Icon name="bolt" className="text-[18px] text-primary" /> {p.isHosting ? "Account set up after payment" : "Deployed automatically after payment"}</li>
+                <li className="flex items-center gap-2"><Icon name="bolt" className="text-[18px] text-primary" /> {p.isHosting ? "Account set up after payment" : p.isColo ? "Our team confirms rack space and arrival details after payment" : p.isVps ? "Deployed automatically after payment" : "Set up by our team after payment"}</li>
                 <li className="flex items-center gap-2"><Icon name={p.isHosting ? "lock" : "shield"} className="text-[18px] text-primary" /> {p.isHosting ? "Free SSL for your domain" : "DDoS protected network"}</li>
                 <li className="flex items-center gap-2"><Icon name="receipt_long" className="text-[18px] text-primary" /> {currency === "INR" ? "GST invoice with your GSTIN" : `Invoice in ${currency} · cards & PayPal`}</li>
               </ul>

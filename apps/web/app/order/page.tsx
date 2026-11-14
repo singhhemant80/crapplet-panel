@@ -35,6 +35,17 @@ function specRows(p: any): [string, string, string][] {
     if (p.specs.bandwidthGb !== null && p.specs.bandwidthGb !== undefined) rows.push(["speed", "Bandwidth", bw(p.specs.bandwidthGb)]);
     return rows;
   }
+  if (p.isColo) {
+    const c = p.colo ?? {};
+    return [
+      ["dns", "Rack space", `${c.rackUnits ?? 1}U`],
+      ["bolt", "Power", c.powerW ? `${c.powerW} W` : "As agreed"],
+      ["settings_ethernet", "Network port", c.portSpeed ?? "1 Gbps"],
+      ["speed", "Bandwidth", bw(p.specs.bandwidthGb)],
+      ["public", "IPv4", `${p.specs.ipv4Count || 1} dedicated`],
+      ...(c.datacenter ? [["location_on", "Data centre", c.datacenter] as [string, string, string]] : []),
+    ];
+  }
   if (p.isVps)
     return [
       ["developer_board", "vCPU", `${p.specs.cpuCores} cores`],

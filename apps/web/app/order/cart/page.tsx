@@ -91,6 +91,7 @@ export default function CartPage() {
                         <div className="font-extrabold text-ink">{i.productName}</div>
                         <div className="text-sm text-mute">{CYCLES[i.cycle]}{i.location ? ` · ${i.location}` : ""}{i.osName ? ` · ${i.osName}` : ""}</div>
                         {i.hostname && !i.domainAction && <div className="text-sm text-mute">{i.hostname}</div>}
+                        {i.equipment && <div className="text-sm text-mute">Your equipment: {i.equipment.device} · {i.equipment.units}U{i.equipment.powerW ? ` · ~${i.equipment.powerW} W` : ""}</div>}
                         {i.domainAction && i.hostname && (
                           <div className="mt-1.5 inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-[#faf7ff] px-2.5 py-1 text-[12.5px] ring-1 ring-[#ede4ff]">
                             <Icon name="language" className="text-[15px] text-primary-dark" />

@@ -752,10 +752,27 @@ adminCore.put(
         notes: z.string().max(5000).optional(),
         terminationDate: z.coerce.date().nullable().optional(),
         terminationReason: z.string().trim().max(300).nullable().optional(),
+        /** colocation: where the customer's equipment sits (staff-maintained, shown to the customer) */
+        colo: z
+          .object({ datacenter: z.string().trim().max(120), rack: z.string().trim().max(60), position: z.string().trim().max(60), pdu: z.string().trim().max(120), switchPort: z.string().trim().max(120), crossConnect: z.string().trim().max(200), access: z.string().trim().max(500) })
+          .partial()
+          .optional(),
+        equipment: z
+          .object({ device: z.string().trim().max(120), units: z.number().int().min(0).max(48).nullable(), powerW: z.number().int().min(0).max(20000).nullable(), psus: z.number().int().min(0).max(4).nullable(), serial: z.string().trim().max(80), notes: z.string().trim().max(500) })
+          .partial()
+          .optional(),
       }),
       req.body,
     );
-    const { password, ...data } = b;
+    const { password, colo, equipment, ...data } = b;
+    if (colo || equipment) {
+      const cur = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, select: { config: true } });
+      const cfg = { ...((cur.config ?? {}) as Record<string, unknown>) };
+      const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== "" && v !== null && v !== undefined));
+      if (colo) cfg.colo = clean({ ...((cfg.colo ?? {}) as object), ...colo });
+      if (equipment) cfg.equipment = clean({ ...((cfg.equipment ?? {}) as object), ...equipment });
+      (data as Record<string, unknown>).config = cfg as Prisma.InputJsonValue;
+    }
     if (data.terminationReason === "") data.terminationReason = null;
     if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
     const before = b.status ? await prisma.service.findUnique({ where: { id: req.params.id }, select: { status: true } }) : null;
@@ -769,6 +786,55 @@ adminCore.put(
       invoices = await cancelServiceInvoices(req.params.id, { actorId: req.user!.id });
     }
     res.json({ ok: true, invoices });
+  }),
+);
+
+/**
+ * Make an ended (terminated / cancelled) or stuck service active again by hand — e.g. colocation and
+ * other manually delivered services, or a termination done by mistake. Nothing is created on any server.
+ */
+adminCore.post(
+  "/services/:id/reactivate",
+  requireStaff("services.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      z.object({
+        nextDueDate: z.coerce.date().nullable().optional(),
+        /** bring back the unpaid invoices that were cancelled when it was terminated */
+        restoreInvoices: z.boolean().default(true),
+        notify: z.boolean().default(false),
+        note: z.string().trim().max(300).optional(),
+      }),
+      req.body ?? {},
+    );
+    const s = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, include: { product: true, user: { select: { email: true, firstName: true, ownerResellerId: true } } } });
+    if (!["TERMINATED", "CANCELLED", "FAILED", "PENDING"].includes(s.status)) throw conflict(`This service is ${s.status.toLowerCase()} — ${s.status === "SUSPENDED" ? "use Unsuspend" : "it's already active"}`);
+    const restored: string[] = [];
+    if (b.restoreInvoices && ["TERMINATED", "CANCELLED"].includes(s.status)) {
+      const logs = await prisma.activityLog.findMany({ where: { action: "invoice.cancelled_on_termination", details: { path: ["serviceId"], equals: s.id } }, select: { entityId: true } });
+      for (const l of logs) {
+        if (!l.entityId) continue;
+        const r = await prisma.invoice.updateMany({ where: { id: l.entityId, status: "CANCELLED", amountPaid: 0 }, data: { status: "UNPAID" } });
+        if (r.count) restored.push(l.entityId);
+      }
+    }
+    await prisma.service.update({
+      where: { id: s.id },
+      data: {
+        status: "ACTIVE",
+        terminationDate: null,
+        terminationReason: null,
+        suspendReason: null,
+        ...(b.nextDueDate !== undefined ? { nextDueDate: b.nextDueDate, nextInvoiceDate: b.nextDueDate } : {}),
+      },
+    });
+    await prisma.provisioningLog.create({ data: { serviceId: s.id, action: "reactivate", success: true, message: `Marked active by staff (was ${s.status.toLowerCase()})${b.note ? ` — ${b.note}` : ""}${restored.length ? ` · ${restored.length} cancelled invoice(s) restored` : ""}` } });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.reactivated", entity: "service", entityId: s.id, details: { from: s.status, restoredInvoices: restored, nextDueDate: b.nextDueDate ?? undefined } });
+    await syncOrderForService(s.id);
+    if (b.notify && !s.user.ownerResellerId) {
+      await queueEmail("service.activated", s.user.email, { name: s.user.firstName ?? "", productName: s.product.name, hostname: s.hostname ?? "", serviceId: s.id }, s.userId);
+    }
+    res.json({ ok: true, restoredInvoices: restored });
   }),
 );
 

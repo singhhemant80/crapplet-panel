@@ -6,7 +6,7 @@ import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, CYCLES, date, gb, invNo, money } from "@/lib/api";
 import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, cx, toast, useApi } from "@/components/ui";
 import { PasswordField, passwordProblem } from "@/components/password-field";
@@ -171,9 +171,24 @@ export default function ServicePage() {
 
       <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         {!isHosting && (
-        <Card title={isVps ? "Server details" : "Service details"}>
+        <Card title={isVps ? "Server details" : svc.colo ? "Colocation details" : "Service details"}>
           <dl className="grid grid-cols-[130px_1fr] gap-y-3 text-sm">
-            <dt className="text-mute">Hostname</dt>
+            {svc.colo && (() => {
+              const c = svc.colo, sp = c.specs ?? {}, l = c.location ?? {}, e = c.equipment ?? {};
+              const rows: [string, React.ReactNode][] = [
+                ["Plan includes", [sp.rackUnits && `${sp.rackUnits}U rack space`, sp.powerW && `${sp.powerW} W power`, sp.portSpeed, `${bandwidth(svc.product.bandwidthGb)} bandwidth`].filter(Boolean).join(" · ")],
+                ...(l.datacenter || sp.datacenter ? [["Data centre", l.datacenter || sp.datacenter] as [string, React.ReactNode]] : []),
+                ...(l.rack || l.position ? [["Rack position", [l.rack && `Rack ${l.rack}`, l.position].filter(Boolean).join(" · ")] as [string, React.ReactNode]] : []),
+                ...(l.pdu ? [["Power", l.pdu] as [string, React.ReactNode]] : []),
+                ...(l.switchPort ? [["Network port", l.switchPort] as [string, React.ReactNode]] : []),
+                ...(l.crossConnect ? [["Cross-connect", l.crossConnect] as [string, React.ReactNode]] : []),
+                ...(e.device ? [["Your equipment", [e.device, e.units && `${e.units}U`, e.powerW && `~${e.powerW} W`, e.serial && `S/N ${e.serial}`].filter(Boolean).join(" · ")] as [string, React.ReactNode]] : []),
+                ...(sp.remoteHands ? [["Remote hands", sp.remoteHands] as [string, React.ReactNode]] : []),
+                ...(l.access ? [["Visits & access", l.access] as [string, React.ReactNode]] : []),
+              ];
+              return rows.map(([k, v]) => <Fragment key={k}><dt className="text-mute">{k}</dt><dd className="font-semibold text-ink">{v}</dd></Fragment>);
+            })()}
+            <dt className="text-mute">{svc.colo ? "Server name" : "Hostname"}</dt>
             <dd className="font-semibold text-ink">{svc.hostname ?? "—"}</dd>
             <dt className="text-mute">Primary IP</dt>
             <dd className="flex items-center gap-1 font-semibold text-ink">

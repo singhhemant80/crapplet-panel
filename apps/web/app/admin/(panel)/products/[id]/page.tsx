@@ -86,7 +86,7 @@ export default function ProductEditor() {
       freeDomain: p.freeDomain ?? "none", freeDomainCycles: p.freeDomainCycles ?? [], freeDomainTlds: String(p.freeDomainTlds ?? "").split(/[\s,]+/).map((t: string) => t.trim()).filter(Boolean),
       hsnSac: p.hsnSac, taxable: p.taxable,
       stockControl: p.stockControl, stockQty: Number(p.stockQty) || 0, outOfStock: !!p.outOfStock, enabled: p.enabled, hidden: p.hidden, featured: p.featured, autoSetup: p.autoSetup, sortOrder: Number(p.sortOrder) || 0,
-      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) }, cpanel: { ...p.moduleConfig.cpanel, accountLimit: num(p.moduleConfig.cpanel?.accountLimit), diskMb: num(p.moduleConfig.cpanel?.diskMb), bandwidthMb: num(p.moduleConfig.cpanel?.bandwidthMb) } },
+      resellerEnabled: p.resellerEnabled, moduleConfig: { proxmox: { ...p.moduleConfig.proxmox }, virtualizor: { ...p.moduleConfig.virtualizor, planId: num(p.moduleConfig.virtualizor?.planId), serverGroupId: num(p.moduleConfig.virtualizor?.serverGroupId) }, cpanel: { ...p.moduleConfig.cpanel, accountLimit: num(p.moduleConfig.cpanel?.accountLimit), diskMb: num(p.moduleConfig.cpanel?.diskMb), bandwidthMb: num(p.moduleConfig.cpanel?.bandwidthMb) }, ...(p.moduleConfig.colo ? { colo: { ...p.moduleConfig.colo, rackUnits: num(p.moduleConfig.colo.rackUnits), powerW: num(p.moduleConfig.colo.powerW), crossConnects: num(p.moduleConfig.colo.crossConnects) } } : {}) },
       pricing: [
         ...Object.entries(p.pricing).filter(([, v]: any) => v && v.price !== "" && v.price !== undefined).map(([cycle, v]: any) => ({ cycle, currency: "INR", price: Math.round(Number(v.price) * 100), setupFee: Math.round(Number(v.setupFee || 0) * 100), enabled: v.enabled !== false })),
         // USD rows only where staff typed a price; blank cycles fall back to auto-conversion
@@ -240,6 +240,17 @@ export default function ProductEditor() {
                 />
                 <VirtualizorPlacement serverIds={p.serverIds} value={p.moduleConfig.virtualizor ?? {}} onChange={(patch) => set({ moduleConfig: { ...p.moduleConfig, virtualizor: { ...p.moduleConfig.virtualizor, ...patch } } })} />
               </>}
+            </>}
+            {p.type === "COLOCATION" && <>
+              <div className="sm:col-span-2 rounded-xl bg-[#faf7ff] p-3 text-xs text-mute ring-1 ring-[#ede4ff]">Colocation: the customer brings their own server, so the order page asks about their equipment instead of an OS, and the service page shows rack, power and network details instead of VM resources.</div>
+              <Field label="Rack space (U)"><Input type="number" min={1} max={48} value={p.moduleConfig.colo?.rackUnits ?? ""} onChange={(e) => mc("colo", "rackUnits", e.target.value)} placeholder="1" /></Field>
+              <Field label="Power included (watts)"><Input type="number" min={0} value={p.moduleConfig.colo?.powerW ?? ""} onChange={(e) => mc("colo", "powerW", e.target.value)} placeholder="e.g. 300" /></Field>
+              <Field label="Network port"><Input value={p.moduleConfig.colo?.portSpeed ?? ""} onChange={(e) => mc("colo", "portSpeed", e.target.value)} placeholder="e.g. 1 Gbps shared / 100 Mbps dedicated" /></Field>
+              <Field label="Bandwidth (GB, empty = unmetered)"><Input type="number" value={p.bandwidthGb ?? ""} onChange={(e) => set({ bandwidthGb: e.target.value })} /></Field>
+              <Field label="IPv4 addresses"><Input type="number" value={p.ipv4Count} onChange={(e) => set({ ipv4Count: e.target.value })} /></Field>
+              <Field label="Cross-connects included"><Input type="number" min={0} value={p.moduleConfig.colo?.crossConnects ?? ""} onChange={(e) => mc("colo", "crossConnects", e.target.value)} placeholder="0" /></Field>
+              <Field label="Data centre"><Input value={p.moduleConfig.colo?.datacenter ?? ""} onChange={(e) => mc("colo", "datacenter", e.target.value)} placeholder="e.g. Noida, Tier III" /></Field>
+              <Field label="Remote hands"><Input value={p.moduleConfig.colo?.remoteHands ?? ""} onChange={(e) => mc("colo", "remoteHands", e.target.value)} placeholder="e.g. 30 min/month included" /></Field>
             </>}
             {isHosting && (
               <CpanelSettings

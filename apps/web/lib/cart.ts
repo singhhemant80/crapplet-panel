@@ -15,6 +15,8 @@ export interface CartItem {
   config: Record<string, string | number | boolean>;
   addonIds: string[];
   quantity: number;
+  /** colocation: the customer's equipment */
+  equipment?: { device: string; units: number; powerW?: number | null; psus?: number | null; serial?: string | null; notes?: string | null } | null;
   /** hosting: how the domain was chosen (register / transfer come with a CartDomain linked by forItem) */
   domainAction?: "register" | "transfer" | "existing";
 }
@@ -53,7 +55,7 @@ export function cartCount() {
 }
 export function toApiCart(c: Cart, currency = "INR") {
   return {
-    items: c.items.map(({ productId, cycle, osTemplateId, hostname, serverId, ipId, config, addonIds, quantity }) => ({ productId, cycle, osTemplateId: osTemplateId || null, hostname: hostname || null, serverId: serverId || null, ipId: ipId || null, config, addonIds, quantity })),
+    items: c.items.map(({ productId, cycle, osTemplateId, hostname, serverId, ipId, config, addonIds, quantity, equipment }) => ({ productId, cycle, osTemplateId: osTemplateId || null, hostname: hostname || null, serverId: serverId || null, ipId: ipId || null, config, addonIds, quantity, ...(equipment ? { equipment } : {}) })),
     domains: c.domains.map(({ name, action, years, eppCode }) => ({ name, action, years, eppCode: eppCode || undefined })),
     promoCode: c.promoCode || null,
     currency,

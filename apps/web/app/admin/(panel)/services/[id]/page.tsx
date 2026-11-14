@@ -34,6 +34,7 @@ export default function AdminService() {
   const act = (action: string, extra: Record<string, unknown> = {}) => api(`/admin/services/${id}/action`, { body: { action, ...extra } }).then(() => { toast.success(`${action} queued`); setTimeout(reload, 3000); }).catch((e) => toast.error(e.message));
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
   const isHosting = s.product.provisioner === "CPANEL";
+  const isColo = s.product.type === "COLOCATION";
   const ended = ["TERMINATED", "CANCELLED"].includes(s.status);
   const primary = s.ips.find((i: any) => i.isPrimary) ?? s.ips[0];
   const days = s.nextDueDate ? Math.ceil((new Date(s.nextDueDate).getTime() - Date.now()) / 86400_000) : null;
@@ -60,7 +61,7 @@ export default function AdminService() {
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
           <div className="relative flex flex-wrap items-start gap-4 sm:gap-5">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white shadow-lg sm:h-16 sm:w-16 sm:rounded-2xl [&_img]:max-h-8 sm:[&_img]:max-h-10">
-              {s.osTemplate ? <OsLogo os={s.osTemplate} size={40} /> : <Icon name={isHosting ? "language" : "dns"} className="text-[32px] text-primary-dark" />}
+              {s.osTemplate ? <OsLogo os={s.osTemplate} size={40} /> : <Icon name={isHosting ? "language" : isColo ? "shelves" : "dns"} className="text-[32px] text-primary-dark" />}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5">
@@ -103,13 +104,14 @@ export default function AdminService() {
       {["TERMINATED", "CANCELLED"].includes(s.status) && <Alert tone="info" className="mb-6"><b>{s.status === "CANCELLED" ? "Cancelled" : "Terminated"}{s.terminationDate ? ` on ${date(s.terminationDate)}` : ""}</b>{s.terminationReason ? ` — ${s.terminationReason}` : " — no reason recorded (add one under Billing & overrides)"}</Alert>}
       {terminating && <TerminateModal hosting={isHosting} username={s.username} onClose={() => setTerminating(false)} onConfirm={(reason) => { setTerminating(false); act("terminate", { reason }); }} />}
       {isVps && ended && <RecreatePanel s={s} onDone={reload} />}
+      {(ended || (!isVps && !isHosting && ["FAILED"].includes(s.status))) && <ReactivatePanel s={s} automated={isVps || isHosting} onDone={reload} />}
 
       {/* ── actions ── */}
       {!ended && (
         <section className="mb-6 rounded-2xl border border-line bg-white p-4 shadow-card">
           <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
             {(s.status === "PENDING" || s.status === "FAILED" || s.status === "PROVISIONING") && (
-              <Group label="Provisioning"><Button size="sm" icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : s.status === "PROVISIONING" ? "Re-run provisioning" : "Provision now"}</Button></Group>
+              <Group label={isVps || isHosting ? "Provisioning" : "Delivery"}>{isVps || isHosting ? <Button size="sm" icon="rocket_launch" onClick={() => act("create")}>{s.status === "FAILED" ? "Retry provisioning" : s.status === "PROVISIONING" ? "Re-run provisioning" : "Provision now"}</Button> : <Button size="sm" icon="check_circle" onClick={() => confirm(`Mark this ${isColo ? "colocation" : "service"} as delivered and active? The customer gets the "service active" email.`) && act("create")}>Mark as delivered (active)</Button>}</Group>
             )}
             {isVps && s.status === "ACTIVE" && (
               <>
@@ -165,7 +167,7 @@ export default function AdminService() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_400px] [&>*]:min-w-0">
         <div className="space-y-6">
-          {isHosting ? <HostingCard s={s} live={live} id={id} /> : (
+          {isColo ? <ColoCard s={s} onSaved={reload} /> : isHosting ? <HostingCard s={s} live={live} id={id} /> : (
             <Card title="Server details">
               <div className="grid gap-x-8 md:grid-cols-2">
                 <Rows rows={[
@@ -228,7 +230,7 @@ export default function AdminService() {
             </Card>
           )}
 
-          {(P.features?.length > 0 || s.addons.length > 0 || Object.keys(s.config ?? {}).filter((k) => !/ip|password/i.test(k)).length > 0) && (
+          {(P.features?.length > 0 || s.addons.length > 0 || Object.entries(s.config ?? {}).filter(([k, v]) => !/ip|password/i.test(k) && v !== null && v !== "" && typeof v !== "object").length > 0) && (
             <Card title="Plan features & add-ons">
               {P.features?.length > 0 && (
                 <ul className="grid gap-x-6 gap-y-2 text-[13px] text-slate-700 sm:grid-cols-2">
@@ -295,7 +297,7 @@ export default function AdminService() {
               <Field label="Next due date"><Input type="date" value={edit.nextDueDate} onChange={(e) => setEdit({ ...edit, nextDueDate: e.target.value })} /></Field>
               <Field label={`Recurring (${s.currency ?? "INR"})`}><Input type="number" step="0.01" value={edit.recurringAmount} onChange={(e) => setEdit({ ...edit, recurringAmount: e.target.value })} /></Field>
               <Field label="Billing cycle"><Select value={edit.billingCycle} onChange={(e) => setEdit({ ...edit, billingCycle: e.target.value })}>{Object.entries(CYCLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-              <Field label="Hostname"><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value.toLowerCase().trim() })} /></Field>
+              <Field label={isColo ? "Server name" : "Hostname"}><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value.toLowerCase().trim() })} /></Field>
               {isVps && (
                 <Field label="Operating system" hint={s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? "Built — use Reinstall to change" : "Used on the next provisioning attempt"}>
                   <Select value={edit.osTemplateId} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} onChange={(e) => setEdit({ ...edit, osTemplateId: e.target.value })}>
@@ -305,12 +307,12 @@ export default function AdminService() {
                   </Select>
                 </Field>
               )}
-              {P.provisioner === "VIRTUALIZOR" ? (
+              {isColo ? null : P.provisioner === "VIRTUALIZOR" ? (
                 <NodeSelect serverIds={s.server ? [s.server.id] : []} value={edit.node} onChange={(v) => setEdit({ ...edit, node: v })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId ? "Change only if it was migrated in Virtualizor" : undefined} />
               ) : (
                 <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
               )}
-              <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>
+              {!isColo && <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>}
               <div className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Toggle checked={edit.overrideAutoSuspend} onChange={(v) => setEdit({ ...edit, overrideAutoSuspend: v })} label="Exempt from automatic suspension" /></div>
               {["TERMINATED", "CANCELLED"].includes(s.status) && <>
                 <Field label={s.status === "CANCELLED" ? "Cancelled on" : "Terminated on"}><Input type="date" value={edit.terminationDate} onChange={(e) => setEdit({ ...edit, terminationDate: e.target.value })} /></Field>
@@ -417,6 +419,123 @@ function FailurePanel({ s }: { s: any }) {
 }
 
 /** A terminated/cancelled VPS can be built again for the same order (same customer, plan and billing record). */
+/** Mark an ended (or failed manual) service active again — nothing is created on any server. */
+function ReactivatePanel({ s, automated, onDone }: { s: any; automated: boolean; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [due, setDue] = useState<string>(s.nextDueDate?.slice(0, 10) ?? "");
+  const [restore, setRestore] = useState(true);
+  const [notify, setNotify] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ended = ["TERMINATED", "CANCELLED"].includes(s.status);
+  async function go() {
+    setBusy(true);
+    try {
+      const r = await api(`/admin/services/${s.id}/reactivate`, { body: { nextDueDate: due || null, restoreInvoices: restore, notify } });
+      toast.success(`Service is active again${r.restoredInvoices.length ? ` — ${r.restoredInvoices.length} invoice(s) restored as unpaid` : ""}`);
+      setOpen(false);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className={cx("mb-6 rounded-2xl border p-5", automated ? "border-slate-200 bg-white" : "border-emerald-200 bg-emerald-50/60")}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-extrabold text-ink">{automated ? "Mark active without building anything" : "Mark this service active again"}</div>
+          <p className="text-sm text-slate-600">
+            {automated
+              ? "Only for a termination done by mistake where the server still exists — this changes the status here and doesn't create or restore anything on the server."
+              : `For services you deliver by hand (like colocation): sets it back to active${ended ? ", clears the termination" : ""} and keeps the same order and billing record.`}
+          </p>
+        </div>
+        {!open && <Button variant={automated ? "outline" : "primary"} icon="restart_alt" onClick={() => setOpen(true)}>Mark active</Button>}
+      </div>
+      {open && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[200px_1fr_auto] lg:items-end">
+          <Field label="Next due date"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+          <div className="space-y-2 pb-1">
+            {ended && <Toggle checked={restore} onChange={setRestore} label="Bring back the unpaid invoices cancelled at termination" />}
+            <Toggle checked={notify} onChange={setNotify} label="Email the customer that the service is active" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button icon="check_circle" loading={busy} onClick={go}>Mark active</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Colocation: what the plan includes, the customer's equipment, and where it's racked (staff fill this in). */
+function ColoCard({ s, onSaved }: { s: any; onSaved: () => void }) {
+  const P = s.product;
+  const spec = P.moduleConfig?.colo ?? {};
+  const cfg = s.config ?? {};
+  const [loc, setLoc] = useState<any>({ datacenter: "", rack: "", position: "", pdu: "", switchPort: "", crossConnect: "", access: "", ...(cfg.colo ?? {}) });
+  const [eq, setEq] = useState<any>({ device: "", units: "", powerW: "", psus: "", serial: "", notes: "", ...(cfg.equipment ?? {}) });
+  const [busy, setBusy] = useState(false);
+  const n = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
+  async function save() {
+    setBusy(true);
+    try {
+      await api(`/admin/services/${s.id}`, { method: "PUT", body: { colo: loc, equipment: { ...eq, units: n(eq.units), powerW: n(eq.powerW), psus: n(eq.psus) } } });
+      toast.success("Colocation details saved");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const primary = s.ips.find((i: any) => i.isPrimary) ?? s.ips[0];
+  return (
+    <Card title="Colocation details">
+      <div className="grid gap-x-8 md:grid-cols-2">
+        <Rows rows={[
+          ["Rack space", spec.rackUnits ? `${spec.rackUnits}U` : "—"],
+          ["Power included", spec.powerW ? `${spec.powerW} W` : "—"],
+          ["Network port", spec.portSpeed ?? "—"],
+          ["Bandwidth", P.bandwidthGb ? `${fmt(P.bandwidthGb)} GB / month` : "Unmetered"],
+        ]} />
+        <Rows rows={[
+          ["IPv4 included", `${P.ipv4Count || 1}`],
+          ["Primary IP", primary ? <span className="flex items-center gap-1 font-mono">{primary.address}<Copy text={primary.address} /></span> : "—"],
+          ["Cross-connects", spec.crossConnects != null ? `${spec.crossConnects}` : "—"],
+          ["Remote hands", spec.remoteHands ?? "—"],
+        ]} />
+      </div>
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-mute">Where it's racked <span className="font-semibold normal-case tracking-normal">· shown to the customer</span></div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Data centre"><Input value={loc.datacenter} placeholder={spec.datacenter ?? "e.g. Noida DC-1"} onChange={(e) => setLoc({ ...loc, datacenter: e.target.value })} /></Field>
+          <Field label="Rack / cabinet"><Input value={loc.rack} placeholder="e.g. R12" onChange={(e) => setLoc({ ...loc, rack: e.target.value })} /></Field>
+          <Field label="Position (U)"><Input value={loc.position} placeholder="e.g. U21–U22" onChange={(e) => setLoc({ ...loc, position: e.target.value })} /></Field>
+          <Field label="PDU / power ports"><Input value={loc.pdu} placeholder="e.g. PDU-A port 7, PDU-B port 7" onChange={(e) => setLoc({ ...loc, pdu: e.target.value })} /></Field>
+          <Field label="Switch port"><Input value={loc.switchPort} placeholder="e.g. sw2 Gi1/0/14" onChange={(e) => setLoc({ ...loc, switchPort: e.target.value })} /></Field>
+          <Field label="Cross-connect"><Input value={loc.crossConnect} onChange={(e) => setLoc({ ...loc, crossConnect: e.target.value })} /></Field>
+          <Field label="Access / visit notes" className="sm:col-span-2 lg:col-span-3"><Input value={loc.access} maxLength={500} placeholder="e.g. Visits by appointment, ID required" onChange={(e) => setLoc({ ...loc, access: e.target.value })} /></Field>
+        </div>
+      </div>
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-mute">Customer's equipment</div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Make & model" className="sm:col-span-2 lg:col-span-1"><Input value={eq.device} onChange={(e) => setEq({ ...eq, device: e.target.value })} /></Field>
+          <Field label="Height (U)"><Input type="number" min={0} max={48} value={eq.units ?? ""} onChange={(e) => setEq({ ...eq, units: e.target.value })} /></Field>
+          <Field label="Power draw (W)"><Input type="number" min={0} value={eq.powerW ?? ""} onChange={(e) => setEq({ ...eq, powerW: e.target.value })} /></Field>
+          <Field label="Power supplies"><Input type="number" min={0} max={4} value={eq.psus ?? ""} onChange={(e) => setEq({ ...eq, psus: e.target.value })} /></Field>
+          <Field label="Serial number"><Input value={eq.serial} onChange={(e) => setEq({ ...eq, serial: e.target.value })} /></Field>
+          <Field label="Notes" className="sm:col-span-2 lg:col-span-3"><Textarea rows={2} value={eq.notes} onChange={(e) => setEq({ ...eq, notes: e.target.value })} /></Field>
+        </div>
+      </div>
+      <div className="mt-4 flex justify-end"><Button icon="save" loading={busy} onClick={save}>Save colocation details</Button></div>
+    </Card>
+  );
+}
+
 function RecreatePanel({ s, onDone }: { s: any; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [os, setOs] = useState<string>(s.osTemplateId ?? "");

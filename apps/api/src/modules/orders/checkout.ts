@@ -8,7 +8,7 @@ import { attachReservationToOrder } from "../ipam/service";
 import { queueEmail } from "../email/mailer";
 import { enqueueProvision } from "../../jobs/queues";
 import { priceCart, type Cart } from "./pricing";
-import { DOMAIN_RE, HOSTING_TYPES, isHostingProduct, isVpsProduct } from "../../lib/product-kind";
+import { DOMAIN_RE, HOSTING_TYPES, coloSpecs, isColoProduct, isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 
 export async function checkout(args: { userId: string; cart: Cart; ip?: string; notes?: string; useCredit?: boolean; resellerId?: string | null; wholesaleDiscountPct?: number | null; extraConfig?: Record<string, unknown>; staff?: boolean }) {
   const ownerId = args.userId;
@@ -45,6 +45,10 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
         }
         const isVps = isVpsProduct(p);
         if (isVps && !item.osTemplateId && p.osTemplates.length) throw badRequest(`Please choose an operating system for ${p.name}`);
+        if (isColoProduct(p) && item.equipment) {
+          const max = coloSpecs(p.moduleConfig).rackUnits;
+          if (max && item.equipment.units > max) throw badRequest(`${p.name} includes ${max}U of rack space — your equipment is ${item.equipment.units}U. Choose a bigger plan or contact sales.`);
+        }
         if (item.ipId && (!p.allowIpSelection || p.provisioner === "VIRTUALIZOR")) throw badRequest(`${p.name} does not support choosing an IP address — IPs are assigned by Virtualizor`);
         if (item.ipId && item.quantity > 1) throw badRequest("A selected IP can only be used for a single server");
         if (isHostingProduct(p)) {
@@ -82,7 +86,7 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
               // root password chosen at order time (encrypted); empty = generated at setup
               passwordEnc: isVps && item.rootPassword ? encrypt(item.rootPassword) : null,
               virtType: p.virtType,
-              config: { ...item.config, ...(args.extraConfig ?? {}), requestedIpId: q === 0 ? item.ipId ?? null : null },
+              config: { ...item.config, ...(args.extraConfig ?? {}), requestedIpId: q === 0 ? item.ipId ?? null : null, ...(isColoProduct(p) && item.equipment ? { equipment: item.equipment } : {}) },
               resellerId: args.resellerId ?? null,
             },
           });

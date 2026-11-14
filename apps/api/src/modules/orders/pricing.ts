@@ -42,6 +42,18 @@ export const cartItemSchema = z.object({
   config: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}),
   addonIds: z.array(z.string()).default([]),
   quantity: z.number().int().min(1).max(10).default(1),
+  /** colocation: the customer's equipment (stored on the service as config.equipment) */
+  equipment: z
+    .object({
+      device: z.string().trim().min(2, "Describe the equipment (make and model)").max(120),
+      units: z.number().int().min(1).max(48),
+      powerW: z.number().int().min(0).max(20000).nullable().optional(),
+      psus: z.number().int().min(1).max(4).nullable().optional(),
+      serial: z.string().trim().max(80).nullable().optional(),
+      notes: z.string().trim().max(500).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   /** optional; empty = the panel generates one and emails it */
   rootPassword: rootPasswordSchema.optional().nullable().or(z.literal("").transform(() => null)),
 });
