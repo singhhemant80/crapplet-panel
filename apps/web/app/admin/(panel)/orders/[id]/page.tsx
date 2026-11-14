@@ -1,4 +1,5 @@
 "use client";
+import { ChangePlanButton } from "@/components/admin/change-plan";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -136,7 +137,7 @@ function ServiceItem({ s, currency, onSaved }: { s: any; currency: string; onSav
           {vps && ["TERMINATED", "CANCELLED"].includes(s.status) && <Link href={`/admin/services/${s.id}`} className="text-xs font-bold text-primary-dark hover:underline">Create a new VPS →</Link>}
         </span>
       }
-      action={<Link href={`/admin/services/${s.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline">Manage <Icon name="arrow_forward" className="text-[16px]" /></Link>}
+      action={<span className="flex items-center gap-3">{["ACTIVE", "SUSPENDED"].includes(s.status) && <ChangePlanButton serviceId={s.id} onDone={onSaved} />}<Link href={`/admin/services/${s.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-primary-dark hover:underline">Manage <Icon name="arrow_forward" className="text-[16px]" /></Link></span>}
     >
       {vps && ["PENDING", "PROVISIONING", "FAILED"].includes(s.status) && (
         <div className="mb-4 rounded-xl bg-[#fbf9ff] px-3 py-2.5 ring-1 ring-[#f0e6ff]">

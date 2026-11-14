@@ -477,6 +477,34 @@ export class VirtualizorClient {
   changeRootPassword(vpsid: string, rootPass: string) {
     return this.call("managevps", { vpsid }, { editvps: 1, rootpass: rootPass });
   }
+  /**
+   * Change a VPS's CPU / RAM / bandwidth and grow its disk (never shrinks — that would destroy data).
+   * Fields that aren't sent keep their value (managevps edits are partial). Checks the result afterwards.
+   */
+  async resizeVps(vpsid: string, want: { cores?: number | null; ramMb?: number | null; diskGb?: number | null; bandwidthGb?: number | null }) {
+    const cur = (await this.findVps(vpsid)) ?? {};
+    const curDisk = Number(cur.space ?? 0);
+    const growDisk = !!want.diskGb && want.diskGb > curDisk;
+    const post: Record<string, unknown> = { editvps: 1 };
+    if (want.ramMb) post.ram = want.ramMb;
+    if (want.cores) post.cores = want.cores;
+    if (want.bandwidthGb !== undefined && want.bandwidthGb !== null) post.bandwidth = want.bandwidthGb;
+    if (growDisk) post.space = want.diskGb;
+    try {
+      await this.call("managevps", { vpsid }, post, { slow: true });
+    } catch (e) {
+      // newer masters describe disks as an array
+      if (!growDisk || !/space|disk/i.test((e as Error).message)) throw e;
+      const { space: _s, ...rest } = post;
+      await this.call("managevps", { vpsid }, { ...rest, space: { 0: { size: want.diskGb } } }, { slow: true });
+    }
+    const after = (await this.findVps(vpsid)) ?? {};
+    const notes: string[] = [];
+    if (want.ramMb && Number(after.ram) && Number(after.ram) !== want.ramMb) notes.push(`RAM is ${after.ram} MB, expected ${want.ramMb} MB`);
+    if (want.cores && Number(after.cores) && Number(after.cores) !== want.cores) notes.push(`cores are ${after.cores}, expected ${want.cores}`);
+    if (growDisk && Number(after.space) && Number(after.space) < want.diskGb!) notes.push(`disk is ${after.space} GB, expected ${want.diskGb} GB`);
+    return { diskKept: !!want.diskGb && want.diskGb < curDisk ? curDisk : null, mismatch: notes };
+  }
   setIps(vpsid: string, ips: string[]) {
     return this.call("managevps", { vpsid }, { editvps: 1, ips });
   }

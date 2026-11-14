@@ -48,6 +48,11 @@ export async function onInvoicePaid(invoiceId: string) {
         }
       }
     }
+    if (item.type === "UPGRADE" && item.relId) {
+      const { applyUpgrade } = await import("./upgrades");
+      await applyUpgrade(item.relId).catch((e) => console.error("[upgrade] couldn't apply after payment", item.relId, e));
+      continue;
+    }
     if (item.type === "ADDON" && item.relId) {
       await prisma.serviceAddon.updateMany({ where: { id: item.relId, status: "PENDING" }, data: { status: "ACTIVE" } });
     }

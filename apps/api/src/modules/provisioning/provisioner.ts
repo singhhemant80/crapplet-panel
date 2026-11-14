@@ -722,6 +722,56 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         await log(svc.id, action, true, `Package changed to ${pkg}`);
         return { ok: true };
       }
+      case "change_plan": {
+        // the service already points at the new plan (billing was changed first) — make the server match
+        const upgradeId = String(params.upgradeId ?? "");
+        const up = upgradeId ? await prisma.serviceUpgrade.findUnique({ where: { id: upgradeId } }) : null;
+        const notes: string[] = [];
+        try {
+          if (prov === "CPANEL") {
+            const pkg = ((svc.product.moduleConfig ?? {}) as { cpanel?: { package?: string } }).cpanel?.package;
+            if (!pkg) throw new ProvisionError(`Plan "${svc.product.name}" has no WHM package — set it under Products → Provisioning`, false);
+            await cpanelChangePackage(svc, pkg);
+            notes.push(`WHM package → ${pkg}`);
+          } else if (prov === "VIRTUALIZOR") {
+            const { server, remoteId } = requireRemote(svc);
+            const c = virtualizorFor(server);
+            const { serverResources } = await import("../billing/upgrades");
+            const want = await serverResources(svc.product, c);
+            const r = await c.resizeVps(remoteId, want);
+            notes.push(`${want.cores ?? "?"} cores, ${want.ramMb ?? "?"} MB RAM${want.diskGb ? `, ${want.diskGb} GB disk` : ""}`);
+            if (r.diskKept) notes.push(`disk kept at ${r.diskKept} GB (disks are never shrunk)`);
+            if (r.mismatch.length) throw new ProvisionError(`Virtualizor accepted the change but reports: ${r.mismatch.join("; ")}`, false);
+          } else if (prov === "PROXMOX") {
+            const { server, remoteId, node } = requireRemote(svc);
+            const c = proxmoxFor(server);
+            const kind = kindOf(svc);
+            const extraRamGb = Number(((svc.config ?? {}) as Record<string, unknown>).extra_ram_gb ?? 0);
+            const ram = (svc.product.ramMb ?? 1024) + extraRamGb * 1024;
+            await c.setConfig(node, kind, remoteId, { cores: svc.product.cpuCores ?? 1, memory: ram });
+            notes.push(`${svc.product.cpuCores ?? 1} cores, ${ram} MB RAM`);
+            if (svc.product.diskGb) {
+              const disk = kind === "lxc" ? "rootfs" : ((((svc.product.moduleConfig ?? {}) as { proxmox?: { disk?: string } }).proxmox?.disk) || "scsi0");
+              const conf = await c.config(node, kind, remoteId);
+              const size = Number(String(conf[disk] ?? "").match(/size=(\d+)G/)?.[1] ?? 0);
+              if (size && size < svc.product.diskGb) {
+                await c.resizeDisk(node, kind, remoteId, disk, svc.product.diskGb);
+                notes.push(`disk ${size} → ${svc.product.diskGb} GB`);
+              } else if (size > svc.product.diskGb) notes.push(`disk kept at ${size} GB (disks are never shrunk)`);
+            }
+          }
+          if (up) {
+            await prisma.serviceUpgrade.update({ where: { id: up.id }, data: { status: "DONE", message: notes.join("; ") || "Done" } });
+            const { notifyDone } = await import("../billing/upgrades");
+            await notifyDone(up.id).catch(() => undefined);
+          }
+          await log(svc.id, action, true, `Plan changed to ${svc.product.name}${notes.length ? ` — ${notes.join("; ")}` : ""}`);
+          return { ok: true };
+        } catch (e) {
+          if (up) await prisma.serviceUpgrade.update({ where: { id: up.id }, data: { status: "FAILED", message: e instanceof Error ? e.message : String(e) } });
+          throw e;
+        }
+      }
       case "reinstall": {
         if (prov === "CPANEL") throw new ProvisionError("Reinstall doesn't apply to hosting accounts", false);
         const osTemplateId = String(params.osTemplateId ?? svc.osTemplateId);

@@ -87,6 +87,13 @@ export const DEFAULT_SETTINGS = {
     terminateEmail: true,
     /** when a service is terminated or cancelled, cancel its unpaid invoices (or remove its lines from shared ones) */
     cancelInvoicesOnTerminate: true,
+    // plan changes (upgrade / downgrade)
+    /** customers can upgrade their own services from the client area */
+    clientUpgrades: true,
+    /** customers can also move to a cheaper plan */
+    clientDowngrades: true,
+    /** the unused part of the old plan on a downgrade goes to account credit */
+    downgradeCredit: true,
     // orders
     /** cancel orders still unpaid after N days (0 = never) — releases held IPs */
     cancelUnpaidOrdersAfterDays: 0,

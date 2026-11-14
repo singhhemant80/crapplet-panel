@@ -5,6 +5,7 @@ import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
+import { ChangePlanButton } from "@/components/admin/change-plan";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge } from "@/components/live-state";
 import { PasswordField, generatePassword, passwordProblem } from "@/components/password-field";
@@ -124,6 +125,7 @@ export default function AdminService() {
               </>
             )}
             {isHosting && s.remoteId && s.status === "ACTIVE" && <Group label="Hosting"><HostingActions s={s} onDone={reload} /></Group>}
+            {["ACTIVE", "SUSPENDED"].includes(s.status) && <Group label="Plan"><ChangePlanButton serviceId={s.id} onDone={() => setTimeout(reload, 800)} /></Group>}
             <div className="w-full sm:ml-auto sm:w-auto">
               <Group label="Account">
                 {s.status === "ACTIVE" && <Button variant="outline" size="sm" icon="pause" onClick={() => { const reason = prompt("Suspension reason", "Suspended by administrator"); if (reason) act("suspend", { reason }); }}>Suspend</Button>}

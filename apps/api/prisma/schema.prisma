@@ -728,6 +728,7 @@ model Service {
 
   ips              IpAddress[]
   addons           ServiceAddon[]
+  upgrades         ServiceUpgrade[]
   logs             ProvisioningLog[]
   tickets          Ticket[]
 
@@ -825,6 +826,7 @@ enum InvoiceItemType {
   LATE_FEE
   WALLET
   CUSTOM
+  UPGRADE // relId = ServiceUpgrade id
 }
 
 model InvoiceItem {
@@ -1457,4 +1459,40 @@ model Quote {
 
   @@index([userId])
   @@index([status])
+}
+
+/// A plan / billing-cycle change of a service (upgrade or downgrade), WHMCS-style with proration.
+model ServiceUpgrade {
+  id             String       @id @default(cuid())
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  userId         String
+  fromProductId  String
+  toProductId    String
+  fromCycle      BillingCycle
+  toCycle        BillingCycle
+  currency       String       @default("INR")
+  oldRecurring   Int
+  newRecurring   Int
+  /// unused value of the current period (paise)
+  credit         Int          @default(0)
+  /// cost of the new plan for the remaining / new period (paise)
+  charge         Int          @default(0)
+  /// charge − credit, before tax; negative = downgrade refund
+  amountDue      Int          @default(0)
+  newNextDueDate DateTime?
+  /// PENDING (invoice unpaid) → PROVISIONING (changing the server) → DONE | FAILED; CANCELLED
+  status         String       @default("PENDING")
+  /// downgrade refund goes to the customer's account credit
+  creditRefund   Boolean      @default(true)
+  applyOnServer  Boolean      @default(true)
+  invoiceId      String?
+  message        String?
+  byClient       Boolean      @default(false)
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  appliedAt      DateTime?
+
+  @@index([serviceId, status])
+  @@index([invoiceId])
 }

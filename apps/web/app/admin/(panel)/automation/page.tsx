@@ -303,6 +303,15 @@ function SettingsTab({ data, onSaved }: { data: any; onSaved: () => void }) {
         </div>
       </Card>
 
+      <Card title="Upgrades & downgrades">
+        <div className="space-y-4">
+          <Toggle checked={f.clientUpgrades ?? true} onChange={(v) => set("clientUpgrades", v)} label="Customers can change their plan from the client area" />
+          {(f.clientUpgrades ?? true) && <Toggle checked={f.clientDowngrades ?? true} onChange={(v) => set("clientDowngrades", v)} label="…including moving to a cheaper plan" />}
+          <Toggle checked={f.downgradeCredit ?? true} onChange={(v) => set("downgradeCredit", v)} label="Give the unused part of the old plan back as account credit on a downgrade" />
+          <p className="text-xs text-mute">Customers see the plans in the same group and module. They pay the prorated difference; the plan, price and server (WHM package, Virtualizor or Proxmox resources) change once it's paid. Staff can change any service under Services → Change plan.</p>
+        </div>
+      </Card>
+
       <Card title="Orders, domains & support">
         <div className="space-y-4">
           <Row>

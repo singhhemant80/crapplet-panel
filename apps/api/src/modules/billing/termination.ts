@@ -18,11 +18,14 @@ const FOLLOWERS = new Set(["LATE_FEE", "PROMO"]);
 export async function cancelServiceInvoices(serviceId: string, opts: { reason?: string; actorId?: string | null; force?: boolean } = {}) {
   const s = await getSettings();
   if (!opts.force && (s.automation as { cancelInvoicesOnTerminate?: boolean }).cancelInvoicesOnTerminate === false) return { cancelled: [], trimmed: [], skipped: [] };
-  const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { id: true, userId: true, hostname: true, status: true, addons: { select: { id: true } } } });
+  const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { id: true, userId: true, hostname: true, status: true, addons: { select: { id: true } }, upgrades: { where: { status: "PENDING" }, select: { id: true } } } });
   if (!svc) return { cancelled: [], trimmed: [], skipped: [] };
   const addonIds = svc.addons.map((a) => a.id);
+  const upgradeIds = svc.upgrades.map((u) => u.id);
   const mine = (it: { type: string; relId: string | null }) =>
-    (it.relId === svc.id && (it.type === "SERVICE" || it.type === "SETUP")) || (it.type === "ADDON" && !!it.relId && addonIds.includes(it.relId));
+    (it.relId === svc.id && (it.type === "SERVICE" || it.type === "SETUP")) ||
+    (it.type === "ADDON" && !!it.relId && addonIds.includes(it.relId)) ||
+    (it.type === "UPGRADE" && !!it.relId && upgradeIds.includes(it.relId));
   const reason = opts.reason ?? `Service ${svc.hostname ?? svc.id} ${svc.status === "CANCELLED" ? "cancelled" : "terminated"}`;
 
   const invoices = await prisma.invoice.findMany({
@@ -30,7 +33,7 @@ export async function cancelServiceInvoices(serviceId: string, opts: { reason?: 
       userId: svc.userId,
       status: { in: ["UNPAID", "DRAFT"] },
       isWalletTopup: false,
-      items: { some: { OR: [{ relId: svc.id, type: { in: ["SERVICE", "SETUP"] } }, ...(addonIds.length ? [{ type: "ADDON" as const, relId: { in: addonIds } }] : [])] } },
+      items: { some: { OR: [{ relId: svc.id, type: { in: ["SERVICE", "SETUP"] } }, ...(addonIds.length ? [{ type: "ADDON" as const, relId: { in: addonIds } }] : []), ...(upgradeIds.length ? [{ type: "UPGRADE" as const, relId: { in: upgradeIds } }] : [])] } },
     },
     include: { items: true },
   });

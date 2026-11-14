@@ -21,6 +21,7 @@ export type ProvisionAction =
   | "reinstall"
   | "reset_password"
   | "change_package"
+  | "change_plan"
   | "hard_reset"
   | "sync";
 

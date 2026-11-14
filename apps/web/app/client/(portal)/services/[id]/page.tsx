@@ -78,6 +78,7 @@ export default function ServicePage() {
           </>}
           {isVps && svc.status === "ACTIVE" && svc.product?.provisioner === "VIRTUALIZOR" && <Button size="sm" icon="terminal" href={`/client/services/${id}/console`}>Open console</Button>}
           {svc.status === "SUSPENDED" && <Button size="sm" icon="bolt" href="/client/invoices?status=UNPAID">Pay to restore</Button>}
+          {svc.status === "ACTIVE" && svc.billingCycle !== "ONETIME" && !svc.resellerId && <Button size="sm" variant="outline" icon="swap_vert" href={`/client/services/${id}/upgrade`}>Upgrade / Downgrade</Button>}
         </>}
         stats={[
           ["Registered", date(svc.registrationDate), `Service #${String(svc.id).slice(-6).toUpperCase()}`],

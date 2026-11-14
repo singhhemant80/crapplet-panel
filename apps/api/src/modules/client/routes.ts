@@ -704,3 +704,34 @@ clientRouter.post(
     res.json({ ok: true });
   }),
 );
+
+// ───── Plan changes (upgrade / downgrade) ─────
+clientRouter.get(
+  "/services/:id/upgrade-options",
+  ah(async (req, res) => {
+    const svc = await prisma.service.findFirst({ where: { id: req.params.id, userId: req.user!.id }, select: { id: true } });
+    if (!svc) throw notFound("Service not found");
+    const { upgradeOptions } = await import("../billing/upgrades");
+    const o = await upgradeOptions(svc.id, { forClient: true });
+    res.json({ ...o, plans: o.plans.map(({ provisioner: _p, sameModule: _s, ...p }) => p), service: { ...o.service, provisioner: undefined } });
+  }),
+);
+
+clientRouter.post(
+  "/services/:id/upgrade",
+  ah(async (req, res) => {
+    const b = parse(z.object({ productId: z.string(), cycle: z.enum(["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL", "BIENNIAL", "TRIENNIAL"]) }), req.body);
+    const { startUpgrade } = await import("../billing/upgrades");
+    const r = await startUpgrade({ serviceId: req.params.id, toProductId: b.productId, toCycle: b.cycle, byClient: true, actorId: req.user!.id });
+    res.status(201).json({ invoiceId: r.invoiceId, applied: r.applied, status: r.upgrade.status, amountDue: r.upgrade.amountDue });
+  }),
+);
+
+clientRouter.post(
+  "/upgrades/:id/cancel",
+  ah(async (req, res) => {
+    const { cancelUpgrade } = await import("../billing/upgrades");
+    await cancelUpgrade(req.params.id, req.user!.id, req.user!.id);
+    res.json({ ok: true });
+  }),
+);
