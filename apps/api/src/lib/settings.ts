@@ -85,6 +85,8 @@ export const DEFAULT_SETTINGS = {
     autoTerminate: true,
     terminateDaysAfterDue: 15,
     terminateEmail: true,
+    /** also auto-terminate services delivered by hand (colocation, manual dedicated servers)? off: they're flagged for staff */
+    terminateManualServices: false,
     /** when a service is terminated or cancelled, cancel its unpaid invoices (or remove its lines from shared ones) */
     cancelInvoicesOnTerminate: true,
     // plan changes (upgrade / downgrade)

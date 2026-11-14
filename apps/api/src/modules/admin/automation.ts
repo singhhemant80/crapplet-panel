@@ -109,6 +109,7 @@ const automationSchema = z.object({
   autoTerminate: z.boolean(),
   terminateDaysAfterDue: z.coerce.number().int().min(1).max(3650),
   terminateEmail: z.boolean(),
+  terminateManualServices: z.boolean().optional(),
   cancelInvoicesOnTerminate: z.boolean(),
   clientUpgrades: z.boolean(),
   clientDowngrades: z.boolean(),

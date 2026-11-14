@@ -412,7 +412,7 @@ clientRouter.get(
   ah(async (req, res) => {
     const inv = await prisma.invoice.findFirst({
       where: { id: req.params.id, userId: req.user!.id, status: { not: "DRAFT" } },
-      include: { items: true, transactions: { orderBy: { createdAt: "asc" } }, paymentIntents: { where: { status: "PENDING_REVIEW" } } },
+      include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }, paymentIntents: { where: { status: "PENDING_REVIEW" } } },
     });
     if (!inv) throw notFound("Invoice not found");
     const s = await getSettings();

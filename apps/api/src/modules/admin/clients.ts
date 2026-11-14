@@ -283,18 +283,29 @@ adminClients.get(
   requireStaff("clients.view"),
   ah(async (req, res) => {
     const u = await client(req.params.id);
-    const [invoices, txns] = await Promise.all([
-      prisma.invoice.findMany({ where: { userId: u.id, status: { notIn: ["DRAFT", "CANCELLED"] } }, select: { id: true, number: true, proformaNumber: true, issueDate: true, total: true, status: true, isWalletTopup: true } }),
-      prisma.transaction.findMany({ where: { userId: u.id }, select: { id: true, createdAt: true, amount: true, type: true, gateway: true, gatewayTxnId: true, invoiceId: true } }),
+    const [invoices, txns, notes, ledger] = await Promise.all([
+      prisma.invoice.findMany({ where: { userId: u.id, status: { notIn: ["DRAFT", "CANCELLED"] }, isWalletTopup: false }, select: { id: true, number: true, proformaNumber: true, issueDate: true, total: true, status: true } }),
+      prisma.transaction.findMany({ where: { userId: u.id }, select: { id: true, createdAt: true, amount: true, type: true, gateway: true, gatewayTxnId: true, invoiceId: true, invoice: { select: { number: true, proformaNumber: true, isWalletTopup: true } } } }),
+      prisma.creditNote.findMany({ where: { userId: u.id }, select: { id: true, number: true, amount: true, createdAt: true, invoice: { select: { number: true, proformaNumber: true } } } }),
+      // credit added or removed by hand (not money received, not credit moving onto an invoice)
+      prisma.creditLedger.findMany({ where: { userId: u.id, refType: { in: ["staff", "referral", "merge", "whmcs", "serviceUpgrade", "surchargeFix"] }, NOT: { amount: 0 } } }),
     ]);
-    type Row = { date: Date; kind: "invoice" | "payment" | "refund"; ref: string; description: string; debit: number; credit: number; id: string };
+    /**
+     * A customer statement: invoices raise what's owed; money received, credit notes and credit given lower it.
+     * Credit moving onto an invoice is shown for reference but isn't new money (the payment that created the
+     * credit is already counted), and wallet top-up invoices aren't a debt. Balance below zero = in credit.
+     */
+    type Row = { date: Date; kind: "invoice" | "payment" | "refund" | "creditnote" | "adjustment" | "info"; ref: string; description: string; debit: number; credit: number; id: string };
+    const label = (i: { number: string | null; proformaNumber: string } | null) => (i ? i.number ?? i.proformaNumber : "");
     const rows: Row[] = [
-      ...invoices.map((i) => ({ date: i.issueDate, kind: "invoice" as const, ref: i.number ?? i.proformaNumber, description: i.isWalletTopup ? "Add funds invoice" : `Invoice (${i.status.toLowerCase()})`, debit: i.total, credit: 0, id: i.id })),
-      ...txns.map((t) =>
-        t.type === "REFUND"
-          ? { date: t.createdAt, kind: "refund" as const, ref: t.gatewayTxnId, description: `Refund via ${t.gateway}`, debit: Math.abs(t.amount), credit: 0, id: t.id }
-          : { date: t.createdAt, kind: "payment" as const, ref: t.gatewayTxnId, description: t.type === "CREDIT_APPLIED" ? "Paid from account credit" : `Payment via ${t.gateway}`, debit: 0, credit: Math.abs(t.amount), id: t.id },
-      ),
+      ...invoices.map((i) => ({ date: i.issueDate, kind: "invoice" as const, ref: label(i), description: `Invoice (${i.status.toLowerCase()})`, debit: i.total, credit: 0, id: i.id })),
+      ...txns.flatMap((t): Row[] => {
+        if (t.type === "CREDIT_APPLIED") return [{ date: t.createdAt, kind: "info", ref: label(t.invoice), description: `${(Math.abs(t.amount) / 100).toFixed(2)} paid from account credit (already counted when received)`, debit: 0, credit: 0, id: t.id }];
+        if (t.type === "REFUND") return t.gateway === "credit" ? [] : [{ date: t.createdAt, kind: "refund", ref: t.gatewayTxnId, description: `Refund via ${t.gateway}`, debit: Math.abs(t.amount), credit: 0, id: t.id }];
+        return [{ date: t.createdAt, kind: "payment", ref: t.gatewayTxnId, description: t.invoice?.isWalletTopup ? `Funds added via ${t.gateway}` : `Payment via ${t.gateway}${t.invoice ? ` for ${label(t.invoice)}` : ""}`, debit: 0, credit: Math.abs(t.amount), id: t.id }];
+      }),
+      ...notes.map((n) => ({ date: n.createdAt, kind: "creditnote" as const, ref: n.number, description: `Credit note for ${label(n.invoice)}`, debit: 0, credit: n.amount, id: n.id })),
+      ...ledger.map((l) => ({ date: l.createdAt, kind: "adjustment" as const, ref: "credit", description: l.description, debit: l.amount < 0 ? -l.amount : 0, credit: l.amount > 0 ? l.amount : 0, id: l.id })),
     ].sort((a, b) => a.date.getTime() - b.date.getTime());
     let balance = 0;
     const out = rows.map((r) => ({ ...r, balance: (balance += r.debit - r.credit) }));

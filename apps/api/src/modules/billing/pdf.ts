@@ -39,7 +39,7 @@ function amountInWords(rupees: number): string {
  * the items table, amount in words + totals card with a gradient Total bar, payment history and footer.
  */
 export async function renderInvoicePdf(invoiceId: string): Promise<Buffer> {
-  const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true, transactions: { orderBy: { createdAt: "asc" } } } });
+  const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } });
   const s = await getSettings();
   const c = s.company as typeof s.company & { billingEmail?: string };
   const bill = (inv.billingSnapshot ?? {}) as Record<string, string | null>;

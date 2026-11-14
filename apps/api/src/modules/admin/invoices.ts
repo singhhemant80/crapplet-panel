@@ -364,6 +364,30 @@ const autopaySchema = z.object({
   autopayDaysBeforeDue: z.coerce.number().int().min(2).max(15),
 });
 
+/** Billing health check: what doesn't add up, with one-click fixes for the safe cases. */
+adminInvoices.get(
+  "/billing/health",
+  requireStaff("billing.view"),
+  ah(async (_req, res) => {
+    const { billingHealth } = await import("../billing/health");
+    res.json(await billingHealth());
+  }),
+);
+
+adminInvoices.post(
+  "/billing/health/fix",
+  requireStaff("billing.manage"),
+  ah(async (req, res) => {
+    const b = parse(z.object({ key: z.string().max(40) }), req.body);
+    const { fixBillingHealth } = await import("../billing/health");
+    const r = await fixBillingHealth(b.key).catch((e: Error) => {
+      throw badRequest(e.message);
+    });
+    await audit({ actorId: req.user!.id, action: "billing.health_fix", entity: "billing", details: { key: b.key, ...r, notes: r.notes.slice(0, 20) } });
+    res.json(r);
+  }),
+);
+
 /** Credit created from gateway convenience fees before they were handled properly — review & reverse. */
 adminInvoices.get(
   "/billing/surcharge-credits",

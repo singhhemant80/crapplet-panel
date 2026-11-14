@@ -169,7 +169,8 @@ test("colocation details are written on the invoice — at order time and on eac
   assert.match(order.description, /Noida DC-1/);
   assert.match(order.description, /Equipment: Dell PowerEdge R640 \(1U\) S\/N ABC123/);
 
-  await prisma.invoiceItem.updateMany({ where: { relId: ids.svc }, data: { periodStart: new Date("2020-01-01") } }); // don't count the order's line as this period
+  // time passes: the month paid on the order has ended
+  await prisma.invoiceItem.updateMany({ where: { relId: ids.svc }, data: { periodStart: new Date("2020-01-01"), periodEnd: new Date(Date.now() + 2 * 86400_000) } });
   await prisma.service.update({ where: { id: ids.svc }, data: { status: "ACTIVE", nextDueDate: new Date(Date.now() + 2 * 86400_000) } });
   const g = await staff.req("POST", `/admin/clients/${ids.user}/generate-due`, {});
   assert.equal(g.status, 200, JSON.stringify(g.json));

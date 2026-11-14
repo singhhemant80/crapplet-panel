@@ -57,7 +57,9 @@ export async function generateRenewalInvoices(opts: { userId?: string; rec?: Rec
   for (const svc of services) {
     try {
       const periodStart = svc.nextDueDate!;
-      const exists = await prisma.invoiceItem.count({ where: { relId: svc.id, type: "SERVICE", periodStart, invoice: { status: { notIn: ["CANCELLED"] } } } });
+      // already billed — same start, or an overlapping period (e.g. the due date was edited after the invoice was made)
+      const { periodAlreadyBilled } = await import("../modules/billing/health");
+      const exists = await periodAlreadyBilled(svc.id, periodStart, svc.billingCycle);
       if (exists) continue;
       const periodEnd = addCycle(periodStart, svc.billingCycle);
       const items: NewInvoiceItem[] = [
@@ -213,10 +215,17 @@ export async function processSuspensions(rec: Recorder = noop) {
     const done = new Set<string>();
     for (const item of overdue) {
       if (done.has(item.relId!)) continue;
-      const svc = await prisma.service.findUnique({ where: { id: item.relId! }, include: { product: { select: { name: true } } } });
+      const svc = await prisma.service.findUnique({ where: { id: item.relId! }, include: { product: { select: { name: true, provisioner: true } } } });
       if (!svc || svc.status !== "SUSPENDED" || svc.overrideAutoSuspend || !(svc.suspendReason ?? "").startsWith("Overdue")) continue;
       done.add(svc.id);
       if (await queuedRecently("terminated", svc.id)) continue;
+      // services delivered by hand (colocation…) — terminating here removes nothing physically; leave it to staff
+      const manual = !["PROXMOX", "VIRTUALIZOR", "CPANEL"].includes(svc.product.provisioner);
+      if (manual && !(a as { terminateManualServices?: boolean }).terminateManualServices) {
+        const flagged = (await prisma.automationEvent.count({ where: { action: "termination_held", entityId: svc.id, createdAt: { gt: new Date(Date.now() - 7 * 86400_000) } } })) > 0;
+        if (!flagged) await rec({ action: "termination_held", entity: "service", entityId: svc.id, userId: svc.userId, label: svc.hostname ?? svc.product.name, message: `Unpaid since ${item.invoice.dueDate.toISOString().slice(0, 10)} — manually delivered, so not terminated automatically. Terminate it from the service page if needed.` });
+        continue;
+      }
       try {
         await enqueueProvision({ serviceId: svc.id, action: "terminate", params: { reason: `Non-payment — unpaid since ${svc.nextDueDate ? svc.nextDueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "the due date"}`, notify: a.terminateEmail } });
         if (item.invoice.amountPaid === 0) await cancelInvoice(item.invoice.id, "Service terminated for non-payment").catch(() => undefined);

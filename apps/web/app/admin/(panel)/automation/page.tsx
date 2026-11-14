@@ -17,6 +17,7 @@ const ACTION_STYLE: Record<string, { icon: string; tone: string }> = {
   suspended: { icon: "pause_circle", tone: "bg-orange-50 text-orange-600" },
   unsuspended: { icon: "play_circle", tone: "bg-emerald-50 text-emerald-600" },
   terminated: { icon: "delete_forever", tone: "bg-rose-50 text-rose-600" },
+  termination_held: { icon: "back_hand", tone: "bg-amber-50 text-amber-700" },
   order_cancelled: { icon: "remove_shopping_cart", tone: "bg-slate-100 text-slate-600" },
   domain_notice: { icon: "public", tone: "bg-teal-50 text-teal-600" },
   domain_expired: { icon: "event_busy", tone: "bg-slate-100 text-slate-600" },
@@ -297,6 +298,8 @@ function SettingsTab({ data, onSaved }: { data: any; onSaved: () => void }) {
         <div className="space-y-4">
           <Toggle checked={f.autoTerminate} onChange={(v) => set("autoTerminate", v)} label="Terminate services still unpaid after suspension" />
           {f.autoTerminate && <Field label="Terminate this many days after due" hint="Must be more than the suspension days. The VPS / hosting account is deleted on the server."><Input {...num("terminateDaysAfterDue")} /></Field>}
+          {f.autoTerminate && <Toggle checked={!!f.terminateManualServices} onChange={(v) => set("terminateManualServices", v)} label="Also terminate manually delivered services (colocation, manual dedicated servers)" />}
+          {f.autoTerminate && !f.terminateManualServices && <p className="-mt-2 text-xs text-mute">Manually delivered services stay suspended and are listed in the automation log as “termination held” for you to decide.</p>}
           <Toggle checked={f.terminateEmail} onChange={(v) => set("terminateEmail", v)} label="Email the customer when a service is terminated" />
           <Toggle checked={f.cancelInvoicesOnTerminate ?? true} onChange={(v) => set("cancelInvoicesOnTerminate", v)} label="Cancel the service's unpaid invoices when it is terminated or cancelled" />
           <p className="text-xs text-mute">Applies to automatic and manual termination. If an invoice also bills other services, only this service's lines are removed. Part-paid invoices are left for you to refund or credit.</p>

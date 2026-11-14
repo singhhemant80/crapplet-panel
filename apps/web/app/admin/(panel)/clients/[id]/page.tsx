@@ -610,21 +610,25 @@ function Statement({ id }: { id: string }) {
     <>
       <Table head={["Date", "Type", "Reference", "Description", "Debit", "Credit", "Balance"]}>
         {data.rows.map((r: any) => (
-          <tr key={r.kind + r.id}>
-            <Td>{date(r.date, true)}</Td>
-            <Td className="capitalize">{r.kind}</Td>
-            <Td className="font-mono text-xs">{r.kind === "invoice" ? <Link className="text-primary-dark" href={`/admin/invoices/${r.id}`}>{r.ref}</Link> : r.ref}</Td>
-            <Td>{r.description}</Td>
-            <Td>{r.debit ? money(r.debit, cur) : ""}</Td>
-            <Td className="text-emerald-700">{r.credit ? money(r.credit, cur) : ""}</Td>
-            <Td className={cx("font-bold", r.balance > 0 && "text-rose-600")}>{money(r.balance, cur)}</Td>
+          <tr key={r.kind + r.id} className={r.kind === "info" ? "text-mute" : undefined}>
+            <Td className="whitespace-nowrap text-xs">{date(r.date, true)}</Td>
+            <Td className="whitespace-nowrap text-xs font-semibold">{KIND[r.kind] ?? r.kind}</Td>
+            <Td className="font-mono text-xs"><span className="block max-w-[150px] truncate" title={r.ref}>{r.kind === "invoice" ? <Link className="text-primary-dark" href={`/admin/invoices/${r.id}`}>{r.ref}</Link> : r.ref}</span></Td>
+            <Td className={cx("min-w-[220px]", r.kind === "info" && "text-xs italic")}>{r.description}</Td>
+            <Td className="whitespace-nowrap">{r.debit ? money(r.debit, cur) : ""}</Td>
+            <Td className="whitespace-nowrap text-emerald-700">{r.credit ? money(r.credit, cur) : ""}</Td>
+            <Td className={cx("whitespace-nowrap font-bold", r.balance > 0 && "text-rose-600", r.balance < 0 && "text-emerald-700")}>{r.kind === "info" ? "" : r.balance < 0 ? `${money(-r.balance, cur)} CR` : money(r.balance, cur)}</Td>
           </tr>
         ))}
       </Table>
-      <div className="flex justify-end border-t border-line px-5 py-3 text-sm">Balance owed:&nbsp;<b className={data.balance > 0 ? "text-rose-600" : "text-emerald-700"}>{money(data.balance, cur)}</b></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
+        <span className="text-xs text-mute">Oldest first. Payments from account credit are listed for reference only — the money was counted when it was received.</span>
+        {data.balance > 0 ? <span>Balance owed:&nbsp;<b className="text-rose-600">{money(data.balance, cur)}</b></span> : data.balance < 0 ? <span>In credit:&nbsp;<b className="text-emerald-700">{money(-data.balance, cur)}</b></span> : <span>Settled:&nbsp;<b className="text-emerald-700">{money(0, cur)}</b></span>}
+      </div>
     </>
   );
 }
+const KIND: Record<string, string> = { invoice: "Invoice", payment: "Payment", refund: "Refund", creditnote: "Credit note", adjustment: "Credit adjustment", info: "Paid from credit" };
 
 // ───── modals ─────
 function ProfileModal({ open, onClose, c, onDone }: any) {

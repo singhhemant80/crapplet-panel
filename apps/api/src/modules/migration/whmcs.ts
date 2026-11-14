@@ -341,9 +341,12 @@ export async function runWhmcsImport(src: SourceDb, opts: ImportOptions, onProgr
         if (localId) {
           // bring the WHMCS password over until they've signed in here (after that, their password here wins)
           const signedInHere = whmcsHash ? await tx.loginHistory.count({ where: { userId: localId, success: true } }) : 1;
+          const hadProfile = !!(await tx.clientProfile.findUnique({ where: { userId: localId }, select: { userId: true } }));
           await tx.user.update({ where: { id: localId }, data: { ...(whmcsHash && !signedInHere ? { passwordHash: whmcsHash } : {}), firstName: str(r.firstname) || "Customer", lastName: str(r.lastname), phone: nul(r.phonenumber), status, profile: { upsert: { create: { ...profile, creditBalance: credit }, update: profile } } } });
           const prof = await tx.clientProfile.findUniqueOrThrow({ where: { userId: localId } });
-          if (prof.creditBalance !== credit) {
+          // profile created just now with the WHMCS credit → its opening entry in the credit history
+          if (!hadProfile && credit) await tx.creditLedger.create({ data: { userId: localId, amount: credit, balanceAfter: credit, description: "Opening credit balance imported from WHMCS", refType: "whmcs", refId: String(r.id) } });
+          if (hadProfile && prof.creditBalance !== credit) {
             const local = await tx.creditLedger.count({ where: { userId: localId, NOT: { refType: "whmcs" } } });
             if (!local) {
               await tx.clientProfile.update({ where: { userId: localId }, data: { creditBalance: credit } });

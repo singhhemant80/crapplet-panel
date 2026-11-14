@@ -467,7 +467,7 @@ adminCore.get(
       where: { OR: [{ id: req.params.id }, { number: req.params.id }] },
       include: {
         user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true, profile: { select: { companyName: true, city: true, state: true, country: true, gstin: true, currency: true } }, _count: { select: { orders: true, services: true } } } },
-        invoice: { include: { items: true, transactions: { orderBy: { createdAt: "asc" } } } },
+        invoice: { include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } },
         services: {
           include: {
             product: { select: { id: true, name: true, provisioner: true, type: true, cpuCores: true, ramMb: true, diskGb: true, moduleConfig: true, servers: { select: { serverId: true } }, osTemplates: { include: { osTemplate: true } } } },
@@ -943,7 +943,7 @@ adminCore.get(
   "/invoices/:id",
   requireStaff("billing.view"),
   ah(async (req, res) => {
-    const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { items: true, transactions: true, creditNotes: true, paymentIntents: true, user: { select: { id: true, email: true, firstName: true, lastName: true } }, order: true } });
+    const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }, creditNotes: { orderBy: { createdAt: "desc" } }, paymentIntents: { orderBy: { createdAt: "desc" } }, user: { select: { id: true, email: true, firstName: true, lastName: true } }, order: true } });
     if (!inv) throw notFound();
     const st = await getSettings();
     res.json({ invoice: inv, label: invoiceLabel(inv), company: st.company, bankDetails: st.invoice.bankDetails, footerNote: st.invoice.footerNote, lutArn: st.currency.lutArn });

@@ -263,6 +263,8 @@ test("full order flow: register → pick IP → checkout with GST + promo → si
 
   // renewal: due in 5 days → one renewal invoice, idempotent across runs
   await prisma.service.update({ where: { id: svc.id }, data: { nextDueDate: new Date(Date.now() - 6 * 86400000) } });
+  // time passes: the month paid on the order ended at that due date
+  await prisma.invoiceItem.updateMany({ where: { relId: svc.id, type: "SERVICE", periodStart: null }, data: { periodEnd: new Date(Date.now() - 6 * 86400000) } });
   await generateRenewalInvoices();
   await generateRenewalInvoices();
   const renewals = await prisma.invoiceItem.findMany({ where: { relId: svc.id, type: "SERVICE", periodStart: { not: null }, invoice: { status: "UNPAID" } } });
