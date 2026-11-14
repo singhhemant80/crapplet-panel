@@ -377,7 +377,7 @@ export default function AdminDashboard() {
 }
 
 const AUTO_LABEL: Record<string, string> = {
-  invoice_created: "Invoices generated", credit_applied: "Paid from credit", reminder_sent: "Payment reminders", overdue_1: "First overdue notices", overdue_2: "Second overdue notices", overdue_3: "Third overdue notices",
+  invoice_created: "Invoices generated", credit_applied: "Paid from credit", invoice_cancelled: "Invoices cancelled (ended services)", reminder_sent: "Payment reminders", overdue_1: "First overdue notices", overdue_2: "Second overdue notices", overdue_3: "Third overdue notices",
   late_fee: "Late fees added", suspended: "Services suspended", unsuspended: "Services unsuspended", terminated: "Services terminated", order_cancelled: "Unpaid orders cancelled",
   domain_notice: "Domain renewal notices", domain_expired: "Domains expired", ticket_closed: "Tickets closed", error: "Failed actions",
 };

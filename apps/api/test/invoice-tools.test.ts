@@ -230,3 +230,59 @@ test("quotes: draft is private, sent quote is accepted by the customer and becom
   assert.equal((await prisma.quote.findUniqueOrThrow({ where: { id: e.id } })).status, "EXPIRED");
   assert.equal((await client.req("POST", `/client/quotes/${e.id}/accept`)).status, 409);
 });
+
+test("terminating or cancelling a service cancels its unpaid invoices (shared ones are trimmed, part-paid ones left)", async () => {
+  const { createInvoice } = await import("../src/modules/billing/invoices");
+  const { runProvisionAction } = await import("../src/modules/provisioning/provisioner");
+  const mkSvc = () => prisma.service.create({ data: { userId: ids.user, productId: ids.product, status: "ACTIVE", billingCycle: "MONTHLY", firstAmount: 40000, recurringAmount: 40000, currency: "INR", nextDueDate: new Date(Date.now() + 86400_000) } });
+  const a = await mkSvc();
+  const other = await mkSvc();
+  const line = (svcId: string, d: string, p = 40000) => ({ type: "SERVICE" as const, relId: svcId, description: d, unitPrice: p, taxable: false });
+  const only = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [line(a.id, "VPS renewal"), { type: "LATE_FEE", description: "Late fee", unitPrice: 2000, taxable: false }] }));
+  const mixed = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [line(a.id, "VPS A renewal"), line(other.id, "VPS B renewal", 30000), { type: "CUSTOM", description: "Consulting", unitPrice: 5000, taxable: false }] }));
+  const part = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [line(a.id, "VPS older renewal")] }));
+  await prisma.invoice.update({ where: { id: part.id }, data: { amountPaid: 10000 } });
+  const paid = await newInvoice([{ description: "already paid thing", unitPrice: 100 }]);
+  await staff.req("POST", `/admin/invoices/${paid}/payment`, { amount: 100, gateway: "bank", reference: `T-${RUN}` });
+
+  await runProvisionAction(a.id, "terminate", { notify: false });
+  assert.equal((await prisma.service.findUniqueOrThrow({ where: { id: a.id } })).status, "TERMINATED");
+  assert.equal((await inv(only.id)).status, "CANCELLED", "invoice only for the terminated service is cancelled");
+  const m = await inv(mixed.id);
+  assert.equal(m.status, "UNPAID", "shared invoice stays due");
+  assert.equal(m.items.some((i) => i.relId === a.id), false, "the terminated service's line is removed");
+  assert.equal(m.total, 35000, "B renewal + consulting");
+  assert.equal((await inv(part.id)).status, "UNPAID", "part-paid invoice is left for staff");
+  assert.ok(await prisma.activityLog.count({ where: { action: "invoice.termination_needs_review", entityId: part.id } }));
+  assert.equal((await inv(paid)).status, "PAID");
+  await prisma.invoice.update({ where: { id: part.id }, data: { amountPaid: 0 } });
+
+  // manual: staff set the other service to CANCELLED
+  const r = await staff.req("PUT", `/admin/services/${other.id}`, { status: "CANCELLED" });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal((await inv(mixed.id)).status, "UNPAID", "consulting line still due");
+  assert.equal((await inv(mixed.id)).total, 5000);
+  assert.deepEqual(r.json.invoices.trimmed, [mixed.id]);
+
+  // switched off → nothing happens
+  const { updateSettings } = await import("../src/lib/settings");
+  const c = await mkSvc();
+  const ci = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [line(c.id, "VPS C renewal")] }));
+  await updateSettings("automation", { cancelInvoicesOnTerminate: false } as never);
+  try {
+    await staff.req("PUT", `/admin/services/${c.id}`, { status: "TERMINATED" });
+    assert.equal((await inv(ci.id)).status, "UNPAID");
+  } finally {
+    await updateSettings("automation", { cancelInvoicesOnTerminate: true } as never);
+  }
+});
+
+test("daily sweep cancels leftover unpaid invoices of services that ended earlier", async () => {
+  const { createInvoice } = await import("../src/modules/billing/invoices");
+  const { sweepEndedServiceInvoices } = await import("../src/modules/billing/termination");
+  const old = await prisma.service.create({ data: { userId: ids.user, productId: ids.product, status: "TERMINATED", billingCycle: "MONTHLY", firstAmount: 1000, recurringAmount: 1000, currency: "INR" } });
+  const i = await prisma.$transaction((tx) => createInvoice(tx, { userId: ids.user, items: [{ type: "SERVICE", relId: old.id, description: "old renewal", unitPrice: 1000, taxable: false }] }));
+  const r = await sweepEndedServiceInvoices();
+  assert.ok(r.cancelled >= 1);
+  assert.equal((await inv(i.id)).status, "CANCELLED");
+});

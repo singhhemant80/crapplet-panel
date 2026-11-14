@@ -85,6 +85,8 @@ export const DEFAULT_SETTINGS = {
     autoTerminate: true,
     terminateDaysAfterDue: 15,
     terminateEmail: true,
+    /** when a service is terminated or cancelled, cancel its unpaid invoices (or remove its lines from shared ones) */
+    cancelInvoicesOnTerminate: true,
     // orders
     /** cancel orders still unpaid after N days (0 = never) — releases held IPs */
     cancelUnpaidOrdersAfterDays: 0,

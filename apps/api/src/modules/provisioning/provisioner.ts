@@ -656,6 +656,9 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
           await tx.service.update({ where: { id: svc.id }, data: { status: "TERMINATED", terminationDate: new Date() } });
         });
         await log(svc.id, action, true);
+        // the service is gone — stop billing for it
+        const { cancelServiceInvoices } = await import("../billing/termination");
+        await cancelServiceInvoices(svc.id, { actorId: typeof params.actorId === "string" ? params.actorId : null }).catch((e) => console.error("[terminate] invoice cleanup failed", svc.id, (e as Error).message));
         if (params.notify !== false) await queueEmail("service.terminated", svc.user.email, vars, svc.userId);
         return { ok: true };
       }

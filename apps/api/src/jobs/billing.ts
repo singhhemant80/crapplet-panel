@@ -11,6 +11,7 @@
 import { prisma } from "../db";
 import { addCycle, addDays, istDayStart, addMonths, CYCLE_LABEL } from "../lib/money";
 import { getSettings } from "../lib/settings";
+import { sweepEndedServiceInvoices } from "../modules/billing/termination";
 import { expireQuotes, pendingForNextInvoice, runBillableItems } from "../modules/billing/extras";
 import { addInvoiceItemsTx, createInvoice, invoiceEmailVars, applyCreditToInvoice, cancelInvoice, type NewInvoiceItem } from "../modules/billing/invoices";
 import { queueEmail } from "../modules/email/mailer";
@@ -351,6 +352,10 @@ export async function runAutomation(opts: { trigger: "schedule" | "manual"; acto
     if (r.invoices) await rec({ action: "invoice_created", label: "Billable items", message: `${r.items} billable item(s) invoiced on ${r.invoices} invoice(s)` });
   });
   await step("Quotes", () => expireQuotes());
+  await step("Ended services", async () => {
+    const r = await sweepEndedServiceInvoices();
+    if (r.cancelled || r.trimmed) await rec({ action: "invoice_cancelled", label: "Ended services", message: `${r.cancelled} unpaid invoice(s) of terminated/cancelled services cancelled${r.trimmed ? `, ${r.trimmed} adjusted` : ""}` });
+  });
   await step("Late fees", () => applyLateFees(rec));
   await step("Suspensions", () => processSuspensions(rec));
   await step("Unpaid orders", () => cancelUnpaidOrders(rec));

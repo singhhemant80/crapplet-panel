@@ -8,6 +8,7 @@ import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, PageHeader, Se
 const ACTION_STYLE: Record<string, { icon: string; tone: string }> = {
   invoice_created: { icon: "receipt_long", tone: "bg-primary-soft text-primary-dark" },
   credit_applied: { icon: "account_balance_wallet", tone: "bg-indigo-50 text-indigo-600" },
+  invoice_cancelled: { icon: "cancel", tone: "bg-slate-100 text-slate-600" },
   reminder_sent: { icon: "notifications", tone: "bg-sky-50 text-sky-600" },
   overdue_1: { icon: "mark_email_unread", tone: "bg-amber-50 text-amber-600" },
   overdue_2: { icon: "mark_email_unread", tone: "bg-orange-50 text-orange-600" },
@@ -297,6 +298,8 @@ function SettingsTab({ data, onSaved }: { data: any; onSaved: () => void }) {
           <Toggle checked={f.autoTerminate} onChange={(v) => set("autoTerminate", v)} label="Terminate services still unpaid after suspension" />
           {f.autoTerminate && <Field label="Terminate this many days after due" hint="Must be more than the suspension days. The VPS / hosting account is deleted on the server."><Input {...num("terminateDaysAfterDue")} /></Field>}
           <Toggle checked={f.terminateEmail} onChange={(v) => set("terminateEmail", v)} label="Email the customer when a service is terminated" />
+          <Toggle checked={f.cancelInvoicesOnTerminate ?? true} onChange={(v) => set("cancelInvoicesOnTerminate", v)} label="Cancel the service's unpaid invoices when it is terminated or cancelled" />
+          <p className="text-xs text-mute">Applies to automatic and manual termination. If an invoice also bills other services, only this service's lines are removed. Part-paid invoices are left for you to refund or credit.</p>
         </div>
       </Card>
 

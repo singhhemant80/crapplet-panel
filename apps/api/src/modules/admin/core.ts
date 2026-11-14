@@ -755,10 +755,17 @@ adminCore.put(
     );
     const { password, ...data } = b;
     if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
-    await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
+    const before = b.status ? await prisma.service.findUnique({ where: { id: req.params.id }, select: { status: true } }) : null;
+    await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...(b.status === "TERMINATED" && before?.status !== "TERMINATED" ? { terminationDate: new Date() } : {}), ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
     await audit({ actorId: req.user!.id, action: "service.updated", entity: "service", entityId: req.params.id, details: Object.keys(b) });
     if (b.status) await syncOrderForService(req.params.id);
-    res.json({ ok: true });
+    // marked terminated / cancelled by hand → its unpaid invoices go too
+    let invoices = null;
+    if ((b.status === "TERMINATED" || b.status === "CANCELLED") && before && before.status !== b.status) {
+      const { cancelServiceInvoices } = await import("../billing/termination");
+      invoices = await cancelServiceInvoices(req.params.id, { actorId: req.user!.id });
+    }
+    res.json({ ok: true, invoices });
   }),
 );
 
