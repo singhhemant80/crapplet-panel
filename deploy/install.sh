@@ -167,7 +167,9 @@ if [ -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
   certbot install --nginx -n --cert-name "$DOMAIN" --redirect >/dev/null 2>&1 || echo "certbot couldn't re-apply SSL — run: certbot --nginx -d $DOMAIN"
 elif [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
   log "Requesting Let's Encrypt certificate"
-  certbot --nginx -n --agree-tos -m "$LETSENCRYPT_EMAIL" -d "$DOMAIN" -d "www.$DOMAIN" --redirect || echo "certbot failed — check DNS, then re-run: certbot --nginx -d $DOMAIN"
+  # www only when it has a DNS record — otherwise Let's Encrypt refuses the whole certificate
+  WWW=(); getent hosts "www.$DOMAIN" >/dev/null 2>&1 && WWW=(-d "www.$DOMAIN")
+  certbot --nginx -n --agree-tos -m "$LETSENCRYPT_EMAIL" -d "$DOMAIN" "${WWW[@]}" --redirect || echo "certbot failed — check that ${DOMAIN} points to this server (and isn't proxied by Cloudflare yet), then re-run: certbot --nginx -d $DOMAIN"
 fi
 
 log "Firewall"
