@@ -73,7 +73,19 @@ export async function onInvoicePaid(invoiceId: string) {
     }
     if (item.type === "DOMAIN" && item.relId) {
       const { onDomainPaid } = await import("../domains/service");
-      await onDomainPaid(item.relId, item.periodStart ? "renew" : "initial").catch((e) => console.error("[domains] post-payment action failed", e));
+      await onDomainPaid(item.relId, item.periodStart ? "renew" : "initial").catch(async (e) => {
+        // a paid domain the registrar refused must reach staff — it used to only reach the server log
+        console.error("[domains] post-payment action failed", e);
+        const d = await prisma.domain.findUnique({ where: { id: item.relId! }, select: { id: true, name: true, registrar: true, userId: true } });
+        const { explainProvisionError } = await import("../provisioning/explain");
+        const x = explainProvisionError((e as Error).message, { kind: "domain" });
+        const what = item.periodStart ? "renewal" : "registration";
+        await prisma.automationEvent.create({ data: { action: "error", entity: "domain", entityId: item.relId, userId: inv.userId, label: d?.name ?? item.description, success: false, message: `Domain ${what} failed at ${d?.registrar ?? "the registrar"}: ${x.cause}` } }).catch(() => undefined);
+        const { audit } = await import("../../lib/audit");
+        await audit({ userId: inv.userId, action: `domain.${what}_failed`, entity: "domain", entityId: item.relId ?? undefined, details: { error: (e as Error).message } });
+        const to = settings.company.billingEmail;
+        if (to) await queueEmail("admin.provisioning_failed", to, { serviceId: item.relId, productName: `Domain ${what}: ${d?.name ?? item.description}`, clientEmail: inv.user.email, error: `${x.title}. Why: ${x.cause} — What to do: complete the ${what} at ${d?.registrar ?? "the registrar"} (or fix the registrar settings) and mark the domain active.` }).catch(() => undefined);
+      });
     }
   }
 

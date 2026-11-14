@@ -888,14 +888,16 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
 }
 
 export async function markCreateFailed(serviceId: string, error: string) {
-  const svc = await prisma.service.update({ where: { id: serviceId }, data: { status: "FAILED" }, include: { product: true, user: true } });
+  const svc = await prisma.service.update({ where: { id: serviceId }, data: { status: "FAILED" }, include: { product: true, user: true, server: { select: { name: true } } } });
+  const { explainProvisionError } = await import("./explain");
+  const x = explainProvisionError(error, { provisioner: svc.product.provisioner, productId: svc.product.id, productName: svc.product.name, serverName: svc.server?.name });
   if (svc.resellerId) {
     const { notifyReseller, serviceEventData } = await import("../reseller/webhooks");
     const data = await serviceEventData(serviceId);
     if (data) await notifyReseller(svc.resellerId, "service.failed", { ...data, error: "Setup failed — our team has been alerted and will retry or refund." });
   }
   const s = await getSettings();
-  await queueEmail("admin.provisioning_failed", s.company.billingEmail, { serviceId, productName: svc.product.name, clientEmail: svc.user.email, error });
+  await queueEmail("admin.provisioning_failed", s.company.billingEmail, { serviceId, productName: svc.product.name, clientEmail: svc.user.email, error: `${x.title}. Why: ${x.cause} — What to do: ${x.fix}${x.cause !== error ? ` (Original error: ${error})` : ""}` });
 }
 
 // ───────────────────────── read-only live data ─────────────────────────

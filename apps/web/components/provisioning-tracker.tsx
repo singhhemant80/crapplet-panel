@@ -1,4 +1,5 @@
 "use client";
+import { FailureExplain, type Explained } from "@/components/failure-explain";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -17,6 +18,7 @@ export type Progress = {
   invoiceId?: string | null;
   job?: { state: string; attempt: number; maxAttempts: number; nextRetryAt: string | null; lastError?: string | null } | null;
   error?: string | null;
+  explain?: Explained | null;
   startedAt?: string | null;
   finishedAt?: string | null;
   now?: string;
@@ -37,7 +39,7 @@ function elapsed(from?: string | null, to?: string | null) {
  * Live provisioning progress (order → payment → queue → server → build → ready). Polls while setup is
  * running and calls onChange when the service status changes, so the parent page can reload.
  */
-export function ProvisioningTracker({ path, audience, onChange, onRetry, compact, initial }: { path: string; audience: "admin" | "client"; onChange?: (status: string) => void; onRetry?: () => void; compact?: boolean; initial?: Progress }) {
+export function ProvisioningTracker({ path, audience, onChange, onRetry, compact, initial, hideExplain }: { path: string; audience: "admin" | "client"; onChange?: (status: string) => void; onRetry?: () => void; compact?: boolean; initial?: Progress; hideExplain?: boolean }) {
   const [p, setP] = useState<Progress | null>(initial ?? null);
   const [, tick] = useState(0);
   const last = useRef<string | null>(initial?.status ?? null);
@@ -106,6 +108,7 @@ export function ProvisioningTracker({ path, audience, onChange, onRetry, compact
             {audience === "admin" && p.job && p.job.maxAttempts > 1 && !done && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-slate-600 ring-1 ring-line">attempt {Math.max(1, p.job.attempt)} of {p.job.maxAttempts} · {p.job.state}</span>}
           </div>
           {p.message && <p className={cx("mt-1 break-words text-sm", failed && audience === "admin" ? "font-semibold text-rose-800" : "text-slate-600")}>{p.message}</p>}
+          {audience === "admin" && p.explain && !hideExplain && (failed || retrying || p.stuck) && <FailureExplain x={p.explain} compact className="mt-2" />}
           {retrying && p.job?.nextRetryAt && <p className="mt-1 text-xs font-semibold text-amber-700">Next attempt around {time(p.job.nextRetryAt)}</p>}
         </div>
         <div className="flex flex-wrap gap-2">

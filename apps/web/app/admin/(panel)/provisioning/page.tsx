@@ -86,7 +86,7 @@ export default function ProvisioningPage() {
                 <Td className="w-[220px]"><ProvisioningTracker key={`${x.id}-${p.status}-${p.percent}`} path={`/admin/services/${x.id}/provisioning`} audience="admin" compact initial={p} /></Td>
                 <Td className="max-w-[320px]">
                   <div className={cx("text-sm font-semibold", x.status === "FAILED" || p.stuck ? "text-rose-700" : "text-ink")}>{x.status === "ACTIVE" ? "Ready" : p.stuck ? p.headline : cur?.label ?? p.headline}</div>
-                  <div className="line-clamp-2 break-words text-xs text-mute">{p.stuck ? "No job queued and nothing logged for 15+ minutes — retry it" : x.status === "FAILED" ? p.error : cur?.detail ?? (p.job?.state === "delayed" ? `Retrying (attempt ${p.job.attempt} of ${p.job.maxAttempts})` : p.message)}</div>
+                  <div className="line-clamp-3 break-words text-xs text-mute">{p.stuck ? "No job queued and nothing logged for 15+ minutes — retry it" : x.status === "FAILED" ? (p.explain ? <><b className="text-rose-700">{p.explain.title}:</b> {p.explain.cause} <span className="text-slate-700">→ {p.explain.fix}</span></> : p.error) : cur?.detail ?? (p.job?.state === "delayed" ? `Retrying (attempt ${p.job.attempt} of ${p.job.maxAttempts})` : p.message)}</div>
                 </Td>
                 <Td><Badge status={x.status} /></Td>
                 <Td className="text-right">

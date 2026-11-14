@@ -8,6 +8,7 @@ import { NodeSelect } from "@/components/admin/node-select";
 import { ChangePlanButton } from "@/components/admin/change-plan";
 import { VirtualizorCheck } from "@/components/admin/virtualizor-check";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
+import { FailureExplain } from "@/components/failure-explain";
 import { LiveBadge } from "@/components/live-state";
 import { PasswordField, generatePassword, passwordProblem } from "@/components/password-field";
 import Link from "next/link";
@@ -97,7 +98,7 @@ export default function AdminService() {
       </section>
 
       {(isVps || isHosting) && !ended && (["PENDING", "PROVISIONING", "FAILED"].includes(s.status) || Date.now() - new Date(s.createdAt).getTime() < 86400_000) && (
-        <ProvisioningTracker path={`/admin/services/${id}/provisioning`} audience="admin" onChange={() => reload()} onRetry={() => act("create")} />
+        <ProvisioningTracker path={`/admin/services/${id}/provisioning`} audience="admin" hideExplain={s.status === "FAILED"} onChange={() => reload()} onRetry={() => act("create")} />
       )}
       {s.status === "FAILED" && <FailurePanel s={s} />}
       {s.status === "SUSPENDED" && <Alert tone="warn" className="mb-6"><b>Suspended</b>{s.suspendReason ? ` — ${s.suspendReason}` : ""}</Alert>}
@@ -267,7 +268,13 @@ export default function AdminService() {
                   <Icon name={l.success ? "check_circle" : "error"} className={cx("mt-0.5 text-[19px]", l.success ? "text-emerald-500" : "text-rose-500")} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-3"><span className="font-bold capitalize text-ink">{l.action.replace(/_/g, " ")}</span><span className="shrink-0 text-xs text-mute">{date(l.createdAt, true)}</span></div>
-                    {l.message && <div className="mt-0.5 break-words text-xs text-mute">{l.message}</div>}
+                    {l.explain ? (
+                      <div className="mt-1 rounded-lg bg-rose-50/70 px-2.5 py-2 text-xs ring-1 ring-rose-100">
+                        <div className="font-bold text-rose-800">{l.explain.title}</div>
+                        <div className="mt-0.5 break-words text-rose-900">{l.explain.cause}</div>
+                        <div className="mt-0.5 break-words text-slate-700"><b>What to do:</b> {l.explain.fix}</div>
+                      </div>
+                    ) : l.message && <div className="mt-0.5 break-words text-xs text-mute">{l.message}</div>}
                   </div>
                 </li>
               ))}
@@ -397,9 +404,9 @@ function FailurePanel({ s }: { s: any }) {
       <div className="flex gap-3 px-5 py-4">
         <Icon name="error" className="text-rose-600" />
         <div className="min-w-0 text-sm">
-          <div className="font-extrabold text-rose-800">Provisioning failed{err ? ` · ${date(err.createdAt, true)}` : ""}</div>
-          <div className="mt-0.5 break-words text-rose-800">{err?.message ?? "See the log below."}</div>
-          <div className="mt-1 text-xs text-rose-700">Fix the cause, then click <b>Retry provisioning</b>. You can change the OS and node under “Billing &amp; overrides”.</div>
+          <div className="font-extrabold text-rose-800">Provisioning failed{err ? ` · ${date(err.createdAt, true)}` : ""}{s.failure ? ` — ${s.failure.title}` : ""}</div>
+          {s.failure ? <FailureExplain x={s.failure} compact className="mt-2" /> : <div className="mt-0.5 break-words text-rose-800">{err?.message ?? "See the log below."}</div>}
+          <div className="mt-2 text-xs text-rose-700">After fixing it, click <b>Retry provisioning</b>. You can change the OS and node under “Billing &amp; overrides”.</div>
         </div>
       </div>
       {problems.length > 0 && (

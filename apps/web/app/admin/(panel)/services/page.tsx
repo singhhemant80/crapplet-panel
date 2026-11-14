@@ -35,7 +35,7 @@ function Services() {
                   <Td><Link href={`/admin/clients/${s.user.id}`} className="text-sm text-primary-dark">{s.user.email}</Link></Td>
                   <Td className="font-mono text-xs">{s.ips.map((i: any) => i.address).join(", ") || "—"}</Td>
                   <Td className="text-xs">{s.server?.name ?? "—"}{s.remoteId && <div className="text-mute">{s.node ? `${s.node} · ` : ""}#{s.remoteId}</div>}</Td>
-                  <Td><div className="flex flex-col items-start gap-1"><Badge status={s.status} />{s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) && <LiveBadge state={live.states[s.id]?.state} reason={live.states[s.id]?.reason} loading={live.loading} />}</div></Td>
+                  <Td><div className="flex flex-col items-start gap-1"><Badge status={s.status} />{s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) && <LiveBadge state={live.states[s.id]?.state} reason={live.states[s.id]?.reason} loading={live.loading} />}{s.failure && <span className="max-w-[220px] text-[11.5px] font-semibold leading-snug text-rose-700" title={s.failure.cause}>{s.failure.title}</span>}</div></Td>
                   <Td>{money(s.recurringAmount, s.currency)}</Td>
                   <Td className="whitespace-nowrap text-mute">{date(s.nextDueDate)}</Td>
                 </tr>

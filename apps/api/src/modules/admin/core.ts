@@ -550,7 +550,19 @@ adminCore.get(
       }),
       prisma.service.count({ where }),
     ]);
-    res.json({ services: rows.map(({ passwordEnc, ...s }) => ({ ...s, hasPassword: !!passwordEnc })), total, page, pageSize });
+    // failed setups: say why right in the list
+    const failedIds = rows.filter((r) => r.status === "FAILED").map((r) => r.id);
+    const why = new Map<string, { title: string; cause: string }>();
+    if (failedIds.length) {
+      const { explainProvisionError } = await import("../provisioning/explain");
+      const fails = await prisma.provisioningLog.findMany({ where: { serviceId: { in: failedIds }, success: false }, orderBy: { createdAt: "desc" }, select: { serviceId: true, message: true } });
+      for (const r of rows.filter((x) => x.status === "FAILED")) {
+        const f = fails.find((l) => l.serviceId === r.id);
+        const x = explainProvisionError(f?.message, { provisioner: r.product.provisioner, serverName: r.server?.name });
+        why.set(r.id, { title: x.title, cause: x.cause });
+      }
+    }
+    res.json({ services: rows.map(({ passwordEnc, ...s }) => ({ ...s, hasPassword: !!passwordEnc, failure: why.get(s.id) ?? null })), total, page, pageSize });
   }),
 );
 
@@ -567,7 +579,13 @@ adminCore.get(
     const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, amountPaid: true, currency: true, dueDate: true, paidAt: true, createdAt: true } });
     // node id → node name (Virtualizor serid / Proxmox node)
     const nodeRow = s.node && server ? await prisma.serverNode.findFirst({ where: { serverId: server.id, OR: [{ externalId: s.node }, { name: s.node }] }, select: { name: true } }) : null;
-    res.json({ service: { ...rest, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname, nameservers: server.nameservers } : null, hasPassword: !!passwordEnc }, invoices });
+    // every failed step explained in plain words (setup, suspend, reinstall, …)
+    const { explainProvisionError } = await import("../provisioning/explain");
+    const ctx = { provisioner: s.product.provisioner, productId: s.product.id, productName: s.product.name, serverId: server?.id, serverName: server?.name, serviceId: s.id };
+    const logs = rest.logs.map((l) => (l.success ? l : { ...l, explain: explainProvisionError(l.message, ctx) }));
+    const lastFail = logs.find((l) => !l.success) as (typeof logs)[number] & { explain?: ReturnType<typeof explainProvisionError> };
+    const failure = s.status === "FAILED" ? lastFail?.explain ?? explainProvisionError(null, ctx) : null;
+    res.json({ service: { ...rest, logs, failure, nodeName: nodeRow?.name ?? s.node ?? null, server: server ? { id: server.id, name: server.name, type: server.type, hostname: server.hostname, nameservers: server.nameservers } : null, hasPassword: !!passwordEnc }, invoices });
   }),
 );
 

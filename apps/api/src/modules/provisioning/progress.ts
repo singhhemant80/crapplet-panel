@@ -1,3 +1,4 @@
+import { explainProvisionError } from "./explain";
 import { prisma } from "../../db";
 import { provisioningQueue } from "../../jobs/queues";
 
@@ -27,6 +28,7 @@ export interface Progress {
   invoiceId?: string | null;
   job?: { state: string; attempt: number; maxAttempts: number; nextRetryAt: Date | null; lastError?: string | null } | null;
   error?: string | null;
+  explain?: import("./explain").Explained | null;
   startedAt?: Date | null;
   finishedAt?: Date | null;
   now: Date;
@@ -51,7 +53,8 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   const s = await prisma.service.findUniqueOrThrow({
     where: { id: serviceId },
     include: {
-      product: { select: { provisioner: true, autoSetup: true } },
+      product: { select: { id: true, name: true, provisioner: true, autoSetup: true } },
+      server: { select: { id: true, name: true } },
       order: { select: { id: true, createdAt: true, invoice: { select: { id: true, status: true, paidAt: true, total: true } } } },
       logs: { where: { action: "create" }, orderBy: { createdAt: "asc" }, take: 200 },
     },
@@ -109,7 +112,8 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
   if (failed) {
     const cur = steps.find((x) => x.state === "current") ?? steps.find((x) => x.state === "pending");
     // the full error is in the header — keep the step short
-    if (cur) Object.assign(cur, { state: "failed", detail: admin && error ? (error.length > 140 ? `${error.slice(0, 140)}…` : error) : undefined });
+    const why = error ? explainProvisionError(error, { provisioner: s.product.provisioner, serverName: s.server?.name }).cause : null;
+    if (cur) Object.assign(cur, { state: "failed", detail: admin && why ? (why.length > 140 ? `${why.slice(0, 140)}…` : why) : undefined });
   }
 
   const done = steps.filter((x) => x.state === "done").length;
@@ -135,7 +139,7 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     message = isVps ? "Login details were sent by email. You can also reveal the password on this page." : "";
   } else if (failed) {
     headline = "Setup needs attention";
-    message = admin ? error ?? "See the provisioning log." : "We hit a problem while setting up your server. Our team has been alerted and will finish it for you — no action is needed on your side.";
+    message = admin ? (error ? explainProvisionError(error, { provisioner: s.product.provisioner, serverName: s.server?.name }).title : "See the provisioning log.") : "We hit a problem while setting up your server. Our team has been alerted and will finish it for you — no action is needed on your side.";
   } else if (!paid) {
     headline = "Waiting for payment";
     message = "Setup starts automatically as soon as the invoice is paid.";
@@ -175,6 +179,8 @@ export async function provisioningProgress(serviceId: string, audience: "admin" 
     invoiceId: !invoicePaid ? inv?.id : null,
     job: admin ? job : null,
     error: admin ? error : null,
+    /** the failure in plain words: what went wrong, why, and how to fix it (staff only) */
+    explain: admin && error ? explainProvisionError(error, { provisioner: s.product.provisioner, productId: s.product.id, productName: s.product.name, serverName: s.server?.name, serviceId: s.id }) : null,
     startedAt: lastStart?.createdAt ?? attempt[0]?.createdAt ?? null,
     finishedAt: s.status === "ACTIVE" ? created?.createdAt ?? null : null,
     /** server time, so "running for" is right even when the viewer's clock is off */

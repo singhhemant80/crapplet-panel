@@ -201,3 +201,18 @@ test("staff can add, remove and clear a customer's credit, with clear messages",
   await prisma.clientProfile.deleteMany({ where: { userId: uid } });
   await prisma.user.delete({ where: { id: uid } });
 });
+
+test("a failed setup is explained on the service page, its activity log and the services list", async () => {
+  const s = await svc({ status: "FAILED", hostname: `fail-${RUN}.test` });
+  await prisma.provisioningLog.create({ data: { serviceId: s, action: "create", success: false, message: 'Virtualizor addvs: {"hostname":"Invalid hostname"}' } });
+  const d = await staff.req("GET", `/admin/services/${s}`);
+  assert.equal(d.status, 200);
+  assert.equal(d.json.service.failure.cause, "Invalid hostname");
+  assert.match(d.json.service.failure.fix, /Retry/);
+  assert.equal(d.json.service.logs.find((l: any) => !l.success).explain.cause, "Invalid hostname");
+  const list = await staff.req("GET", `/admin/services?q=fail-${RUN}`);
+  assert.equal(list.json.services.find((x: any) => x.id === s).failure.cause, "Invalid hostname");
+  const p = await staff.req("GET", `/admin/services/${s}/provisioning`);
+  assert.equal(p.status, 200);
+  assert.equal(p.json.explain?.cause, "Invalid hostname");
+});
