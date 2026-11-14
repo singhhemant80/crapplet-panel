@@ -140,3 +140,25 @@ test("reactivation is refused for services that are already running", async () =
   assert.equal(r.status, 409);
   assert.equal((await client.req("POST", `/admin/services/${ids.svc}/reactivate`, {})).status, 403);
 });
+
+test("invoice lists say which service each invoice is for — staff and customer", async () => {
+  const inv = await prisma.invoice.findFirstOrThrow({ where: { userId: ids.user, items: { some: { relId: ids.svc } } } });
+  const a = await staff.req("GET", `/admin/invoices?userId=${ids.user}`);
+  assert.equal(a.status, 200);
+  const row = a.json.invoices.find((i: any) => i.id === inv.id);
+  assert.deepEqual(row.for.map((f: any) => [f.kind, f.id, f.label, f.product]), [["service", ids.svc, "db1.example.com", `Colocation 1U ${RUN}`]]);
+  assert.equal(row.for[0].status, "ACTIVE");
+  const p = await staff.req("GET", `/admin/clients/${ids.user}`);
+  assert.equal(p.json.invoices.find((i: any) => i.id === inv.id).for[0].id, ids.svc);
+  const c = await client.req("GET", "/client/invoices");
+  const mine = c.json.invoices.find((i: any) => i.id === inv.id);
+  assert.equal(mine.for[0].label, "db1.example.com");
+  assert.equal(mine.for[0].status, undefined, "customers get the link, not internal states");
+  // a custom charge with nothing linked is described by its line
+  const custom = await staff.req("POST", "/admin/invoices", { userId: ids.user, sendEmail: false, items: [{ description: "Remote hands — 1 hour", unitPrice: 100000, taxable: false }] });
+  assert.equal(custom.status, 201);
+  const list = (await staff.req("GET", `/admin/invoices?userId=${ids.user}`)).json.invoices;
+  const r2 = list.find((i: any) => i.id === custom.json.id);
+  assert.deepEqual(r2.for, []);
+  assert.equal(r2.forSummary, "Remote hands — 1 hour");
+});

@@ -169,7 +169,8 @@ adminCore.get(
       prisma.user.findUnique({ where: { id: req.params.id }, select: { status: true } }),
       prisma.order.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 50, select: { id: true, number: true, status: true, total: true, currency: true, createdAt: true } }),
     ]);
-    res.json({ client: { ...user, status: notesUser?.status }, services, invoices, tickets, domains, transactions, logins, ledger, orders });
+    const { withInvoiceLinks } = await import("../billing/invoice-links");
+    res.json({ client: { ...user, status: notesUser?.status }, services, invoices: await withInvoiceLinks(invoices, { includeStatus: true }), tickets, domains, transactions, logins, ledger, orders });
   }),
 );
 
@@ -933,7 +934,8 @@ adminCore.get(
     ]);
     // never add rupees to dollars: one total per currency
     const byCurrency = sums.map((g) => ({ currency: g.currency, ...g._sum }));
-    res.json({ invoices: rows, total, page, pageSize, sums: byCurrency.find((g) => g.currency === "INR") ?? { total: 0, amountPaid: 0, taxTotal: 0 }, sumsByCurrency: byCurrency });
+    const { withInvoiceLinks } = await import("../billing/invoice-links");
+    res.json({ invoices: await withInvoiceLinks(rows, { includeStatus: true }), total, page, pageSize, sums: byCurrency.find((g) => g.currency === "INR") ?? { total: 0, amountPaid: 0, taxTotal: 0 }, sumsByCurrency: byCurrency });
   }),
 );
 

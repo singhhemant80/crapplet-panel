@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { InvoiceFor } from "@/components/invoice-for";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { date, invNo, money } from "@/lib/api";
@@ -27,13 +28,13 @@ function Invoices() {
           <Empty icon="receipt_long" title="No invoices" />
         ) : (
           <>
-            <Table head={["Invoice", "Date", "Due", "Total", "Status", ""]}>
+            <Table head={["Invoice", "For", "Date", "Due", "Total", "Status", ""]}>
               {data.invoices.map((i: any) => (
                 <tr key={i.id} className="hover:bg-primary-tint">
                   <Td className="font-bold text-ink">
                     {invNo(i)}
-                    {i.isWalletTopup && <span className="ml-2 text-xs font-semibold text-mute">wallet</span>}
                   </Td>
+                  <Td><InvoiceFor inv={i} audience="client" /></Td>
                   <Td className="whitespace-nowrap text-mute">{date(i.issueDate)}</Td>
                   <Td className="whitespace-nowrap text-mute">{date(i.dueDate)}</Td>
                   <Td className="font-semibold">{money(i.total, i.currency)}</Td>

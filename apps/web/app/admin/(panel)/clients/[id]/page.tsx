@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { InvoiceFor } from "@/components/invoice-for";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, date, invNo, money } from "@/lib/api";
@@ -339,6 +340,7 @@ function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab
                     <Link href={`/admin/invoices/${i.id}`} className={cx("flex items-center gap-3 px-4 py-3", over && "bg-rose-50/40")}>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-mono text-[13px] font-bold text-primary-dark">{invNo(i)}</span>
+                        <span className="block truncate text-[12px] font-semibold text-ink">{i.for?.length ? i.for.map((f: any) => f.label).join(", ") : i.isWalletTopup ? "Add funds" : i.forSummary ?? ""}</span>
                         <span className={cx("block text-[12px]", over ? "font-bold text-rose-600" : "text-mute")}>{over ? "overdue · " : "due "}{date(i.dueDate)}</span>
                       </span>
                       <span className="flex shrink-0 flex-col items-end gap-1"><span className="font-bold tabular-nums text-ink">{money(i.total, i.currency)}</span><Badge status={i.status} /></span>
@@ -366,12 +368,13 @@ function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab
           )}
           {tab === "orders" && <Table head={["Order", "Placed", "Total", "Status"]}>{rows.orders.map((o: any) => <tr key={o.id} className="hover:bg-[#fbf9ff]"><Td><Link className="font-mono font-bold text-primary-dark hover:underline" href={`/admin/orders/${o.id}`}>{o.number}</Link></Td><Td className="text-slate-600"><Ago at={o.createdAt} /></Td><Td className="font-semibold tabular-nums">{money(o.total, o.currency)}</Td><Td><Badge status={o.status} /></Td></tr>)}</Table>}
           {tab === "invoices" && (
-            <div className="hidden sm:block"><Table head={["Invoice", "Issued", "Due", "Total", "Status"]}>
+            <div className="hidden sm:block"><Table head={["Invoice", "For", "Issued", "Due", "Total", "Status"]}>
               {data.invoices.map((i: any) => {
                 const over = i.status === "UNPAID" && i.dueDate && new Date(i.dueDate) < today;
                 return (
                   <tr key={i.id} className={cx("hover:bg-[#fbf9ff]", over && "bg-rose-50/40")}>
-                    <Td><Link className="font-mono font-bold text-primary-dark hover:underline" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link>{i.isWalletTopup && <div className="text-[11px] text-mute">add funds</div>}</Td>
+                    <Td className="whitespace-nowrap"><Link className="font-mono font-bold text-primary-dark hover:underline" href={`/admin/invoices/${i.id}`}>{invNo(i)}</Link></Td>
+                    <Td><InvoiceFor inv={i} audience="admin" compact showProduct={false} /></Td>
                     <Td className="whitespace-nowrap text-slate-600">{date(i.issueDate)}</Td>
                     <Td className={cx("whitespace-nowrap", over ? "font-bold text-rose-600" : "text-slate-600")}>{date(i.dueDate)}{over && <div className="text-[11px] uppercase">overdue</div>}</Td>
                     <Td className="whitespace-nowrap font-semibold tabular-nums">{money(i.total, i.currency)}{i.status === "UNPAID" && i.amountPaid > 0 && <div className="text-[11.5px] font-normal text-amber-700">{money(i.total - i.amountPaid, i.currency)} left</div>}</Td>

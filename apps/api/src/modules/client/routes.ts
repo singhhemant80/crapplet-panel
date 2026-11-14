@@ -402,7 +402,8 @@ clientRouter.get(
     // drafts are staff-only until they're issued
     const where = { userId: req.user!.id, ...(typeof req.query.status === "string" && req.query.status !== "DRAFT" ? { status: req.query.status as "PAID" } : { status: { not: "DRAFT" as const } }) };
     const [rows, total] = await Promise.all([prisma.invoice.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }), prisma.invoice.count({ where })]);
-    res.json({ invoices: rows, total, page, pageSize });
+    const { withInvoiceLinks } = await import("../billing/invoice-links");
+    res.json({ invoices: await withInvoiceLinks(rows), total, page, pageSize });
   }),
 );
 

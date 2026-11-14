@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
+import { InvoiceFor } from "@/components/invoice-for";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, date, invNo, money } from "@/lib/api";
-import { Badge, Button, Card, Field, Input, Loading, Modal, PageHeader, Pager, Select, Table, Td, Textarea, Toggle, toast, useApi } from "@/components/ui";
+import { Badge, Button, Card, Field, Input, Loading, Modal, PageHeader, Pager, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 import { ClientPicker, CurrencySelect, LineEditor, newLine, linesToApi, type Line } from "@/components/admin/billing-kit";
 
 const BULK: [string, string, string, boolean?][] = [
@@ -55,16 +56,17 @@ function Invoices() {
       <Card pad={false}>
         {loading ? <Loading /> : (
           <>
-            <Table head={[<input key="all" type="checkbox" aria-label="Select all" className="h-4 w-4 accent-primary" checked={data.invoices.length > 0 && data.invoices.every((i: any) => sel.includes(i.id))} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...data.invoices.map((i: any) => i.id)])] : sel.filter((x) => !data.invoices.some((i: any) => i.id === x)))} />, "Invoice", "Customer", "Issued", "Due", "Total", "GST", "Status"]}>
+            <Table head={[<input key="all" type="checkbox" aria-label="Select all" className="h-4 w-4 accent-primary" checked={data.invoices.length > 0 && data.invoices.every((i: any) => sel.includes(i.id))} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...data.invoices.map((i: any) => i.id)])] : sel.filter((x) => !data.invoices.some((i: any) => i.id === x)))} />, "Invoice", "Customer", "For", "Issued", "Due", "Total", "GST", "Status"]}>
               {data.invoices.map((i: any) => (
                 <tr key={i.id} className={sel.includes(i.id) ? "bg-primary-tint/70" : "hover:bg-primary-tint"}>
                   <Td><input type="checkbox" aria-label={`Select ${invNo(i)}`} className="h-4 w-4 accent-primary" checked={sel.includes(i.id)} onChange={(e) => setSel(e.target.checked ? [...sel, i.id] : sel.filter((x) => x !== i.id))} /></Td>
-                  <Td><Link href={`/admin/invoices/${i.id}`} className="font-bold text-ink hover:text-primary-dark">{invNo(i)}</Link>{i.isWalletTopup && <div className="text-xs text-mute">wallet top-up</div>}</Td>
-                  <Td className="text-xs">{i.user.firstName} {i.user.lastName}<div className="text-mute">{i.user.email}</div></Td>
+                  <Td className="whitespace-nowrap"><Link href={`/admin/invoices/${i.id}`} className="font-bold text-ink hover:text-primary-dark">{invNo(i)}</Link></Td>
+                  <Td className="text-xs"><div className="max-w-[200px] truncate">{i.user.firstName} {i.user.lastName}</div><div className="max-w-[200px] truncate text-mute">{i.user.email}</div></Td>
+                  <Td><InvoiceFor inv={i} audience="admin" /></Td>
                   <Td className="whitespace-nowrap text-mute">{date(i.issueDate)}</Td>
-                  <Td className={i.status === "UNPAID" && new Date(i.dueDate) < new Date() ? "font-bold text-rose-600" : "text-mute"}>{date(i.dueDate)}</Td>
-                  <Td className="font-semibold">{money(i.total, i.currency)}</Td>
-                  <Td className="text-xs text-mute">{money(i.taxTotal, i.currency)}</Td>
+                  <Td className={cx("whitespace-nowrap", i.status === "UNPAID" && new Date(i.dueDate) < new Date() ? "font-bold text-rose-600" : "text-mute")}>{date(i.dueDate)}</Td>
+                  <Td className="whitespace-nowrap font-semibold">{money(i.total, i.currency)}</Td>
+                  <Td className="whitespace-nowrap text-xs text-mute">{money(i.taxTotal, i.currency)}</Td>
                   <Td><Badge status={i.status} /></Td>
                 </tr>
               ))}
