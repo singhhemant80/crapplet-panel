@@ -1,4 +1,4 @@
-/* Crapplet — floating "Chat on WhatsApp" button (bottom-right on every page).
+/* Crapplet — floating "Chat on WhatsApp" button (bottom-left on every page).
  * Opens a chat with our support number, with a short message about the page the visitor is on.
  * To change the number, edit NUMBER below (country code + number, digits only). */
 (function () {
@@ -18,17 +18,17 @@
   }
 
   var css = '' +
-    '#cwa-fab{position:fixed;right:20px;bottom:20px;z-index:45;display:flex;align-items:center;gap:10px;text-decoration:none;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}' +
+    '#cwa-fab{position:fixed;left:20px;bottom:20px;z-index:45;display:flex;align-items:center;gap:10px;text-decoration:none;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}' +
     '#cwa-fab .cwa-btn{position:relative;display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:linear-gradient(145deg,#2fe474,#1ebe5b 55%,#128c4b);box-shadow:0 10px 28px -6px rgba(18,140,75,.55),0 2px 6px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s}' +
     '#cwa-fab .cwa-btn:before{content:"";position:absolute;inset:0;border-radius:50%;background:#25d366;opacity:.45;animation:cwa-ping 2.4s cubic-bezier(0,0,.2,1) infinite;z-index:-1}' +
     '#cwa-fab svg{width:31px;height:31px;fill:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.15))}' +
-    '#cwa-fab .cwa-label{order:-1;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;padding:0;border-radius:999px;background:#fff;color:#0f172a;font-size:14px;font-weight:700;line-height:1;box-shadow:0 8px 24px -8px rgba(15,23,42,.3),0 0 0 1px rgba(15,23,42,.06);transition:max-width .35s cubic-bezier(.22,1,.36,1),opacity .25s,padding .35s}' +
+    '#cwa-fab .cwa-label{order:1;max-width:0;overflow:hidden;white-space:nowrap;opacity:0;padding:0;border-radius:999px;background:#fff;color:#0f172a;font-size:14px;font-weight:700;line-height:1;box-shadow:0 8px 24px -8px rgba(15,23,42,.3),0 0 0 1px rgba(15,23,42,.06);transition:max-width .35s cubic-bezier(.22,1,.36,1),opacity .25s,padding .35s}' +
     '#cwa-fab .cwa-label small{display:block;margin-top:4px;font-size:11.5px;font-weight:600;color:#16a34a}' +
     '#cwa-fab:hover .cwa-btn,#cwa-fab:focus-visible .cwa-btn{transform:translateY(-2px) scale(1.04);box-shadow:0 14px 32px -6px rgba(18,140,75,.6),0 2px 6px rgba(0,0,0,.12)}' +
     '#cwa-fab:hover .cwa-label,#cwa-fab:focus-visible .cwa-label,#cwa-fab.cwa-hello .cwa-label{max-width:220px;opacity:1;padding:11px 16px}' +
     '#cwa-fab:focus{outline:none}#cwa-fab:focus-visible .cwa-btn{outline:3px solid #a7f3d0;outline-offset:3px}' +
     '@keyframes cwa-ping{0%{transform:scale(1);opacity:.45}75%,100%{transform:scale(1.55);opacity:0}}' +
-    '@media (max-width:640px){#cwa-fab{right:14px;bottom:14px}#cwa-fab .cwa-btn{width:54px;height:54px}#cwa-fab svg{width:29px;height:29px}}' +
+    '@media (max-width:640px){#cwa-fab{left:14px;bottom:14px}#cwa-fab .cwa-btn{width:54px;height:54px}#cwa-fab svg{width:29px;height:29px}}' +
     '@media (prefers-reduced-motion:reduce){#cwa-fab .cwa-btn:before{animation:none}#cwa-fab *{transition:none!important}}' +
     '@media print{#cwa-fab{display:none}}';
 

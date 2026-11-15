@@ -15,7 +15,9 @@ function messageFor(path: string) {
   return "Hi Crapplet Cloud! I have a question.";
 }
 
-/** Floating "Chat on WhatsApp" button, bottom-right. */
+const AUTH_PAGES = /^\/client\/(login|register|forgot-password|reset-password|verify-email|two-factor|accept-invite)(\/|$)/;
+
+/** Floating "Chat on WhatsApp" button, bottom-left. */
 export function WhatsAppFab() {
   const path = usePathname() ?? "";
   const [hello, setHello] = useState(false);
@@ -31,6 +33,8 @@ export function WhatsAppFab() {
       /* storage blocked */
     }
   }, []);
+  // the client area has a 272px sidebar on large screens — sit just past it instead of over it
+  const besideSidebar = path.startsWith("/client") && !AUTH_PAGES.test(path);
   const href = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(messageFor(path))}`;
   return (
     <a
@@ -38,10 +42,10 @@ export function WhatsAppFab() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with Crapplet Cloud on WhatsApp"
-      className="group fixed bottom-3.5 right-3.5 z-[45] flex items-center gap-2.5 [-webkit-tap-highlight-color:transparent] focus:outline-none sm:bottom-5 sm:right-5 print:hidden"
+      className={`group fixed bottom-3.5 left-3.5 z-[45] flex items-center gap-2.5 [-webkit-tap-highlight-color:transparent] focus:outline-none sm:bottom-5 sm:left-5 print:hidden ${besideSidebar ? "lg:left-[292px]" : ""}`}
     >
       <span
-        className={`order-first max-w-0 overflow-hidden whitespace-nowrap rounded-full bg-white px-0 py-0 text-sm font-bold leading-none text-ink opacity-0 shadow-[0_8px_24px_-8px_rgba(15,23,42,.3),0_0_0_1px_rgba(15,23,42,.06)] transition-all duration-300 group-hover:max-w-[220px] group-hover:px-4 group-hover:py-[11px] group-hover:opacity-100 group-focus-visible:max-w-[220px] group-focus-visible:px-4 group-focus-visible:py-[11px] group-focus-visible:opacity-100 ${hello ? "!max-w-[220px] !px-4 !py-[11px] !opacity-100" : ""}`}
+        className={`order-last max-w-0 overflow-hidden whitespace-nowrap rounded-full bg-white px-0 py-0 text-sm font-bold leading-none text-ink opacity-0 shadow-[0_8px_24px_-8px_rgba(15,23,42,.3),0_0_0_1px_rgba(15,23,42,.06)] transition-all duration-300 group-hover:max-w-[220px] group-hover:px-4 group-hover:py-[11px] group-hover:opacity-100 group-focus-visible:max-w-[220px] group-focus-visible:px-4 group-focus-visible:py-[11px] group-focus-visible:opacity-100 ${hello ? "!max-w-[220px] !px-4 !py-[11px] !opacity-100" : ""}`}
       >
         Chat with us
         <small className="mt-1 block text-[11.5px] font-semibold text-green-600">Usually replies in minutes</small>
