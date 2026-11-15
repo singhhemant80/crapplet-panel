@@ -211,12 +211,29 @@ adminCore.post(
   }),
 );
 
+/** a required field left blank in the edit form means "keep it", not "clear it" */
+function dropBlankRequired(body: unknown) {
+  if (!body || typeof body !== "object") return body;
+  const out = { ...(body as Record<string, unknown>) };
+  for (const k of ["firstName", "email", "phone", "address1", "city", "state", "postcode", "country"]) if (typeof out[k] === "string" && !(out[k] as string).trim()) delete out[k];
+  return out;
+}
+
 adminCore.put(
   "/clients/:id",
   requireStaff("clients.manage"),
   ah(async (req, res) => {
-    const b = parse(profileSchema.partial().extend({ email: z.string().email().toLowerCase().optional(), status: z.enum(["ACTIVE", "INACTIVE", "CLOSED"]).optional(), notes: z.string().max(5000).optional(), currency: z.string().length(3).toUpperCase().optional() }), req.body);
-    const { email, status, firstName, lastName, phone, notes, currency, ...profile } = b;
+    const b = parse(profileSchema.partial().extend({ email: z.string().trim().toLowerCase().email().optional(), status: z.enum(["ACTIVE", "INACTIVE", "CLOSED"]).optional(), notes: z.string().max(5000).optional(), currency: z.string().length(3).toUpperCase().optional(), emailVerified: z.boolean().optional() }), dropBlankRequired(req.body));
+    const { email, status, firstName, lastName, phone, notes, currency, emailVerified, ...profile } = b;
+    const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, type: true, email: true, emailVerifiedAt: true } });
+    if (!user || user.type !== "CLIENT") throw notFound("Client not found");
+    const emailChanged = !!email && email !== user.email.toLowerCase();
+    if (emailChanged) {
+      const taken = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, NOT: { id: user.id } }, select: { id: true, type: true } });
+      if (taken) throw conflict(`Another ${taken.type === "STAFF" ? "staff" : "client"} account already uses ${email}`);
+    }
+    // a new address isn't proven yet — unless staff confirm they checked it
+    const verifiedAt = emailVerified === true ? (emailChanged || !user.emailVerifiedAt ? new Date() : undefined) : emailVerified === false || emailChanged ? null : undefined;
     const current = await prisma.clientProfile.findUnique({ where: { userId: req.params.id } });
     if (currency && currency !== current?.currency) {
       // switching currency mid-life would mix rupees and dollars on one account
@@ -230,12 +247,18 @@ adminCore.put(
       (profile as Record<string, unknown>).currency = currency;
     }
     const stateCode = profile.country || profile.state || profile.gstin ? resolveStateCode(profile.country ?? current?.country ?? "IN", profile.state ?? current?.state ?? "", profile.gstin ?? current?.gstin, profile.stateCode) : undefined;
+    const profileData = { ...profile, ...(stateCode !== undefined ? { stateCode } : {}), ...(notes !== undefined ? { notes } : {}) };
     await prisma.user.update({
       where: { id: req.params.id },
-      data: { email, status, firstName, lastName, phone, profile: { update: { ...profile, ...(stateCode !== undefined ? { stateCode } : {}), ...(notes !== undefined ? { notes } : {}) } } },
+      data: {
+        email, status, firstName, lastName, phone,
+        ...(verifiedAt !== undefined ? { emailVerifiedAt: verifiedAt } : {}),
+        // WHMCS-imported / older accounts may have no profile row yet
+        profile: { upsert: { create: { country: "IN", currency: "INR", ...profileData, stateCode: stateCode ?? resolveStateCode(profile.country ?? "IN", profile.state ?? "", profile.gstin, profile.stateCode) } as never, update: profileData } },
+      },
     });
     if (status && status !== "ACTIVE") await prisma.session.updateMany({ where: { userId: req.params.id, revokedAt: null }, data: { revokedAt: new Date() } });
-    await audit({ actorId: req.user!.id, userId: req.params.id, action: "client.updated", details: Object.keys(b) });
+    await audit({ actorId: req.user!.id, userId: req.params.id, action: "client.updated", details: { fields: Object.keys(b), ...(emailChanged ? { emailFrom: user.email, emailTo: email } : {}) } });
     res.json({ ok: true });
   }),
 );

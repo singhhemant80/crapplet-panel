@@ -17,9 +17,33 @@ export const ah =
     fn(req, res, next).catch(next);
   };
 
+/** "Validation failed" → "Phone: must be at least 6 characters; Email: invalid email address" (first 3 fields). */
+export function validationMessage(err: { issues: { path: (string | number)[]; message: string }[] }) {
+  const human = (k: string) => k.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase()).replace(/\b(Gstin|Pan|Ip|Url|Id)\b/g, (m) => m.toUpperCase()).replace(/ (\d)$/, " $1");
+  const tidy = (m: string) =>
+    m
+      .replace(/^String must contain at least (\d+) character\(s\)$/, (_, n) => (n === "1" ? "is required" : `must be at least ${n} characters`))
+      .replace(/^String must contain at most (\d+) character\(s\)$/, "must be at most $1 characters")
+      .replace(/^Too small: expected string to have >=?(\d+) characters?$/, (_, n) => (n === "1" ? "is required" : `must be at least ${n} characters`))
+      .replace(/^Invalid email$/i, "isn't a valid email address")
+      .replace(/^Required$/, "is required");
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const i of err.issues) {
+    const field = i.path.filter((p) => typeof p === "string").pop() as string | undefined;
+    const key = field ?? "";
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const msg = tidy(i.message);
+    parts.push(field ? `${human(field)} ${/^(is|must|isn't)\b/.test(msg) ? msg : `— ${msg}`}` : msg);
+    if (parts.length === 3) break;
+  }
+  return parts.length ? `Please check: ${parts.join("; ")}` : "Validation failed";
+}
+
 export function parse<S extends ZodTypeAny>(schema: S, data: unknown): z.output<S> {
   const r = schema.safeParse(data);
-  if (!r.success) throw badRequest("Validation failed", r.error.flatten());
+  if (!r.success) throw badRequest(validationMessage(r.error), r.error.flatten());
   return r.data;
 }
 

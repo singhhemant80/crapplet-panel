@@ -78,6 +78,7 @@ export default function ClientDetail() {
         </>}
         actions={<>
           <Button size="sm" icon="add_shopping_cart" href={`/admin/orders/new?client=${c.id}`}>New order</Button>
+          <Button size="sm" variant="outline" icon="edit" onClick={() => setModal("profile")}>Edit details</Button>
           <Button size="sm" variant="outline" icon="login" disabled={c.status !== "ACTIVE"} onClick={loginAs}>Login as client</Button>
           <Button size="sm" variant="outline" icon="mail" onClick={() => setModal("email")}>Email</Button>
           <Button size="sm" variant="outline" icon="chat" disabled={!c.phone} onClick={() => setModal("whatsapp")}>WhatsApp</Button>
@@ -633,26 +634,82 @@ const KIND: Record<string, string> = { invoice: "Invoice", payment: "Payment", r
 // ───── modals ─────
 function ProfileModal({ open, onClose, c, onDone }: any) {
   const [f, setF] = useState<any>({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   useEffect(() => {
     if (open) {
       const p = c.profile ?? {};
-      setF({ firstName: c.firstName, lastName: c.lastName ?? "", email: c.email, phone: c.phone ?? "", companyName: p.companyName ?? "", gstin: p.gstin ?? "", pan: p.pan ?? "", address1: p.address1 ?? "", address2: p.address2 ?? "", city: p.city ?? "", state: p.state ?? "", postcode: p.postcode ?? "", country: p.country ?? "IN" });
+      setF({ firstName: c.firstName ?? "", lastName: c.lastName ?? "", email: c.email ?? "", phone: c.phone ?? "", companyName: p.companyName ?? "", gstin: p.gstin ?? "", pan: p.pan ?? "", address1: p.address1 ?? "", address2: p.address2 ?? "", city: p.city ?? "", state: p.state ?? "", postcode: p.postcode ?? "", country: p.country ?? "IN", emailVerified: !!c.emailVerified });
+      setErr("");
     }
   }, [open, c]);
   const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
-  const fields: [string, string][] = [["firstName", "First name"], ["lastName", "Last name"], ["email", "Email"], ["phone", "Phone"], ["companyName", "Company"], ["gstin", "GSTIN"], ["pan", "PAN"], ["address1", "Address 1"], ["address2", "Address 2"], ["city", "City"], ["state", "State"], ["postcode", "Postcode"]];
+  const emailChanged = (f.email ?? "").trim().toLowerCase() !== (c.email ?? "").toLowerCase();
+  const inp = (k: string, label: string, extra: { type?: string; placeholder?: string; hint?: string; upper?: boolean; className?: string } = {}) => (
+    <Field label={label} hint={extra.hint} className={extra.className}>
+      <Input type={extra.type ?? "text"} value={f[k] ?? ""} placeholder={extra.placeholder} onChange={(e) => setF({ ...f, [k]: extra.upper ? e.target.value.toUpperCase() : e.target.value })} />
+    </Field>
+  );
+  async function save() {
+    setBusy(true);
+    setErr("");
+    // required fields left empty are not sent (keeps the current value); optional ones can be cleared
+    const required = ["firstName", "email", "phone", "address1", "city", "state", "postcode"];
+    const body: Record<string, unknown> = Object.fromEntries(Object.entries(f).filter(([k, v]) => k !== "emailVerified" && !(required.includes(k) && String(v ?? "").trim() === "")).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]));
+    if (emailChanged || f.emailVerified !== !!c.emailVerified) body.emailVerified = !!f.emailVerified;
+    try {
+      await api(`/admin/clients/${c.id}`, { method: "PUT", body });
+      toast.success("Client details saved");
+      onClose();
+      onDone();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <Modal open={open} onClose={onClose} title="Edit client information" wide>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map(([k, l]) => <Field key={k} label={l}><Input value={f[k] ?? ""} onChange={set(k)} /></Field>)}
-        <Field label="Country"><Select value={f.country ?? "IN"} onChange={set("country")}>{Object.entries(COUNTRY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
+    <Modal open={open} onClose={onClose} title="Edit client details" wide>
+      <div className="space-y-5">
+        <section>
+          <div className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-slate-500">Name &amp; contact</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {inp("firstName", "First name")}
+            {inp("lastName", "Last name")}
+            {inp("email", "Email (login)", { type: "email", hint: "Used to sign in and for invoices" })}
+            {inp("phone", "Phone / mobile", { type: "tel", placeholder: "+91 98765 43210", hint: "Also used for WhatsApp" })}
+          </div>
+          <label className="mt-2.5 flex items-start gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#6d28d9]" checked={!!f.emailVerified} onChange={(e) => setF({ ...f, emailVerified: e.target.checked })} />
+            <span>Email is verified{emailChanged && <span className="block text-[12.5px] text-amber-700">You changed the email — leave this unticked to make the client confirm the new address, or tick it if you&apos;ve checked it yourself.</span>}</span>
+          </label>
+        </section>
+        <section>
+          <div className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-slate-500">Business &amp; tax</div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {inp("companyName", "Company", { className: "sm:col-span-3" })}
+            {inp("gstin", "GSTIN", { upper: true, placeholder: "23ABCDE1234F1Z5" })}
+            {inp("pan", "PAN", { upper: true, placeholder: "ABCDE1234F" })}
+          </div>
+        </section>
+        <section>
+          <div className="mb-2 text-[12px] font-extrabold uppercase tracking-wide text-slate-500">Billing address</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {inp("address1", "Address line 1")}
+            {inp("address2", "Address line 2")}
+            {inp("city", "City")}
+            {inp("state", "State")}
+            {inp("postcode", "Postcode / PIN")}
+            <Field label="Country"><Select value={f.country ?? "IN"} onChange={set("country")}>{Object.entries(COUNTRY).map(([k, v]) => <option key={k} value={k}>{v as string}</option>)}</Select></Field>
+          </div>
+        </section>
+        {err && <Alert tone="error">{err}</Alert>}
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          <Button icon="save" loading={busy} onClick={save}>Save changes</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <span className="text-[12.5px] text-mute">Every change is recorded in the activity log.</span>
+        </div>
       </div>
-      <Button className="mt-4" onClick={() => {
-        // required fields left empty are not sent (keeps the current value); optional ones can be cleared
-        const required = ["firstName", "email", "phone", "address1", "city", "state", "postcode"];
-        const body = Object.fromEntries(Object.entries(f).filter(([k, v]) => !(required.includes(k) && String(v ?? "").trim() === "")));
-        api(`/admin/clients/${c.id}`, { method: "PUT", body }).then(() => { toast.success("Client updated"); onClose(); onDone(); }).catch((e) => toast.error(e.message));
-      }}>Save changes</Button>
     </Modal>
   );
 }
