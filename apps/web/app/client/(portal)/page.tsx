@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { LiveClock } from "@/components/live-clock";
+import { ClockCard, TodayDate } from "@/components/live-clock";
 import type { ReactNode } from "react";
 import { useSession } from "@/lib/session";
 import { CYCLES, date, gb, invNo, money } from "@/lib/api";
@@ -36,7 +36,7 @@ export default function Dashboard() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:linear-gradient(90deg,transparent,black)]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold text-white/75"><LiveClock /></p>
+            <p className="text-sm font-semibold text-white/75"><TodayDate /></p>
             <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-[32px]">{greet()}, {me?.firstName}</h1>
             <p className="mt-2 max-w-xl text-sm text-white/80">
               {s.overdueInvoices ? `You have ${s.overdueInvoices} overdue invoice${s.overdueInvoices > 1 ? "s" : ""} — pay now to keep your services running.` : s.activeServices ? `All ${s.activeServices} of your services are managed from here — servers, hosting, domains, billing and support.` : "Welcome to Crapplet Cloud. Deploy your first VPS or hosting plan in minutes."}
@@ -47,11 +47,14 @@ export default function Dashboard() {
               {a.company && <span className="inline-flex items-center gap-1.5"><Icon name="apartment" className="text-[16px]" />{a.company}</span>}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-4 lg:items-end">
+          <ClockCard className="self-start lg:self-end" />
+          <div className="flex flex-wrap gap-2 lg:justify-end">
             {s.outstanding > 0 && <HeroBtn href={data.unpaid.length === 1 ? `/client/invoices/${data.unpaid[0].id}` : "/client/invoices?status=UNPAID"} icon="bolt" primary>Pay {money(s.outstanding, cur)}</HeroBtn>}
             <HeroBtn href="/order" icon="rocket_launch" primary={!s.outstanding}>Order new</HeroBtn>
             <HeroBtn href="/client/tickets/new" icon="support_agent">Get support</HeroBtn>
             <HeroBtn href="/client/wallet" icon="add_card">Add funds</HeroBtn>
+          </div>
           </div>
         </div>
       </section>

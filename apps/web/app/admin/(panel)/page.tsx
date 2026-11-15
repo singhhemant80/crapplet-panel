@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, date, money } from "@/lib/api";
 import { can, useSession } from "@/lib/session";
-import { LiveClock } from "@/components/live-clock";
+import { ClockCard, TodayDate } from "@/components/live-clock";
 import { Badge, Button, Icon, Loading, PageHeader, cx, toast, useApi } from "@/components/ui";
 
 /** ₹1,26,930 → "₹1.27L"; ₹2.4 cr → "₹2.42Cr" — for big tiles and chart labels */
@@ -279,13 +279,14 @@ export default function AdminDashboard() {
       <PageHeader
         icon="space_dashboard"
         title={`${greet()}, ${me?.firstName ?? "Admin"}`}
-        subtitle={<LiveClock />}
+        subtitle={<TodayDate />}
         meta={<>
           <span className="inline-flex items-center gap-1.5"><Icon name="group" className="text-[16px] text-white/60" />{d.clients.online} client{d.clients.online === 1 ? "" : "s"} online</span>
           <span className="inline-flex items-center gap-1.5"><Icon name="badge" className="text-[16px] text-white/60" />{d.staffOnline.length} staff online</span>
           <span className={cx("inline-flex items-center gap-1.5", !d.automation.healthy && "font-bold text-amber-200")}><Icon name="schedule" className="text-[16px] text-white/60" />{d.automation.enabled ? (d.automation.healthy ? "Automation running" : "Automation not running") : "Automation off"}</span>
         </>}
         actions={<>
+          <ClockCard className="mr-1" />
           <Button size="sm" icon="add_shopping_cart" href="/admin/orders/new">New order</Button>
           <Button size="sm" variant="outline" icon="play_arrow" loading={running} onClick={runAutomation}>Run automation</Button>
         </>}
