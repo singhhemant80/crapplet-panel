@@ -12,8 +12,10 @@ const PERKS = [
 /** Split-screen auth layout: branded panel on the left, form card on the right. */
 export function AuthShell({ title, subtitle, children, wide, eyebrow = "Client area" }: { title: string; subtitle?: ReactNode; children: ReactNode; wide?: boolean; eyebrow?: string }) {
   return (
-    <div className="relative overflow-hidden bg-[radial-gradient(circle_at_0%_0%,#efe3ff_0,transparent_45%),radial-gradient(circle_at_100%_100%,#fde7f3_0,transparent_40%)] bg-[#fbf9ff] px-4 py-10 sm:py-14">
-      <div className={cx("relative mx-auto grid overflow-hidden rounded-[28px] border border-line bg-white shadow-[0_40px_90px_rgba(46,16,101,.16)] fade-up lg:grid-cols-[0.9fr_1.1fr]", wide ? "max-w-6xl" : "max-w-5xl")}>
+    <div className="relative overflow-hidden bg-white lg:bg-[radial-gradient(circle_at_0%_0%,#efe3ff_0,transparent_45%),radial-gradient(circle_at_100%_100%,#fde7f3_0,transparent_40%)] lg:bg-[#fbf9ff] lg:px-4 lg:py-14">
+      {/* phones & tablets: a soft wash behind the heading instead of a card in a card */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(120%_100%_at_50%_0%,#efe6ff_0%,#f8f4ff_45%,#ffffff_100%)] lg:hidden" />
+      <div className={cx("relative mx-auto grid fade-up lg:grid-cols-[0.9fr_1.1fr] lg:overflow-hidden lg:rounded-[28px] lg:border lg:border-line lg:bg-white lg:shadow-[0_40px_90px_rgba(46,16,101,.16)]", wide ? "max-w-6xl" : "max-w-5xl")}>
         {/* brand panel */}
         <aside className="relative hidden overflow-hidden bg-[linear-gradient(150deg,#8b5cf6_0%,#6d28d9_50%,#3b0f7a_100%)] p-10 text-white lg:flex lg:flex-col">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
@@ -87,22 +89,27 @@ export function AuthShell({ title, subtitle, children, wide, eyebrow = "Client a
         </aside>
 
         {/* form */}
-        <section className="min-w-0 p-6 sm:p-10">
-          <div className="-mx-6 -mt-6 mb-7 flex gap-2 overflow-x-auto bg-[linear-gradient(120deg,#8b5cf6,#6d28d9)] px-6 py-3 sm:-mx-10 sm:-mt-10 sm:px-10 lg:hidden">
-            {PERKS.map((p) => (
-              <span key={p.title} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold text-white ring-1 ring-white/20">
-                <Icon name={p.icon} className="text-[16px]" /> {p.title}
-              </span>
-            ))}
-          </div>
-          <div className="mb-7">
-            <span className="text-[11px] font-extrabold uppercase tracking-[.2em] text-primary-dark">{eyebrow}</span>
-            <h1 className="mt-1.5 text-[26px] font-extrabold tracking-tight text-ink sm:text-[30px]">{title}</h1>
-            {subtitle && <p className="mt-1.5 text-[14.5px] text-mute">{subtitle}</p>}
+        <section className={cx("mx-auto w-full min-w-0 px-5 pb-10 pt-8 sm:px-8 sm:pt-12 lg:max-w-none lg:p-10", wide ? "max-w-2xl" : "max-w-[440px]")}>
+          <div className="mb-7 lg:mb-7">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[.16em] text-primary-dark shadow-sm ring-1 ring-[#e9ddff] lg:bg-transparent lg:p-0 lg:shadow-none lg:ring-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 lg:hidden" />
+              {eyebrow}
+            </span>
+            <h1 className="mt-3 text-[26px] font-extrabold leading-[1.15] tracking-tight text-ink sm:text-[28px] lg:mt-1.5 lg:text-[30px]">{title}</h1>
+            {subtitle && <p className="mt-2 text-[15px] leading-relaxed text-mute lg:mt-1.5 lg:text-[14.5px]">{subtitle}</p>}
           </div>
           {children}
-          <p className="mt-8 flex items-center justify-center gap-2 text-xs font-semibold text-mute">
-            <Icon name="lock" className="text-[16px]" /> Secured with 256-bit TLS · Crapplet Infotech Pvt. Ltd.
+          {/* phones & tablets: what you get, compactly (desktop has the side panel) */}
+          <ul className="mt-9 grid grid-cols-3 gap-2 lg:hidden">
+            {[["bolt", "Instant VPS setup"], ["receipt_long", "GST invoices"], ["support_agent", "24/7 support"]].map(([i, t]) => (
+              <li key={t} className="flex flex-col items-center gap-1.5 rounded-2xl bg-[#faf7ff] px-2 py-3 text-center ring-1 ring-[#efe7ff]">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-white text-primary-dark shadow-sm"><Icon name={i} className="text-[18px]" /></span>
+                <span className="text-[11.5px] font-bold leading-tight text-slate-700">{t}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-mute lg:mt-8 lg:gap-2">
+            <Icon name="lock" className="text-[15px]" /> Secured with 256-bit TLS<span className="hidden lg:inline"> · Crapplet Infotech Pvt. Ltd.</span>
           </p>
         </section>
       </div>
@@ -118,7 +125,7 @@ export function IconInput({ icon, trailing, className, ...p }: InputHTMLAttribut
       <input
         {...p}
         className={cx(
-          "h-12 w-full rounded-xl border border-[#e6dcf8] bg-[#fcfaff] pl-11 text-[15px] text-ink outline-none transition placeholder:text-slate-400 hover:border-[#d8c6fb] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/15",
+          "h-12 w-full rounded-xl border border-[#e6dcf8] bg-[#fcfaff] pl-11 text-base text-ink sm:text-[15px] outline-none transition placeholder:text-slate-400 hover:border-[#d8c6fb] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/15",
           trailing ? "pr-12" : "pr-3.5",
           className,
         )}
