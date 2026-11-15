@@ -92,6 +92,44 @@ adminSupport.put(
   }),
 );
 
+/** Staff tickets can be assigned to (names only — usable by support agents without staff-management rights). */
+adminSupport.get(
+  "/ticket-assignees",
+  requireStaff("tickets.view"),
+  ah(async (_req, res) => {
+    res.json({ staff: await prisma.user.findMany({ where: { type: "STAFF", status: "ACTIVE" }, select: { id: true, firstName: true, lastName: true, email: true }, orderBy: { firstName: "asc" } }) });
+  }),
+);
+
+/** Change many tickets at once: close / reopen / set status, priority, department or assignee. */
+adminSupport.post(
+  "/tickets/bulk",
+  requireStaff("tickets.manage"),
+  ah(async (req, res) => {
+    const b = parse(
+      z.object({
+        ids: z.array(z.string()).max(500),
+        status: z.nativeEnum(TicketStatus).optional(),
+        priority: z.nativeEnum(TicketPriority).optional(),
+        departmentId: z.string().optional(),
+        assignedToId: z.string().nullable().optional(),
+      }),
+      req.body,
+    );
+    const { ids, ...change } = b;
+    if (!ids.length) throw badRequest("Select at least one ticket");
+    if (!Object.keys(change).length) throw badRequest("Choose what to change");
+    if (change.departmentId && !(await prisma.ticketDepartment.findUnique({ where: { id: change.departmentId } }))) throw badRequest("Department not found");
+    if (change.assignedToId && !(await prisma.user.findFirst({ where: { id: change.assignedToId, type: "STAFF" } }))) throw badRequest("Staff member not found");
+    const data = { ...change, ...(change.status === "CLOSED" ? { closedAt: new Date() } : change.status ? { closedAt: null } : {}) };
+    // closing skips tickets already closed, so their original close time is kept
+    const where = { id: { in: ids }, ...(change.status === "CLOSED" ? { status: { not: TicketStatus.CLOSED } } : {}) };
+    const r = await prisma.ticket.updateMany({ where, data });
+    await audit({ actorId: req.user!.id, action: "ticket.bulk_updated", entity: "ticket", details: { ...change, count: r.count, ids: ids.slice(0, 100) } });
+    res.json({ updated: r.count, skipped: ids.length - r.count });
+  }),
+);
+
 adminSupport.get(
   "/attachments/:id",
   requireStaff("tickets.view"),

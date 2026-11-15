@@ -37,6 +37,43 @@ async function sumTxn(type: "PAYMENT" | "REFUND", from?: Date, to?: Date) {
   return { total: Math.round(Math.abs(Number(r[0]?.total ?? 0))), count: Number(r[0]?.n ?? 0) };
 }
 
+/** Income / orders / new clients for the dashboard chart: by day for 7d, 15d and 1m; by month for 6m and 1y (IST). */
+export const CHART_RANGES = { "7d": { days: 7 }, "15d": { days: 15 }, "1m": { days: 30 }, "6m": { months: 6 }, "1y": { months: 12 } } as const;
+export async function dashboardChart(range: keyof typeof CHART_RANGES, now = new Date()) {
+  const r = CHART_RANGES[range] as { days?: number; months?: number };
+  const byDay = !!r.days;
+  const unit = byDay ? "day" : "month";
+  const fmt = byDay ? "YYYY-MM-DD" : "YYYY-MM";
+  let keys: string[];
+  let from: Date;
+  if (byDay) {
+    const today = new Date(now.getTime() + IST);
+    const start = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - (r.days! - 1) * 86400_000;
+    from = new Date(start - IST);
+    keys = Array.from({ length: r.days! }, (_, i) => new Date(start + i * 86400_000).toISOString().slice(0, 10));
+  } else {
+    from = istMonthStart(now, -(r.months! - 1));
+    keys = Array.from({ length: r.months! }, (_, i) => new Date(istMonthStart(now, i - (r.months! - 1)).getTime() + IST).toISOString().slice(0, 7));
+  }
+  const [inc, ord, cli] = await Promise.all([
+    prisma.$queryRaw<{ k: string; v: number }[]>`SELECT to_char(date_trunc(${unit}, t."createdAt" AT TIME ZONE 'Asia/Kolkata'), ${fmt}) AS k, SUM(t."amount" * COALESCE(i."exchangeRate", 1)) AS v FROM "Transaction" t LEFT JOIN "Invoice" i ON i."id" = t."invoiceId" WHERE t."type" = 'PAYMENT' AND t."createdAt" >= ${from} GROUP BY 1`,
+    prisma.$queryRaw<{ k: string; v: bigint }[]>`SELECT to_char(date_trunc(${unit}, "createdAt" AT TIME ZONE 'Asia/Kolkata'), ${fmt}) AS k, COUNT(*) AS v FROM "Order" WHERE "createdAt" >= ${from} GROUP BY 1`,
+    prisma.$queryRaw<{ k: string; v: bigint }[]>`SELECT to_char(date_trunc(${unit}, "createdAt" AT TIME ZONE 'Asia/Kolkata'), ${fmt}) AS k, COUNT(*) AS v FROM "User" WHERE "type" = 'CLIENT' AND "createdAt" >= ${from} GROUP BY 1`,
+  ]);
+  const pick = (rows: { k: string; v: unknown }[], k: string) => Math.round(Number(rows.find((x) => x.k === k)?.v ?? 0));
+  const rows = keys.map((k) => ({ key: k, income: pick(inc, k), orders: pick(ord, k), clients: pick(cli, k) }));
+  return { range, unit, rows, totals: { income: rows.reduce((a, x) => a + x.income, 0), orders: rows.reduce((a, x) => a + x.orders, 0), clients: rows.reduce((a, x) => a + x.clients, 0) } };
+}
+
+adminDashboard.get(
+  "/dashboard/chart",
+  requireStaff(),
+  ah(async (req, res) => {
+    const range = (String(req.query.range ?? "7d") in CHART_RANGES ? String(req.query.range ?? "7d") : "7d") as keyof typeof CHART_RANGES;
+    res.json(await dashboardChart(range));
+  }),
+);
+
 adminDashboard.get(
   "/dashboard/overview",
   requireStaff(),

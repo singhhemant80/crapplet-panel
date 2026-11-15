@@ -45,8 +45,55 @@ const More = ({ href, children = "View all" }: { href: string; children?: React.
   <Link href={href} className="inline-flex shrink-0 items-center gap-0.5 text-[12.5px] font-bold text-primary-dark hover:underline">{children}<Icon name="chevron_right" className="text-[17px]" /></Link>
 );
 
-/** 12 months: income bars + orders line */
-function Chart({ rows }: { rows: { month: string; income: number; orders: number; clients: number }[] }) {
+const RANGES = [["7d", "7 days", "7D"], ["15d", "15 days", "15D"], ["1m", "1 month", "1M"], ["6m", "6 months", "6M"], ["1y", "1 year", "1Y"]] as const;
+type ChartRow = { key: string; income: number; orders: number; clients: number };
+
+/** Income bars + orders line for the chosen period (by day up to a month, by month beyond). */
+function IncomeChart() {
+  const [range, setRange] = useState<string>(() => {
+    try { return localStorage.getItem("dash.chartRange") || "7d"; } catch { return "7d"; }
+  });
+  const [d, setD] = useState<{ unit: "day" | "month"; rows: ChartRow[]; totals: { income: number; orders: number; clients: number } } | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    api(`/admin/dashboard/chart?range=${range}`).then((r) => live && setD(r)).catch(() => {}).finally(() => live && setLoading(false));
+    try { localStorage.setItem("dash.chartRange", range); } catch {}
+    return () => { live = false; };
+  }, [range]);
+  const title = RANGES.find(([k]) => k === range)?.[1] ?? "";
+  return (
+    <Panel
+      title={`Income & orders · ${title}`}
+      icon="monitoring"
+      action={
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-xl bg-[#f4effd] p-0.5 text-[12px] font-bold" role="tablist" aria-label="Chart period">
+            {RANGES.map(([k, l, sh]) => (
+              <button key={k} role="tab" aria-selected={range === k} title={l} onClick={() => setRange(k)} className={cx("whitespace-nowrap rounded-lg px-2.5 py-1 transition", range === k ? "bg-white text-primary-dark shadow-sm" : "text-mute hover:text-ink")}>
+                <span className="hidden 2xl:inline">{l}</span>
+                <span className="2xl:hidden">{sh}</span>
+              </button>
+            ))}
+          </div>
+          <span className="hidden sm:inline"><More href="/admin/reports">Reports</More></span>
+        </div>
+      }
+    >
+      {d && (
+        <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <span className="text-mute">Income <b className="text-ink">{inr(d.totals.income)}</b></span>
+          <span className="text-mute">Orders <b className="text-ink">{d.totals.orders.toLocaleString("en-IN")}</b></span>
+          <span className="text-mute">New clients <b className="text-ink">{d.totals.clients.toLocaleString("en-IN")}</b></span>
+        </div>
+      )}
+      <div className={cx("transition-opacity", loading && "opacity-50")}>{d ? <Chart rows={d.rows} unit={d.unit} /> : <div className="h-[230px] animate-pulse rounded-xl bg-[#faf7ff]" />}</div>
+    </Panel>
+  );
+}
+
+function Chart({ rows, unit }: { rows: ChartRow[]; unit: "day" | "month" }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 720, H = 230, P = { l: 52, r: 36, t: 16, b: 28 };
   const maxI = Math.max(1, ...rows.map((r) => r.income));
@@ -56,6 +103,11 @@ function Chart({ rows }: { rows: { month: string; income: number; orders: number
   const yo = (v: number) => P.t + (H - P.t - P.b) * (1 - v / maxO);
   const line = rows.map((r, i) => `${i ? "L" : "M"}${P.l + cw * i + cw / 2},${yo(r.orders)}`).join(" ");
   const h = hover !== null ? rows[hover] : null;
+  const date = (k: string) => new Date(unit === "day" ? `${k}T00:00:00` : `${k}-01T00:00:00`);
+  const short = (k: string) => (unit === "day" ? date(k).toLocaleString("en-IN", { day: "numeric", month: rows.length > 15 ? undefined : "short" }) : date(k).toLocaleString("en-IN", { month: "short" }));
+  const long = (k: string) => (unit === "day" ? date(k).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : date(k).toLocaleString("en-IN", { month: "long", year: "numeric" }));
+  // a month of days: label every 5th (and the last) so they don't collide
+  const every = rows.length > 15 ? 5 : 1;
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" onMouseLeave={() => setHover(null)}>
@@ -66,25 +118,26 @@ function Chart({ rows }: { rows: { month: string; income: number; orders: number
           <g key={f}>
             <line x1={P.l} x2={W - P.r} y1={y(maxI * f)} y2={y(maxI * f)} stroke="#efe9fb" />
             <text x={P.l - 8} y={y(maxI * f) + 4} textAnchor="end" fontSize="10.5" fill="#8a84a3">{inr(maxI * f, true)}</text>
-            <text x={W - P.r + 8} y={yo(maxO * f) + 4} fontSize="10.5" fill="#0ea5e9">{Math.round(maxO * f)}</text>
+            <text x={W - P.r + 8} y={yo(maxO * f) + 4} fontSize="10.5" fill="#0ea5e9">{maxO * f < 10 && maxO < 4 ? (maxO * f).toFixed(f % 1 ? 1 : 0) : Math.round(maxO * f)}</text>
           </g>
         ))}
         {rows.map((r, i) => {
           const bh = Math.max(r.income ? 3 : 0, H - P.b - y(r.income));
+          const showLabel = i % every === 0 || i === rows.length - 1;
           return (
-            <g key={r.month} onMouseEnter={() => setHover(i)}>
+            <g key={r.key} onMouseEnter={() => setHover(i)} onClick={() => setHover(i)}>
               <rect x={P.l + cw * i} y={P.t} width={cw} height={H - P.t - P.b} fill={hover === i ? "#f6f1ff" : "transparent"} />
-              <rect x={P.l + cw * i + cw * 0.22} y={H - P.b - bh} width={cw * 0.56} height={bh} rx="5" fill="url(#bar)" opacity={hover === null || hover === i ? 1 : 0.55} />
-              <text x={P.l + cw * i + cw / 2} y={H - 8} textAnchor="middle" fontSize="11" fill="#8a84a3" fontWeight={hover === i ? 700 : 500}>{new Date(r.month + "-01").toLocaleString("en-IN", { month: "short" })}</text>
+              <rect x={P.l + cw * i + cw * 0.2} y={H - P.b - bh} width={cw * 0.6} height={bh} rx={Math.min(5, cw * 0.2)} fill="url(#bar)" opacity={hover === null || hover === i ? 1 : 0.55} />
+              {showLabel && <text x={P.l + cw * i + cw / 2} y={H - 8} textAnchor="middle" fontSize="11" fill="#8a84a3" fontWeight={hover === i ? 700 : 500}>{short(r.key)}</text>}
             </g>
           );
         })}
         <path d={line} fill="none" stroke="#0ea5e9" strokeWidth="2.5" strokeLinejoin="round" />
-        {rows.map((r, i) => <circle key={r.month} cx={P.l + cw * i + cw / 2} cy={yo(r.orders)} r={hover === i ? 5 : 3.5} fill="#fff" stroke="#0ea5e9" strokeWidth="2.5" />)}
+        {rows.map((r, i) => <circle key={r.key} cx={P.l + cw * i + cw / 2} cy={yo(r.orders)} r={hover === i ? 5 : rows.length > 15 ? 2.5 : 3.5} fill="#fff" stroke="#0ea5e9" strokeWidth={rows.length > 15 ? 2 : 2.5} />)}
       </svg>
       {h && (
-        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-xl bg-ink px-3 py-2 text-xs text-white shadow-lg">
-          <div className="font-bold">{new Date(h.month + "-01").toLocaleString("en-IN", { month: "long", year: "numeric" })}</div>
+        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-xl bg-ink px-3 py-2 text-xs text-white shadow-lg">
+          <div className="font-bold">{long(h.key)}</div>
           <div>Income <b>{inr(h.income)}</b> · Orders <b>{h.orders}</b> · New clients <b>{h.clients}</b></div>
         </div>
       )}
@@ -329,9 +382,7 @@ export default function AdminDashboard() {
 
       {/* ── chart + automation ── */}
       <div className="mb-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Panel title="Income & orders · 12 months" icon="monitoring" action={<More href="/admin/reports">Reports</More>}>
-          <Chart rows={d.chart} />
-        </Panel>
+        <IncomeChart />
         <Panel title="Automation" icon="schedule" action={<More href="/admin/automation">Details</More>}>
           <div className={cx("flex items-center gap-3 rounded-xl p-3", d.automation.healthy && d.automation.enabled ? "bg-emerald-50" : "bg-rose-50")}>
             <Icon name={d.automation.healthy && d.automation.enabled ? "check_circle" : "warning"} className={cx("text-[24px]", d.automation.healthy && d.automation.enabled ? "text-emerald-600" : "text-rose-600")} />

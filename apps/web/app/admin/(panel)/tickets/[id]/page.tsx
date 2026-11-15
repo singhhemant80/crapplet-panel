@@ -9,7 +9,7 @@ export default function AdminTicket() {
   const { id } = useParams<{ id: string }>();
   const { data, loading, reload } = useApi(`/admin/tickets/${id}`);
   const depts = useApi("/admin/ticket-departments");
-  const staff = useApi("/admin/staff");
+  const staff = useApi("/admin/ticket-assignees");
   const canned = useApi("/admin/canned-responses");
   const [note, setNote] = useState(false);
   const [status, setStatus] = useState("ANSWERED");
