@@ -1,9 +1,10 @@
 "use client";
+import { PRESETS, presetRange, type Range } from "@/components/admin/date-range";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, CYCLES, money } from "@/lib/api";
-import { Badge, Button, Empty, Icon, Loading, PageHeader, Pager, Spinner, cx, toast, useApi } from "@/components/ui";
+import { Badge, Button, Empty, Icon, Input, Loading, PageHeader, Pager, Spinner, cx, toast, useApi } from "@/components/ui";
 import { Ago, Avatar, FilterSelect, ListShell, SearchBox, StatusTabs, initialsOf, planIcon, type Tab } from "@/components/admin/list-kit";
 
 const TABS: Tab[] = [
@@ -27,8 +28,10 @@ function Orders() {
   const [payment, setPayment] = useState("");
   const [page, setPage] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
-  const qs = new URLSearchParams({ page: String(page), ...(status && { status }), ...(q && { q }), ...(period && { period }), ...(payment && { payment }) });
-  const { data, loading, reload } = useApi(`/admin/orders?${qs}`, [page, status, q, period, payment]);
+  const [custom, setCustom] = useState<Range>({ from: "", to: "" });
+  const r = period === "custom" ? custom : presetRange(period);
+  const qs = new URLSearchParams({ page: String(page), ...(status && { status }), ...(q && { q }), ...(r.from && { from: r.from }), ...(r.to && { to: r.to }), ...(payment && { payment }) });
+  const { data, loading, reload } = useApi(`/admin/orders?${qs}`, [qs.toString()]);
   const reset = (f: () => void) => { f(); setPage(1); };
   const filtered = !!(q || period || payment);
 
@@ -74,9 +77,16 @@ function Orders() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <SearchBox value={q} onSearch={(v) => reset(() => setQ(v))} placeholder="Search order #, customer, email, hostname, domain…" className="flex-1" />
               <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
-                <FilterSelect label="Placed" icon="calendar_month" value={period} onChange={(v) => reset(() => setPeriod(v))} options={[["", "Any time"], ["today", "Today"], ["7d", "Last 7 days"], ["30d", "Last 30 days"]]} />
+                <FilterSelect label="Placed" icon="calendar_month" value={period} onChange={(v) => reset(() => setPeriod(v))} options={PRESETS} />
+                {period === "custom" && (
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <Input type="date" className="h-10 w-[150px]" value={custom.from} max={custom.to || undefined} onChange={(e) => reset(() => setCustom({ ...custom, from: e.target.value }))} aria-label="From" />
+                    <span className="text-xs font-bold text-mute">to</span>
+                    <Input type="date" className="h-10 w-[150px]" value={custom.to} min={custom.from || undefined} onChange={(e) => reset(() => setCustom({ ...custom, to: e.target.value }))} aria-label="To" />
+                  </span>
+                )}
                 <FilterSelect label="Payment" icon="payments" value={payment} onChange={(v) => reset(() => setPayment(v))} options={[["", "Any payment"], ["paid", "Paid"], ["unpaid", "Unpaid"]]} />
-                {filtered && <button onClick={() => reset(() => { setQ(""); setPeriod(""); setPayment(""); })} className="h-10 shrink-0 rounded-xl px-3 text-[13px] font-bold text-primary-dark hover:bg-primary-tint">Clear</button>}
+                {filtered && <button onClick={() => reset(() => { setQ(""); setPeriod(""); setPayment(""); setCustom({ from: "", to: "" }); })} className="h-10 shrink-0 rounded-xl px-3 text-[13px] font-bold text-primary-dark hover:bg-primary-tint">Clear</button>}
               </div>
             </div>
           </>

@@ -1,11 +1,12 @@
 "use client";
+import { PRESETS, presetRange, type Range } from "@/components/admin/date-range";
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, money } from "@/lib/api";
 import { Badge, Button, Empty, Field, Icon, Input, Loading, Modal, PageHeader, Pager, cx, toast, useApi } from "@/components/ui";
 import { emptyProfile, ProfileFields } from "@/components/profile-fields";
-import { Ago, Avatar, ListShell, SearchBox, StatusTabs, initialsOf, type Tab } from "@/components/admin/list-kit";
+import { Ago, Avatar, FilterSelect, ListShell, SearchBox, StatusTabs, initialsOf, type Tab } from "@/components/admin/list-kit";
 
 const TABS: Tab[] = [
   { key: "", label: "All customers" },
@@ -26,8 +27,12 @@ function Clients() {
   const [segment, setSegment] = useState(sp.get("segment") ?? "");
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
-  const qs = new URLSearchParams({ page: String(page), ...(q && { q }), ...(segment && { segment }) });
-  const { data, loading, reload } = useApi(`/admin/clients?${qs}`, [page, q, segment]);
+  const [joined, setJoined] = useState("");
+  const [custom, setCustom] = useState<Range>({ from: "", to: "" });
+  const [kind, setKind] = useState("");
+  const jr = joined === "custom" ? custom : presetRange(joined);
+  const qs = new URLSearchParams({ page: String(page), ...(q && { q }), ...(segment && { segment }), ...(jr.from && { from: jr.from }), ...(jr.to && { to: jr.to }), ...(kind && { kind }) });
+  const { data, loading, reload } = useApi(`/admin/clients?${qs}`, [qs.toString()]);
   const c = data?.counts;
 
   return (
@@ -52,7 +57,20 @@ function Clients() {
         toolbar={
           <>
             <StatusTabs tabs={TABS} value={segment} onChange={(k) => { setSegment(k); setPage(1); }} counts={c} />
-            <SearchBox value={q} onSearch={(v) => { setQ(v); setPage(1); }} placeholder="Search name, email, phone, company, GSTIN, IP…" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <SearchBox value={q} onSearch={(v) => { setQ(v); setPage(1); }} placeholder="Search name, email, phone, company, GSTIN, IP…" className="flex-1" />
+              <div className="flex flex-wrap gap-2">
+                <FilterSelect label="Joined" icon="calendar_month" value={joined} onChange={(v) => { setJoined(v); setPage(1); }} options={PRESETS} />
+                {joined === "custom" && (
+                  <span className="flex items-center gap-1.5">
+                    <Input type="date" className="h-10 w-[150px]" value={custom.from} max={custom.to || undefined} onChange={(e) => { setCustom({ ...custom, from: e.target.value }); setPage(1); }} aria-label="From" />
+                    <span className="text-xs font-bold text-mute">to</span>
+                    <Input type="date" className="h-10 w-[150px]" value={custom.to} min={custom.from || undefined} onChange={(e) => { setCustom({ ...custom, to: e.target.value }); setPage(1); }} aria-label="To" />
+                  </span>
+                )}
+                <FilterSelect label="Type" icon="badge" value={kind} onChange={(v) => { setKind(v); setPage(1); }} options={[["", "All customers"], ["business", "Business (GSTIN)"], ["individual", "Individuals"]]} />
+              </div>
+            </div>
           </>
         }
         footer={data && <Pager page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />}

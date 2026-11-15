@@ -6,6 +6,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma, Prisma, InvoiceStatus, ServiceStatus, BillingCycle, OrderStatus } from "../../db";
+import { dateRange, str } from "../../lib/filters";
 import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { cartSchema, rootPasswordSchema, hostingPasswordSchema } from "../orders/pricing";
@@ -105,11 +106,22 @@ adminCore.get(
       noservices: { services: { none: {} } },
       inactive: { status: { in: ["INACTIVE", "CLOSED"] } },
     };
-    const base: Prisma.UserWhereInput = { type: "CLIENT", ...(q ? clientWhere(q) : {}) };
+    const signed = dateRange(req.query);
+    // each filter is its own AND condition, so none can overwrite another (search uses OR too)
+    const kind = req.query.kind === "business" ? { profile: { gstin: { not: null } } } : req.query.kind === "individual" ? { OR: [{ profile: { gstin: null } }, { profile: null }] } : null;
+    const base: Prisma.UserWhereInput = {
+      type: "CLIENT",
+      AND: [
+        ...(q ? [clientWhere(q)] : []),
+        ...(signed ? [{ createdAt: signed }] : []),
+        ...(str(req.query.state) ? [{ profile: { state: { equals: str(req.query.state), mode: "insensitive" as const } } }] : []),
+        ...(kind ? [kind] : []),
+      ],
+    };
     const where: Prisma.UserWhereInput = {
       ...base,
       ...(req.query.status ? { status: req.query.status as "ACTIVE" } : {}),
-      ...(SEGMENTS[segment] ? { AND: [SEGMENTS[segment]] } : {}),
+      ...(SEGMENTS[segment] ? { AND: [...(base.AND as Prisma.UserWhereInput[]), SEGMENTS[segment]] } : {}),
     };
     const [rows, total, ...segCounts] = await Promise.all([
       prisma.user.findMany({
@@ -121,7 +133,7 @@ adminCore.get(
       }),
       prisma.user.count({ where }),
       prisma.user.count({ where: base }),
-      ...Object.values(SEGMENTS).map((w) => prisma.user.count({ where: { ...base, AND: [w] } })),
+      ...Object.values(SEGMENTS).map((w) => prisma.user.count({ where: { ...base, AND: [...(base.AND as Prisma.UserWhereInput[]), w] } })),
     ]);
     const counts = Object.fromEntries([["all", segCounts[0]], ...Object.keys(SEGMENTS).map((k, i) => [k, segCounts[i + 1]])]);
     // per-row money: what each customer owes, has paid, and how many services are live
@@ -300,7 +312,7 @@ adminCore.get(
     // filters other than status (the status tabs show counts within them)
     const base: Prisma.OrderWhereInput = {
       ...(q ? orderWhere(q) : {}),
-      ...(since ? { createdAt: { gte: since } } : {}),
+      ...(dateRange(req.query) ? { createdAt: dateRange(req.query) } : since ? { createdAt: { gte: since } } : {}),
       ...(payment === "paid" ? { invoice: { status: "PAID" } } : payment === "unpaid" ? { invoice: { status: "UNPAID" } } : {}),
       ...(typeof req.query.userId === "string" ? { userId: req.query.userId } : {}),
     };
@@ -538,6 +550,11 @@ adminCore.get(
       ...(req.query.serverId ? { serverId: String(req.query.serverId) } : {}),
       ...(req.query.vps === "1" ? { product: { provisioner: { in: ["PROXMOX", "VIRTUALIZOR"] } } } : {}),
       ...(req.query.resellerId ? { resellerId: String(req.query.resellerId) } : {}),
+      ...(str(req.query.productId) ? { productId: str(req.query.productId) } : {}),
+      ...(str(req.query.cycle) ? { billingCycle: str(req.query.cycle) as "MONTHLY" } : {}),
+      ...(str(req.query.type) ? { product: { type: str(req.query.type) as "VPS_LINUX" } } : {}),
+      // date filter: created (default), next due, or terminated
+      ...((r) => (r ? { [({ due: "nextDueDate", terminated: "terminationDate" } as Record<string, string>)[str(req.query.dateField)] ?? "createdAt"]: r } : {}))(dateRange(req.query)),
       ...(q ? serviceWhere(q) : {}),
     };
     const [rows, total] = await Promise.all([
@@ -953,10 +970,17 @@ adminCore.get(
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    // date filter on the date staff choose: issued (default), due or paid
+    const range = dateRange(req.query);
+    const dateField = ({ issued: "issueDate", due: "dueDate", paid: "paidAt", created: "createdAt" } as const)[str(req.query.dateField) as "issued"] ?? "issueDate";
     const where: Prisma.InvoiceWhereInput = {
       ...(req.query.status ? { status: req.query.status as InvoiceStatus } : {}),
       ...(req.query.userId ? { userId: String(req.query.userId) } : {}),
       ...(req.query.overdue === "1" ? { status: "UNPAID", dueDate: { lt: new Date() } } : {}),
+      ...(req.query.overdue === "soon" ? { status: "UNPAID", dueDate: { gte: new Date(), lt: new Date(Date.now() + 7 * 86400_000) } } : {}),
+      ...(str(req.query.currency) ? { currency: str(req.query.currency) } : {}),
+      ...(req.query.kind === "topup" ? { isWalletTopup: true } : req.query.kind === "billing" ? { isWalletTopup: false } : {}),
+      ...(range ? { [dateField]: range } : {}),
       ...(q ? invoiceWhere(q) : {}),
     };
     const [rows, total, sums] = await Promise.all([
@@ -1074,12 +1098,38 @@ adminCore.get(
   requireStaff("billing.view"),
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
-    const where: Prisma.TransactionWhereInput = { ...(req.query.gateway ? { gateway: String(req.query.gateway) } : {}), ...(req.query.userId ? { userId: String(req.query.userId) } : {}) };
-    const [rows, total] = await Promise.all([
-      prisma.transaction.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, invoice: { select: { id: true, number: true, proformaNumber: true } } } }),
+    const q = str(req.query.q);
+    const created = dateRange(req.query);
+    const type = str(req.query.type);
+    const where: Prisma.TransactionWhereInput = {
+      ...(req.query.gateway ? { gateway: String(req.query.gateway) } : {}),
+      ...(req.query.userId ? { userId: String(req.query.userId) } : {}),
+      ...(["PAYMENT", "REFUND", "WALLET_TOPUP", "CREDIT_APPLIED"].includes(type) ? { type: type as "PAYMENT" } : {}),
+      ...(created ? { createdAt: created } : {}),
+      ...(q
+        ? {
+            OR: [
+              { gatewayTxnId: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
+              { user: { OR: [{ email: { contains: q, mode: "insensitive" } }, { firstName: { contains: q, mode: "insensitive" } }, { lastName: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] } },
+              { invoice: { OR: [{ number: { contains: q, mode: "insensitive" } }, { proformaNumber: { contains: q, mode: "insensitive" } }] } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total, sums] = await Promise.all([
+      prisma.transaction.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip, take, include: { user: { select: { id: true, email: true, firstName: true, lastName: true } }, invoice: { select: { id: true, number: true, proformaNumber: true } } } }),
       prisma.transaction.count({ where }),
+      // totals for exactly what's filtered — per currency and type, never mixing rupees and dollars
+      prisma.transaction.groupBy({ by: ["currency", "type"], where, _sum: { amount: true, fee: true }, _count: { _all: true } }),
     ]);
-    res.json({ transactions: rows.map(({ raw, ...t }) => t), total, page, pageSize });
+    const totals = [...new Set(sums.map((g) => g.currency))].map((currency) => {
+      const of = (t: string) => sums.find((g) => g.currency === currency && g.type === t);
+      const received = (of("PAYMENT")?._sum.amount ?? 0) + (of("WALLET_TOPUP")?._sum.amount ?? 0);
+      const refunded = Math.abs(of("REFUND")?._sum.amount ?? 0);
+      return { currency, received, refunded, net: received - refunded, fees: sums.filter((g) => g.currency === currency).reduce((a, g) => a + (g._sum.fee ?? 0), 0), creditApplied: Math.abs(of("CREDIT_APPLIED")?._sum.amount ?? 0), count: sums.filter((g) => g.currency === currency).reduce((a, g) => a + g._count._all, 0) };
+    });
+    res.json({ transactions: rows.map(({ raw, ...t }) => t), total, page, pageSize, totals });
   }),
 );
 
@@ -1120,9 +1170,17 @@ adminCore.post(
 adminCore.get(
   "/payment-reviews",
   requireStaff("billing.view"),
-  ah(async (_req, res) => {
+  ah(async (req, res) => {
+    // default: what's waiting; "all" shows approved / rejected history too
+    const st = str(req.query.status);
+    const when = dateRange(req.query);
+    const where: Prisma.PaymentIntentWhereInput = {
+      ...(st === "all" ? { gateway: { in: ["bank", "upi", "manual", "wire"] }, status: { in: ["PENDING_REVIEW", "PAID", "REJECTED"] } } : st ? { status: st as "PAID" } : { status: "PENDING_REVIEW" }),
+      ...(when ? { updatedAt: when } : {}),
+      ...(str(req.query.q) ? { user: { email: { contains: str(req.query.q), mode: "insensitive" } } } : {}),
+    };
     res.json({
-      intents: await prisma.paymentIntent.findMany({ where: { status: "PENDING_REVIEW" }, orderBy: { updatedAt: "asc" }, include: { user: { select: { email: true, firstName: true, lastName: true } }, invoice: { select: { id: true, number: true, proformaNumber: true, total: true, amountPaid: true } } } }),
+      intents: await prisma.paymentIntent.findMany({ where, take: 200, orderBy: { updatedAt: st ? "desc" : "asc" }, include: { user: { select: { email: true, firstName: true, lastName: true } }, invoice: { select: { id: true, number: true, proformaNumber: true, total: true, amountPaid: true } } } }),
     });
   }),
 );
@@ -1225,7 +1283,24 @@ adminCore.get(
   requireStaff("reports.view"),
   ah(async (req, res) => {
     const { skip, take, page, pageSize } = pageParams(req.query);
-    const [rows, total] = await Promise.all([prisma.activityLog.findMany({ orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { email: true } } } }), prisma.activityLog.count()]);
-    res.json({ items: rows, total, page, pageSize });
+    const q = str(req.query.q);
+    const when = dateRange(req.query);
+    // "action" filters by area (invoice., service., …) or an exact action
+    const action = str(req.query.action);
+    const actor = str(req.query.actor);
+    const where: Prisma.ActivityLogWhereInput = {
+      ...(when ? { createdAt: when } : {}),
+      ...(action ? (action.endsWith(".") ? { action: { startsWith: action } } : { action }) : {}),
+      ...(actor === "staff" ? { actorId: { not: null } } : actor === "system" ? { actorId: null } : actor ? { actorId: actor } : {}),
+      ...(q ? { OR: [{ action: { contains: q, mode: "insensitive" } }, { ip: { contains: q } }, { entityId: q }, { user: { email: { contains: q, mode: "insensitive" } } }] } : {}),
+    };
+    const [rows, total, staff] = await Promise.all([
+      prisma.activityLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: { select: { email: true } } } }),
+      prisma.activityLog.count({ where }),
+      prisma.user.findMany({ where: { type: "STAFF" }, select: { id: true, firstName: true, lastName: true, email: true } }),
+    ]);
+    // who did it (staff), shown next to each entry
+    const names = new Map(staff.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email]));
+    res.json({ items: rows.map((r) => ({ ...r, actorName: r.actorId ? names.get(r.actorId) ?? null : null })), total, page, pageSize, staff: staff.map((u) => ({ id: u.id, name: names.get(u.id) })) });
   }),
 );

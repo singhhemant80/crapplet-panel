@@ -1,4 +1,5 @@
 "use client";
+import { DateRangeFilter, rangeQs, type Range } from "@/components/admin/date-range";
 import Link from "next/link";
 import { useState } from "react";
 import { date, money } from "@/lib/api";
@@ -19,7 +20,8 @@ export default function Quotes() {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const { data, loading } = useApi(`/admin/quotes?status=${status}&page=${page}&q=${encodeURIComponent(query)}`, [status, page, query]);
+  const [range, setRange] = useState<Range>({ from: "", to: "" });
+  const { data, loading } = useApi(`/admin/quotes?status=${status}&page=${page}&q=${encodeURIComponent(query)}${rangeQs(range) ? `&${rangeQs(range)}` : ""}`, [status, page, query, range.from, range.to]);
   const c = data?.counts ?? {};
   const counts = Object.fromEntries(TABS.map((t) => [t.key || "all", t.key ? c[t.key]?.count ?? 0 : Object.values(c).reduce((a: number, x: any) => a + x.count, 0)]));
   const sent = c.SENT?.count ?? 0;
@@ -37,6 +39,7 @@ export default function Quotes() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <StatusTabs tabs={TABS} value={status} counts={counts} onChange={(k) => { setStatus(k); setPage(1); }} />
         <form onSubmit={(e) => { e.preventDefault(); setQuery(q); setPage(1); }} className="w-full sm:w-72"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Quote no., subject or email" /></form>
+        <DateRangeFilter className="w-full sm:w-auto sm:min-w-[240px]" value={range} onChange={(r) => { setRange(r); setPage(1); }} />
       </div>
       <Card pad={false}>
         {loading ? <Loading /> : !data.quotes.length ? <Empty icon="request_quote" title="No quotes yet">Create a quote for a custom server, a bulk deal or a project — the customer can accept it from their account.</Empty> : (

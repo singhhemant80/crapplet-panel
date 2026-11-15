@@ -1,4 +1,5 @@
 "use client";
+import { DateRangeFilter, rangeQs, type Range } from "@/components/admin/date-range";
 import Link from "next/link";
 import { useState } from "react";
 import { api, date, invNo, money } from "@/lib/api";
@@ -21,7 +22,8 @@ export default function BillableItems() {
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState<string[]>([]);
   const [edit, setEdit] = useState<any | null>(null);
-  const { data, loading, reload } = useApi(`/admin/billable-items?status=${status}&page=${page}&q=${encodeURIComponent(query)}`, [status, page, query]);
+  const [range, setRange] = useState<Range>({ from: "", to: "" });
+  const { data, loading, reload } = useApi(`/admin/billable-items?status=${status}&page=${page}&q=${encodeURIComponent(query)}${rangeQs(range) ? `&${rangeQs(range)}` : ""}`, [status, page, query, range.from, range.to]);
   const rows: any[] = data?.items ?? [];
   const selRows = rows.filter((r) => sel.includes(r.id));
   const oneCustomer = selRows.length > 0 && new Set(selRows.map((r) => r.userId)).size === 1;
@@ -34,6 +36,7 @@ export default function BillableItems() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <StatusTabs value={status} onChange={(k) => { setStatus(k); setPage(1); setSel([]); }} tabs={[{ key: "open", label: "Not yet billed", icon: "pending" }, { key: "billed", label: "Billed", icon: "task_alt", tone: "green" }, { key: "all", label: "All", icon: "list" }]} />
         <form onSubmit={(e) => { e.preventDefault(); setQuery(q); setPage(1); }} className="w-full sm:w-72"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search description or email" /></form>
+        <DateRangeFilter className="w-full sm:w-auto sm:min-w-[240px]" value={range} onChange={(r) => { setRange(r); setPage(1); }} />
       </div>
       {sel.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-primary/30 bg-white px-4 py-2.5 shadow-lg">

@@ -1,4 +1,5 @@
 "use client";
+import { DateRangeFilter, rangeQs, type Range } from "@/components/admin/date-range";
 import { VirtualizorSyncAll } from "@/components/admin/virtualizor-sync-all";
 import Link from "next/link";
 import { Suspense, useState } from "react";
@@ -14,16 +15,28 @@ function Services() {
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const { data, loading, reload } = useApi(`/admin/services?page=${page}&status=${status}&vps=${vps}&q=${encodeURIComponent(query)}`, [page, status, vps, query]);
+  const [type, setType] = useState("");
+  const [cycle, setCycle] = useState("");
+  const [dateField, setDateField] = useState("created");
+  const [range, setRange] = useState<Range>({ from: "", to: "" });
+  const qs = [`page=${page}`, status && `status=${status}`, vps && `vps=${vps}`, query && `q=${encodeURIComponent(query)}`, type && `type=${type}`, cycle && `cycle=${cycle}`, (range.from || range.to) && `dateField=${dateField}`, rangeQs(range)].filter(Boolean).join("&");
+  const { data, loading, reload } = useApi(`/admin/services?${qs}`, [qs]);
   const liveIds = (data?.items ?? []).filter((s: any) => s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s: any) => s.id).join(",");
   const live = useLiveStates(liveIds ? `/admin/live-states?ids=${liveIds}` : null);
   return (
     <>
       <PageHeader title="VPS & Services" subtitle="Every customer service. Open a VPS to run power actions, reinstall or suspend." actions={<VirtualizorSyncAll onDone={reload} />} />
-      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px_180px]">
-        <form onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(q); }}><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hostname, IP, VMID or customer email" /></form>
-        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED", "FAILED", "TERMINATED", "CANCELLED"].map((s) => <option key={s}>{s}</option>)}</Select>
-        <Select value={vps} onChange={(e) => { setVps(e.target.value); setPage(1); }}><option value="">All products</option><option value="1">VPS only</option></Select>
+      <div className="mb-2 grid gap-2 md:grid-cols-2 xl:grid-cols-[1.3fr_160px_190px_190px]">
+        <form onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(q); }}><Input className="h-10" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Hostname, IP, VMID or customer email" /></form>
+        <Select className="h-10" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["PENDING", "PROVISIONING", "ACTIVE", "SUSPENDED", "FAILED", "TERMINATED", "CANCELLED"].map((s) => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}</Select>
+        <Select className="h-10" value={type || (vps ? "vps" : "")} onChange={(e) => { const v = e.target.value; setVps(v === "vps" ? "1" : ""); setType(v === "vps" ? "" : v); setPage(1); }}>
+          <option value="">All products</option><option value="vps">All VPS</option>
+          {[["VPS_LINUX", "Linux VPS"], ["VPS_WINDOWS", "Windows VPS"], ["SHARED_HOSTING", "Shared hosting"], ["RESELLER_HOSTING", "Reseller hosting"], ["DEDICATED", "Dedicated servers"], ["COLOCATION", "Colocation"], ["CUSTOM", "Other"]].map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </Select>
+        <Select className="h-10" value={cycle} onChange={(e) => { setCycle(e.target.value); setPage(1); }}><option value="">Any billing cycle</option>{[["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["SEMIANNUAL", "Half-yearly"], ["ANNUAL", "Yearly"], ["BIENNIAL", "2 years"], ["TRIENNIAL", "3 years"], ["ONETIME", "One-time"]].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</Select>
+      </div>
+      <div className="mb-4">
+        <DateRangeFilter className="max-w-2xl" value={range} onChange={(r) => { setRange(r); setPage(1); }} fields={[["created", "Created"], ["due", "Next due"], ["terminated", "Terminated"]]} field={dateField} onField={(f) => { setDateField(f); setPage(1); }} />
       </div>
       <Card pad={false}>
         {loading ? <Loading /> : (

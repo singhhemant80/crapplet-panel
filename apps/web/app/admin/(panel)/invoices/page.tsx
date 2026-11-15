@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, date, invNo, money } from "@/lib/api";
 import { Badge, Button, Card, Field, Input, Loading, Modal, PageHeader, Pager, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
+import { DateRangeFilter, rangeQs, type Range } from "@/components/admin/date-range";
 import { ClientPicker, CurrencySelect, LineEditor, newLine, linesToApi, type Line } from "@/components/admin/billing-kit";
 
 const BULK: [string, string, string, boolean?][] = [
@@ -28,14 +29,22 @@ function Invoices() {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
-  const { data, loading, reload } = useApi(`/admin/invoices?page=${page}&status=${status}&overdue=${overdue}&q=${encodeURIComponent(query)}`, [page, status, overdue, query]);
+  const [range, setRange] = useState<Range>({ from: "", to: "" });
+  const [dateField, setDateField] = useState("issued");
+  const [currency, setCurrency] = useState("");
+  const [kind, setKind] = useState("");
+  const qs = [`page=${page}`, status && `status=${status}`, overdue && `overdue=${overdue}`, query && `q=${encodeURIComponent(query)}`, currency && `currency=${currency}`, kind && `kind=${kind}`, (range.from || range.to) && `dateField=${dateField}`, rangeQs(range)].filter(Boolean).join("&");
+  const { data, loading, reload } = useApi(`/admin/invoices?${qs}`, [qs]);
   return (
     <>
       <PageHeader title="Invoices" actions={<Button icon="add" onClick={() => setCreating(true)}>New invoice</Button>} />
-      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px_180px]">
-        <form onSubmit={(e) => { e.preventDefault(); setQuery(q); setPage(1); }}><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Invoice number or customer email" /></form>
-        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["DRAFT", "UNPAID", "PAID", "CANCELLED", "REFUNDED"].map((s) => <option key={s}>{s}</option>)}</Select>
-        <Select value={overdue} onChange={(e) => { setOverdue(e.target.value); setPage(1); }}><option value="">Any due date</option><option value="1">Overdue only</option></Select>
+      <div className="mb-4 grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_150px_190px_180px_170px]">
+        <form onSubmit={(e) => { e.preventDefault(); setQuery(q); setPage(1); }}><Input className="h-10" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Invoice number, customer name or email" /></form>
+        <Select className="h-10" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option>{["DRAFT", "UNPAID", "PAID", "CANCELLED", "REFUNDED"].map((s) => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}</Select>
+        <Select className="h-10" value={overdue} onChange={(e) => { setOverdue(e.target.value); setPage(1); }}><option value="">Any due date</option><option value="1">Overdue</option><option value="soon">Due in next 7 days</option></Select>
+        <Select className="h-10" value={kind} onChange={(e) => { setKind(e.target.value); setPage(1); }}><option value="">All kinds</option><option value="billing">Services & orders</option><option value="topup">Wallet top-ups</option></Select>
+        <Select className="h-10" value={currency} onChange={(e) => { setCurrency(e.target.value); setPage(1); }}><option value="">Any currency</option><option value="INR">INR</option><option value="USD">USD</option></Select>
+        <DateRangeFilter className="md:col-span-2 md:max-w-2xl xl:col-span-5" value={range} onChange={(r) => { setRange(r); setPage(1); }} fields={[["issued", "Issued"], ["due", "Due"], ["paid", "Paid"]]} field={dateField} onField={(f) => { setDateField(f); setPage(1); }} />
       </div>
       {(data?.sumsByCurrency ?? []).map((g: any) => (
         <div key={g.currency} className="mb-2 flex flex-wrap gap-6 text-sm text-mute">

@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma, type Prisma } from "../../db";
+import { dateRange } from "../../lib/filters";
 import { ah, badRequest, conflict, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
@@ -43,6 +44,7 @@ adminBillingExtras.get(
       ...(req.query.userId ? { userId: String(req.query.userId) } : {}),
       ...(st === "open" ? { invoiced: false } : st === "billed" ? { invoiced: true } : {}),
       ...(req.query.q ? { OR: [{ description: { contains: String(req.query.q), mode: "insensitive" } }, { user: { email: { contains: String(req.query.q), mode: "insensitive" } } }] } : {}),
+      ...(dateRange(req.query) ? { createdAt: dateRange(req.query) } : {}),
     };
     const [rows, total, open] = await Promise.all([
       prisma.billableItem.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: userBrief } }),
@@ -137,6 +139,7 @@ adminBillingExtras.get(
       ...(req.query.status ? { status: String(req.query.status) } : {}),
       ...(req.query.userId ? { userId: String(req.query.userId) } : {}),
       ...(q ? { OR: [{ number: { contains: q, mode: "insensitive" } }, { subject: { contains: q, mode: "insensitive" } }, { user: { email: { contains: q, mode: "insensitive" } } }] } : {}),
+      ...(dateRange(req.query) ? { createdAt: dateRange(req.query) } : {}),
     };
     const [rows, total, counts] = await Promise.all([
       prisma.quote.findMany({ where, orderBy: { createdAt: "desc" }, skip, take, include: { user: userBrief } }),

@@ -1,4 +1,5 @@
 "use client";
+import { DateRangeFilter, type Range } from "@/components/admin/date-range";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ago, api } from "@/lib/api";
@@ -11,8 +12,9 @@ export default function Tickets() {
   const depts = useApi("/admin/ticket-departments");
   const staff = useApi("/admin/ticket-assignees");
   const [f, setF] = useState({ status: "active", departmentId: "", priority: "", assigned: "", q: "" });
+  const [range, setRange] = useState<Range>({ from: "", to: "" });
   const [page, setPage] = useState(1);
-  const qs = new URLSearchParams({ page: String(page), ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) }).toString();
+  const qs = new URLSearchParams({ page: String(page), ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), ...(range.from && { from: range.from }), ...(range.to && { to: range.to }) }).toString();
   const { data, loading, reload } = useApi(`/admin/tickets?${qs}`, [qs]);
   const [sel, setSel] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -41,12 +43,13 @@ export default function Tickets() {
   return (
     <>
       <PageHeader title="Support tickets" />
-      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
         <Input className="h-10" placeholder="Search #, subject, email" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <Select className="h-10" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="active">Awaiting reply</option><option value="">All</option>{STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}</Select>
         <Select className="h-10" value={f.departmentId} onChange={(e) => setF({ ...f, departmentId: e.target.value })}><option value="">All departments</option>{depts.data?.items?.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}</Select>
         <Select className="h-10" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}><option value="">Any priority</option>{["URGENT", "HIGH", "MEDIUM", "LOW"].map((s) => <option key={s} value={s}>{label(s)}</option>)}</Select>
         <Select className="h-10" value={f.assigned} onChange={(e) => setF({ ...f, assigned: e.target.value })}><option value="">Anyone</option><option value="me">Assigned to me</option><option value="none">Unassigned</option></Select>
+        <DateRangeFilter value={range} onChange={(r) => { setRange(r); setPage(1); }} label="Opened any time" />
       </div>
 
       {sel.length > 0 && (

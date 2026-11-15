@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma, Prisma, TicketPriority, TicketStatus, DomainStatus } from "../../db";
+import { dateRange } from "../../lib/filters";
 import { ah, badRequest, notFound, pageParams, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
@@ -27,6 +28,7 @@ adminSupport.get(
       ...(q.priority ? { priority: q.priority as TicketPriority } : {}),
       ...(q.assigned === "me" ? { assignedToId: req.user!.id } : q.assigned === "none" ? { assignedToId: null } : {}),
       ...(q.userId ? { userId: q.userId } : {}),
+      ...((r) => (r ? { [q.dateField === "replied" ? "lastReplyAt" : "createdAt"]: r } : {}))(dateRange(q)),
       ...(q.q ? { OR: [{ number: { contains: q.q } }, { subject: { contains: q.q, mode: "insensitive" } }, { user: { email: { contains: q.q, mode: "insensitive" } } }] } : {}),
     };
     const [rows, total] = await Promise.all([
