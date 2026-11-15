@@ -170,6 +170,8 @@ export async function refundOne(args: { paymentId: string; amount: number; metho
     }
     throw e;
   }
+  const { alertStaffLater, alertRefund } = await import("../email/staff-alerts");
+  alertStaffLater(() => alertRefund({ paymentId: p.id, amount: args.amount, method: args.method, reason: args.reason, actorId: args.actorId, refundId }));
   return { paymentId: p.id, amount: args.amount, refundId, gateway, status };
 }
 

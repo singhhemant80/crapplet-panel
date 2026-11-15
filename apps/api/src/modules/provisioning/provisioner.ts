@@ -689,6 +689,10 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         await prisma.service.update({ where: { id: svc.id }, data: { status: "SUSPENDED", suspendReason: reason } });
         await log(svc.id, action, true, reason);
         if (params.notify !== false) await queueEmail("service.suspended", svc.user.email, { ...vars, reason }, svc.userId);
+        {
+          const { alertStaffLater, alertServiceState } = await import("../email/staff-alerts");
+          alertStaffLater(() => alertServiceState(svc.id, "suspended", reason));
+        }
         return { ok: true };
       }
       case "unsuspend": {
@@ -728,6 +732,10 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         const { cancelServiceInvoices } = await import("../billing/termination");
         await cancelServiceInvoices(svc.id, { actorId: typeof params.actorId === "string" ? params.actorId : null }).catch((e) => console.error("[terminate] invoice cleanup failed", svc.id, (e as Error).message));
         if (params.notify !== false) await queueEmail("service.terminated", svc.user.email, vars, svc.userId);
+        {
+          const { alertStaffLater, alertServiceState } = await import("../email/staff-alerts");
+          alertStaffLater(() => alertServiceState(svc.id, "terminated", typeof params.reason === "string" ? params.reason : undefined));
+        }
         return { ok: true };
       }
       case "hard_reset": {
@@ -896,8 +904,8 @@ export async function markCreateFailed(serviceId: string, error: string) {
     const data = await serviceEventData(serviceId);
     if (data) await notifyReseller(svc.resellerId, "service.failed", { ...data, error: "Setup failed — our team has been alerted and will retry or refund." });
   }
-  const s = await getSettings();
-  await queueEmail("admin.provisioning_failed", s.company.billingEmail, { serviceId, productName: svc.product.name, clientEmail: svc.user.email, error: `${x.title}. Why: ${x.cause} — What to do: ${x.fix}${x.cause !== error ? ` (Original error: ${error})` : ""}` });
+  const { alertStaff, adminLink } = await import("../email/staff-alerts");
+  await alertStaff("service.provisioning_failed", { vars: { serviceId, productName: svc.product.name, clientEmail: svc.user.email, error: `${x.title}. Why: ${x.cause} — What to do: ${x.fix}${x.cause !== error ? ` (Original error: ${error})` : ""}` }, link: adminLink(`/admin/services/${serviceId}`) });
 }
 
 // ───────────────────────── read-only live data ─────────────────────────

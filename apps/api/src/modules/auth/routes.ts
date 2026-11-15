@@ -172,6 +172,11 @@ authRouter.post(
     await sendVerification(user);
     await queueEmail("auth.welcome", user.email, { name: user.firstName }, user.id);
     await audit({ actorId: user.id, userId: user.id, action: "client.registered", ip: clientIp(req) });
+    {
+      const { alertStaffLater, alertClientRegistered } = await import("../email/staff-alerts");
+      const ip = clientIp(req);
+      alertStaffLater(() => alertClientRegistered(user.id, ip));
+    }
     await startSession(req, res, user);
     res.status(201).json({ user: await publicUser(user.id), requireEmailVerification: settings.orders.requireEmailVerification });
   }),

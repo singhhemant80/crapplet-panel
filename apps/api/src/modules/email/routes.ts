@@ -168,3 +168,50 @@ adminEmail.post(
     }
   }),
 );
+
+// ───── Staff alerts (emails to the business about orders, payments, tickets …) ─────
+adminEmail.get(
+  "/email/staff-alerts",
+  perm,
+  ah(async (_req, res) => {
+    const { STAFF_ALERTS, getStaffAlertConfig } = await import("./staff-alerts");
+    const { getSettings } = await import("../../lib/settings");
+    const cfg = await getStaffAlertConfig();
+    const s = await getSettings();
+    res.json({
+      config: { enabled: cfg.enabled, recipients: cfg.recipients, events: cfg.events },
+      sendingTo: cfg.to,
+      billingEmail: s.company.billingEmail,
+      alerts: Object.entries(STAFF_ALERTS).map(([key, a]) => ({ key, name: a.name, group: a.group, hint: a.hint, default: a.on, template: a.template })),
+    });
+  }),
+);
+
+adminEmail.put(
+  "/email/staff-alerts",
+  perm,
+  ah(async (req, res) => {
+    const { parseRecipients, saveStaffAlertConfig } = await import("./staff-alerts");
+    const b = parse(z.object({ enabled: z.boolean().optional(), recipients: z.string().max(1000).optional(), events: z.record(z.string(), z.boolean()).optional() }), req.body);
+    if (b.recipients !== undefined) {
+      const bad = b.recipients.split(/[\s,;]+/).filter((x) => x.trim() && !parseRecipients(x).length);
+      if (bad.length) throw badRequest(`Not a valid email address: ${bad.slice(0, 3).join(", ")}`);
+    }
+    const saved = await saveStaffAlertConfig(b as Parameters<typeof saveStaffAlertConfig>[0]);
+    await audit({ actorId: req.user!.id, action: "email.staff_alerts_updated", entity: "settings", entityId: "staffAlerts", details: { enabled: saved.enabled, recipients: saved.to, off: Object.entries(saved.events).filter(([, v]) => !v).map(([k]) => k) } });
+    res.json({ config: { enabled: saved.enabled, recipients: saved.recipients, events: saved.events }, sendingTo: saved.to });
+  }),
+);
+
+adminEmail.post(
+  "/email/staff-alerts/test",
+  perm,
+  ah(async (_req, res) => {
+    const { sendTestAlert } = await import("./staff-alerts");
+    try {
+      res.json(await sendTestAlert());
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
+  }),
+);

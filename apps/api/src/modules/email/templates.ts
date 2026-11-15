@@ -133,7 +133,7 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
   "admin.provisioning_failed": {
     name: "Admin: provisioning failed",
     subject: "[Action needed] Provisioning failed for service {{serviceId}}",
-    body: `<p>Provisioning of <b>{{productName}}</b> for {{clientEmail}} failed.</p><pre style="white-space:pre-wrap">{{error}}</pre>`,
+    body: `<p>Provisioning of <b>{{productName}}</b> for {{clientEmail}} failed.</p><pre style="white-space:pre-wrap">{{error}}</pre><p><a href="{{adminUrl}}">Open in admin</a></p>`,
   },
   "admin.manual_setup": {
     name: "Admin: paid order needs manual setup",
@@ -144,5 +144,75 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
     name: "Message from staff (Send Email on the client page)",
     subject: "{{subject}}",
     body: `<p>Hi {{name}},</p>{{{messageHtml}}}`,
+  },
+  "alert.order_placed": {
+    name: "Staff alert: new order",
+    subject: "🛒 New order {{orderNumber}} · {{total}} · {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.upgrade_requested": {
+    name: "Staff alert: plan change ordered",
+    subject: "⬆️ {{clientName}} ordered a {{direction}}: {{from}} → {{to}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.payment_received": {
+    name: "Staff alert: payment received",
+    subject: "💰 Payment received: {{amount}} from {{clientName}} ({{gateway}})",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.payment_review": {
+    name: "Staff alert: payment to verify",
+    subject: "[Action needed] Verify {{amount}} {{gateway}} payment from {{clientName}} — ref {{reference}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.payment_failed": {
+    name: "Staff alert: AutoPay payment failed",
+    subject: "⚠️ AutoPay failed: {{amount}} for invoice {{invoiceNumber}} ({{clientName}})",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.payment_problem": {
+    name: "Staff alert: payment couldn't be applied",
+    subject: "[Action needed] {{gateway}} payment {{gatewayTxnId}} couldn't be applied",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.credit_applied": {
+    name: "Staff alert: invoice paid from credit",
+    subject: "Invoice {{invoiceNumber}} paid from credit ({{amount}}) · {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.refund_issued": {
+    name: "Staff alert: refund issued",
+    subject: "↩️ Refund issued: {{amount}} to {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.service_suspended": {
+    name: "Staff alert: service suspended",
+    subject: "Suspended: {{productName}} {{hostname}} · {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.service_terminated": {
+    name: "Staff alert: service terminated",
+    subject: "Terminated: {{productName}} {{hostname}} · {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.ticket_opened": {
+    name: "Staff alert: new ticket",
+    subject: "🎫 New ticket #{{ticketNumber}}: {{subject}} · {{clientName}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.cancellation": {
+    name: "Staff alert: cancellation request",
+    subject: "[Action needed] Cancellation request from {{clientName}} (#{{ticketNumber}})",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.ticket_reply": {
+    name: "Staff alert: customer replied",
+    subject: "💬 {{clientName}} replied on #{{ticketNumber}}: {{subject}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.client_registered": {
+    name: "Staff alert: new client",
+    subject: "👤 New client: {{clientName}} ({{clientEmail}})",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
   },
 };

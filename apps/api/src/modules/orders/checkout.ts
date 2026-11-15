@@ -163,6 +163,8 @@ export async function checkout(args: { userId: string; cart: Cart; ip?: string; 
     const prof = await prisma.clientProfile.findUnique({ where: { userId: ownerId } });
     if (prof && prof.creditBalance > 0) paid = (await applyCreditToInvoice(ownerId, result.invoice.id)).paid;
   }
+  const { alertStaffLater, alertOrderPlaced } = await import("../email/staff-alerts");
+  alertStaffLater(() => alertOrderPlaced(result.order.id, { byStaff: !!args.staff }));
   return { orderId: result.order.id, orderNumber: result.order.number, invoiceId: result.invoice.id, total: result.invoice.total, paid };
 }
 

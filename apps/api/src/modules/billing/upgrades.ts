@@ -182,6 +182,10 @@ export async function startUpgrade(args: {
       createdById: args.actorId,
     },
   });
+  if (args.byClient) {
+    const { alertStaffLater, alertUpgrade } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertUpgrade(up.id));
+  }
   await audit({ actorId: args.actorId, userId: svc.userId, action: args.byClient ? "service.upgrade_requested" : "service.plan_change", entity: "service", entityId: svc.id, details: { upgradeId: up.id, from: `${svc.product.name} ${svc.billingCycle}`, to: `${to.name} ${args.toCycle}`, amountDue, free } });
 
   if (amountDue > 0) {

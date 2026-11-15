@@ -14,12 +14,17 @@ type Check = { key: string; label: string; status: "ok" | "warn" | "error" | "in
 
 const TABS = [
   { k: "setup", label: "Mail server", icon: "dns" },
+  { k: "alerts", label: "Staff alerts", icon: "notifications_active" },
   { k: "check", label: "Deliverability check", icon: "verified" },
   { k: "log", label: "Delivery log", icon: "list_alt" },
 ] as const;
 
 export default function EmailDelivery() {
   const [tab, setTab] = useState<(typeof TABS)[number]["k"]>("setup");
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some((x) => x.k === t)) setTab(t as (typeof TABS)[number]["k"]);
+  }, []);
   return (
     <>
       <PageHeader title="Email Delivery" subtitle="Where invoices, welcome emails and VPS details are sent from — and what it takes for them to land in the inbox, not spam." />
@@ -31,6 +36,7 @@ export default function EmailDelivery() {
         ))}
       </div>
       {tab === "setup" && <Setup onCheck={() => setTab("check")} />}
+      {tab === "alerts" && <StaffAlerts />}
       {tab === "check" && <Deliverability onSetup={() => setTab("setup")} />}
       {tab === "log" && <DeliveryLog />}
     </>
@@ -314,6 +320,102 @@ function DeliveryLog() {
         )}
         {data && <Pager page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />}
       </Card>
+    </div>
+  );
+}
+
+type AlertDef = { key: string; name: string; group: string; hint: string; default: boolean; template: string };
+type AlertCfg = { enabled: boolean; recipients: string; events: Record<string, boolean> };
+const GROUP_ICON: Record<string, string> = { Orders: "shopping_bag", Payments: "payments", Services: "dns", Support: "support_agent", Clients: "group" };
+
+function StaffAlerts() {
+  const { data, loading, reload } = useApi<{ config: AlertCfg; sendingTo: string[]; billingEmail: string; alerts: AlertDef[] }>("/admin/email/staff-alerts");
+  const [c, setC] = useState<AlertCfg | null>(null);
+  const [busy, setBusy] = useState("");
+  useEffect(() => { if (data) setC(structuredClone(data.config)); }, [data]);
+  if (loading || !c || !data) return <Loading />;
+  const groups = [...new Set(data.alerts.map((a) => a.group))];
+  const dirty = JSON.stringify(c) !== JSON.stringify(data.config);
+  const onCount = data.alerts.filter((a) => c.events[a.key]).length;
+  const setAll = (v: boolean, group?: string) => setC({ ...c, events: { ...c.events, ...Object.fromEntries(data.alerts.filter((a) => !group || a.group === group).map((a) => [a.key, v])) } });
+
+  async function save() {
+    setBusy("save");
+    try {
+      await api("/admin/email/staff-alerts", { method: "PUT", body: c });
+      toast.success("Staff alerts saved");
+      reload();
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(""); }
+  }
+  async function test() {
+    if (dirty) return toast.error("Save your changes first");
+    setBusy("test");
+    try {
+      const r = await api<{ to: string[] }>("/admin/email/staff-alerts/test", { body: {} });
+      toast.success(`Test alert sent to ${r.to.join(", ")} — check the inbox (and the Delivery log)`);
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(""); }
+  }
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+      <div className="space-y-5">
+        <Card title="Who gets the alerts">
+          <div className="space-y-4">
+            <Toggle checked={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? "Staff alerts are on" : "Staff alerts are off — nothing below is sent"} />
+            <Field label="Send to" hint={<>One or more addresses, separated by commas. Leave empty to use the billing email ({data.billingEmail || "not set"}) from Settings → Company.</>}>
+              <Input value={c.recipients} onChange={(e) => setC({ ...c, recipients: e.target.value })} placeholder={data.billingEmail || "owner@yourcompany.com, billing@yourcompany.com"} />
+            </Field>
+            <div className="text-[13px] text-slate-600">
+              Currently sending to: {data.sendingTo.length ? data.sendingTo.map((e) => <span key={e} className="mr-1.5 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 font-semibold text-primary-dark">{e}</span>) : <b className="text-rose-600">nobody — add an address</b>}
+            </div>
+          </div>
+        </Card>
+
+        <Card title={<span>What to send <span className="ml-1 text-sm font-semibold text-mute">{onCount} of {data.alerts.length} on</span></span>} action={<div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setAll(true)}>All on</Button><Button size="sm" variant="outline" onClick={() => setAll(false)}>All off</Button></div>}>
+          <div className={cx("space-y-6", !c.enabled && "pointer-events-none opacity-50")}>
+            {groups.map((g) => (
+              <div key={g}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[13px] font-extrabold uppercase tracking-wide text-slate-500"><Icon name={GROUP_ICON[g] ?? "notifications"} className="text-[18px]" />{g}</div>
+                  <div className="flex gap-3 text-xs font-bold text-primary-dark"><button onClick={() => setAll(true, g)} className="hover:underline">All on</button><button onClick={() => setAll(false, g)} className="hover:underline">All off</button></div>
+                </div>
+                <div className="divide-y divide-line rounded-xl border border-line">
+                  {data.alerts.filter((a) => a.group === g).map((a) => (
+                    <label key={a.key} className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50">
+                      <input type="checkbox" className="mt-1 h-4 w-4 accent-[#6d28d9]" checked={!!c.events[a.key]} onChange={(e) => setC({ ...c, events: { ...c.events, [a.key]: e.target.checked } })} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-ink">{a.name}</span>
+                        <span className="block text-[13px] text-mute">{a.hint}</span>
+                      </span>
+                      {!a.default && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">off by default</span>}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button icon="save" loading={busy === "save"} disabled={!dirty} onClick={save}>Save alerts</Button>
+          {dirty && <span className="text-sm font-semibold text-amber-600">Unsaved changes</span>}
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        <Card title="Test">
+          <p className="mb-3 text-sm text-slate-600">Sends a sample “Payment received” alert to everyone above.</p>
+          <Button variant="outline" icon="send" className="w-full" loading={busy === "test"} onClick={test}>Send test alert</Button>
+        </Card>
+        <Card title="Good to know">
+          <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+            <li>Each alert has the client, amount, invoice / order and a button straight to it in the admin.</li>
+            <li>Passwords and card details are never included.</li>
+            <li>Alerts use your mail server above — if it isn&apos;t set up they only appear in the Delivery log.</li>
+            <li>Change the wording under <a href="/admin/email-templates" className="font-bold text-primary-dark hover:underline">Email Templates</a> (the ones starting “Staff alert”).</li>
+          </ul>
+        </Card>
+      </div>
     </div>
   );
 }

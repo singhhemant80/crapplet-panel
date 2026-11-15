@@ -57,6 +57,10 @@ export async function openTicket(args: {
     include: { user: true, department: true },
   });
   await queueEmail("ticket.opened", ticket.user.email, { name: ticket.user.firstName, ticketNumber: ticket.number, subject: ticket.subject, department: dept.name, ticketId: ticket.id }, ticket.userId);
+  if (!args.isStaff) {
+    const { alertStaffLater, alertTicket } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertTicket(ticket.id, "opened", args.message));
+  }
   return ticket;
 }
 
@@ -76,6 +80,10 @@ export async function replyTicket(args: { ticketId: string; authorId: string; is
       ...(args.isStaff && !t.firstResponseAt ? { firstResponseAt: new Date() } : {}),
     },
   });
+  if (!args.isStaff) {
+    const { alertStaffLater, alertTicket } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertTicket(t.id, "reply", args.message));
+  }
   if (args.isStaff) {
     await queueEmail("ticket.reply", t.user.email, { name: t.user.firstName, ticketNumber: t.number, subject: t.subject, message: args.message, ticketId: t.id }, t.userId);
   }

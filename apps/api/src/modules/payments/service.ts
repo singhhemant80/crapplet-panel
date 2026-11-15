@@ -59,6 +59,8 @@ export async function settleVerified(gateway: string, v: Verified) {
   if (v.currency && v.currency.toUpperCase() !== intent.currency) {
     // never credit a USD invoice with an INR charge (or vice versa)
     console.error(`[payments] ${gateway} ${v.gatewayTxnId} charged ${v.currency}, intent is ${intent.currency} — not applied`);
+    const { alertPaymentProblem } = await import("../email/staff-alerts");
+    await alertPaymentProblem({ gateway, gatewayTxnId: v.gatewayTxnId, amount: v.amount, currency: v.currency, intentId: intent.id, problem: `charged in ${v.currency.toUpperCase()} but the invoice is in ${intent.currency}` });
     throw badRequest(`Payment currency ${v.currency} doesn't match the invoice (${intent.currency}). Our billing team has been notified.`);
   }
   if (v.amount < intent.amount) {
@@ -137,6 +139,8 @@ export async function submitOfflineReference(args: { userId: string; intentId: s
   const dupe = await prisma.paymentIntent.findFirst({ where: { gateway: intent.gateway, reference: args.reference, NOT: { id: intent.id } } });
   if (dupe) throw conflict("This reference number has already been submitted");
   await prisma.paymentIntent.update({ where: { id: intent.id }, data: { reference: args.reference, status: "PENDING_REVIEW" } });
+  const { alertStaffLater, alertPaymentReview } = await import("../email/staff-alerts");
+  alertStaffLater(() => alertPaymentReview(intent.id));
   return { ok: true };
 }
 

@@ -41,12 +41,9 @@ export async function onInvoicePaid(invoiceId: string) {
         } else {
           // manual products stay PENDING until staff activates them (Admin → Orders) — tell staff it's paid
           await prisma.service.update({ where: { id: svc.id }, data: { nextDueDate: due, nextInvoiceDate: due } });
-          const to = settings.company.billingEmail;
-          if (to) {
-            const u = await prisma.user.findUnique({ where: { id: svc.userId }, select: { email: true } });
-            const { config } = await import("../../config");
-            await queueEmail("admin.manual_setup", to, { productName: svc.product.name, clientEmail: u?.email ?? "", hostname: svc.hostname ?? "", adminUrl: `${config.appUrl}/admin/services/${svc.id}` }).catch(() => undefined);
-          }
+          const u = await prisma.user.findUnique({ where: { id: svc.userId }, select: { email: true } });
+          const { alertStaff, adminLink } = await import("../email/staff-alerts");
+          await alertStaff("service.manual_setup", { vars: { productName: svc.product.name, clientEmail: u?.email ?? "", hostname: svc.hostname ?? "" }, link: adminLink(`/admin/services/${svc.id}`) });
         }
       } else if (item.periodEnd) {
         const newDue = item.periodEnd > (svc.nextDueDate ?? new Date(0)) ? item.periodEnd : svc.nextDueDate;
@@ -83,8 +80,8 @@ export async function onInvoicePaid(invoiceId: string) {
         await prisma.automationEvent.create({ data: { action: "error", entity: "domain", entityId: item.relId, userId: inv.userId, label: d?.name ?? item.description, success: false, message: `Domain ${what} failed at ${d?.registrar ?? "the registrar"}: ${x.cause}` } }).catch(() => undefined);
         const { audit } = await import("../../lib/audit");
         await audit({ userId: inv.userId, action: `domain.${what}_failed`, entity: "domain", entityId: item.relId ?? undefined, details: { error: (e as Error).message } });
-        const to = settings.company.billingEmail;
-        if (to) await queueEmail("admin.provisioning_failed", to, { serviceId: item.relId, productName: `Domain ${what}: ${d?.name ?? item.description}`, clientEmail: inv.user.email, error: `${x.title}. Why: ${x.cause} — What to do: complete the ${what} at ${d?.registrar ?? "the registrar"} (or fix the registrar settings) and mark the domain active.` }).catch(() => undefined);
+        const { alertStaff } = await import("../email/staff-alerts");
+        await alertStaff("service.provisioning_failed", { vars: { serviceId: item.relId, productName: `Domain ${what}: ${d?.name ?? item.description}`, clientEmail: inv.user.email, error: `${x.title}. Why: ${x.cause} — What to do: complete the ${what} at ${d?.registrar ?? "the registrar"} (or fix the registrar settings) and mark the domain active.` } });
       });
     }
   }

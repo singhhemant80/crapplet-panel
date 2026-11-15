@@ -113,6 +113,14 @@ export const DEFAULT_SETTINGS = {
     autoCloseHours: 72,
     defaultSlaHours: 4,
   },
+  /** emails to the business about orders, payments, tickets … (Admin → Email Delivery → Staff alerts) */
+  staffAlerts: {
+    enabled: true,
+    /** comma separated; empty → company.billingEmail */
+    recipients: "",
+    /** per-alert on/off; missing → the alert's default (modules/email/staff-alerts.ts) */
+    events: {} as Record<string, boolean>,
+  },
   affiliates: {
     enabled: true,
     defaultCommissionPct: 10,

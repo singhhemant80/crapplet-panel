@@ -192,6 +192,10 @@ export async function onChargeFailed(gatewayOrderId: string, reason: string) {
   if (!intent || meta.autopay !== "charge" || intent.status === "PAID") return;
   await prisma.paymentIntent.update({ where: { id: intent.id }, data: { status: "FAILED", meta: { ...meta, error: reason } } });
   const inv = await prisma.invoice.findUnique({ where: { id: intent.invoiceId }, include: { user: true } });
+  if (inv && inv.status === "UNPAID") {
+    const { alertStaffLater, alertPaymentFailed } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertPaymentFailed(intent.id, reason));
+  }
   if (inv && inv.status === "UNPAID") await notify(inv.user, "AutoPay couldn't pay your invoice", `<p>Your UPI AutoPay payment of <b>₹${(intent.amount / 100).toFixed(2)}</b> for invoice ${inv.number ?? inv.proformaNumber} didn't go through (${escapeHtml(reason)}).</p><p>We'll try again in a day or two. To avoid any interruption you can also pay it now from your client area.</p>`);
 }
 

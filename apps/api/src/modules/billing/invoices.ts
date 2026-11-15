@@ -246,6 +246,11 @@ export async function applyPayment(input: PaymentInput): Promise<{ duplicate: bo
     if ((e as { code?: string }).code === "P2002") return { duplicate: true, paid: false, invoiceId: input.invoiceId };
     throw e;
   }
+  {
+    const paidNow = becamePaid;
+    const { alertStaffLater, alertPaymentReceived } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertPaymentReceived({ invoiceId: input.invoiceId, amount: input.amount, gateway: input.gateway, gatewayTxnId: input.gatewayTxnId, fee: input.fee, becamePaid: paidNow }));
+  }
   if (becamePaid) {
     const { onInvoicePaid } = await import("./hooks");
     await onInvoicePaid(input.invoiceId);
@@ -283,6 +288,8 @@ export async function applyCreditToInvoice(userId: string, invoiceId: string, ma
     return amount;
   });
   if (becamePaid) {
+    const { alertStaffLater, alertCreditApplied } = await import("../email/staff-alerts");
+    alertStaffLater(() => alertCreditApplied(invoiceId, applied));
     const { onInvoicePaid } = await import("./hooks");
     await onInvoicePaid(invoiceId);
   }
