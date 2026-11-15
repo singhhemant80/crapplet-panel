@@ -68,6 +68,8 @@ function lookup(vars: Record<string, unknown>, path: string): unknown {
 export function htmlToText(html: string) {
   return html
     .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "")
+    // the hidden inbox-preview line (and its spacer characters) isn't part of the message
+    .replace(/<div style="display:none[^"]*"[^>]*>[\s\S]*?<\/div>/i, "")
     .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href, text) => {
       const t = text.replace(/<[^>]+>/g, "").trim();
       return t && t !== href ? `${t} (${href})` : href;
@@ -100,19 +102,40 @@ export function emailLogoUrl(company: Company) {
 }
 
 export function layout(body: string, company: Company, preheader = "", footer?: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(company.brand)}</title></head>
-<body style="margin:0;background:#f6f0ff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ece4fb">
-<tr><td style="padding:20px 28px 16px;background:#ffffff"><a href="${esc(company.website || config.appUrl)}" style="text-decoration:none"><img src="${esc(emailLogoUrl(company))}" width="200" alt="${esc(company.brand)}" style="display:block;width:200px;max-width:60%;height:auto;border:0;outline:none;color:#7c3aed;font-size:22px;font-weight:800"></a></td></tr>
-<tr><td bgcolor="#7c3aed" style="height:4px;line-height:4px;font-size:0;background:#7c3aed;background:linear-gradient(90deg,#a365fe,#7c3aed)">&nbsp;</td></tr>
-<tr><td style="padding:28px;font-size:15px;line-height:1.6">${body}</td></tr>
-<tr><td style="padding:18px 28px;background:#faf7ff;color:#64748b;font-size:12px;line-height:1.6">
-${esc(company.legalName)} · ${esc(company.address)}<br>
-${footer ?? `You're receiving this because you have an account with ${esc(company.brand)}.`} Questions? Reply to this email or write to <a href="mailto:${esc(company.email)}" style="color:#7c3aed">${esc(company.email)}</a>.<br>
-<a href="${esc(company.website)}" style="color:#7c3aed">${esc(company.website)}</a></td></tr>
-</table></td></tr></table></body></html>`;
+  const site = (company.website || config.appUrl).replace(/\/+$/, "");
+  const app = config.appUrl.replace(/\/+$/, "");
+  const phone = (company as { phone?: string }).phone ?? "";
+  const wa = phone.replace(/\D/g, "");
+  const link = (href: string, text: string) => `<a href="${esc(href)}" style="color:#6d28d9;text-decoration:none;font-weight:600">${text}</a>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${esc(company.brand)}</title>
+<style>
+body{margin:0;padding:0;-webkit-text-size-adjust:100%}
+a{color:#6d28d9}
+@media (max-width:620px){.em-card{width:100%!important;border-radius:0!important}.em-pad{padding-left:22px!important;padding-right:22px!important}.em-outer{padding:0!important}h1{font-size:22px!important}.em-hide{display:none!important}}
+</style></head>
+<body style="margin:0;background:#f4effd;font-family:Inter,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all">${esc(preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4effd;background:linear-gradient(180deg,#ede3ff 0px,#f4effd 260px)"><tr><td class="em-outer" align="center" style="padding:36px 12px">
+<table role="presentation" class="em-card" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e9e0fb;box-shadow:0 18px 50px -24px rgba(76,29,149,.35)">
+<tr><td bgcolor="#7c3aed" style="height:5px;line-height:5px;font-size:0;background:#7c3aed;background:linear-gradient(90deg,#38bdf8,#a365fe 45%,#7c3aed)">&nbsp;</td></tr>
+<tr><td class="em-pad" style="padding:24px 36px 20px;border-bottom:1px solid #f1ebfd">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle"><a href="${esc(site)}" style="text-decoration:none"><img src="${esc(emailLogoUrl(company))}" width="190" alt="${esc(company.brand)}" style="display:block;width:190px;max-width:190px;height:auto;border:0;outline:none;color:#7c3aed;font-size:22px;font-weight:800"></a></td>
+<td class="em-hide" align="right" style="vertical-align:middle"><a href="${esc(app)}/client" style="display:inline-block;padding:9px 16px;border-radius:999px;background:#f5f0ff;border:1px solid #e4d6ff;color:#6d28d9;font-size:13px;font-weight:700;text-decoration:none">Client area&nbsp;&rarr;</a></td>
+</tr></table></td></tr>
+<tr><td class="em-pad" style="padding:30px 36px 34px;font-size:15.5px;line-height:1.65;color:#0f172a">${body}</td></tr>
+<tr><td class="em-pad" style="padding:22px 36px;background:#faf7ff;border-top:1px solid #f1ebfd">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:13.5px;line-height:1.7;color:#475569">
+<b style="color:#0f172a">Need help?</b> We're here 24/7.<br>
+${phone ? `${link(`tel:${phone.replace(/\s+/g, "")}`, esc(phone))}${wa ? ` &nbsp;·&nbsp; ${link(`https://wa.me/${wa}`, "WhatsApp")}` : ""} &nbsp;·&nbsp; ` : ""}${link(`mailto:${company.email}`, esc(company.email))} &nbsp;·&nbsp; ${link(`${app}/client/tickets`, "Open a ticket")}
+</td></tr></table></td></tr>
+</table>
+<table role="presentation" width="600" class="em-card" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px"><tr><td class="em-pad" align="center" style="padding:22px 24px 8px;font-size:12px;line-height:1.7;color:#8b8fa8">
+${link(site, "Website")} &nbsp;·&nbsp; ${link(`${app}/client/services`, "My services")} &nbsp;·&nbsp; ${link(`${app}/client/invoices`, "Invoices")} &nbsp;·&nbsp; ${link(`${app}/client`, "Client area")}<br>
+${footer ?? `You're receiving this because you have an account with ${esc(company.brand)}.`}<br>
+${esc(company.legalName)} · ${esc(company.address)}
+</td></tr></table>
+</td></tr></table></body></html>`;
 }
 
 /** Headers and envelope that mailbox providers expect from well-behaved transactional senders. */
