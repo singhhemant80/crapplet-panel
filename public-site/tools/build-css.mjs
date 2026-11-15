@@ -19,7 +19,8 @@ const SITE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(SITE, "css");
 fs.mkdirSync(OUT, { recursive: true });
 // classes added by the shared scripts
-const SHARED = ["header.js", "currency.js", "whatsapp.js"].map((f) => path.join(SITE, f)).filter((f) => fs.existsSync(f));
+// (every site script except the old browser build of Tailwind — plans.js builds the plan cards, header.js the menus …)
+const SHARED = fs.readdirSync(SITE).filter((f) => f.endsWith(".js") && f !== "tailwind.js").map((f) => path.join(SITE, f));
 
 const CDN = /<script\s+src="https:\/\/cdn\.tailwindcss\.com([^"]*)"\s*><\/script>\s*/i;
 const INLINE_CFG = /<script(?:\s+id="tailwind-config")?\s*>\s*tailwind\.config\s*=\s*([\s\S]*?)<\/script>\s*/i;

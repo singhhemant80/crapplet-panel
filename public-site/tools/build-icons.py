@@ -13,7 +13,8 @@ from fontTools.ttLib import TTFont
 SITE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 full = sys.argv[1]
 names = set()
-for f in glob.glob(os.path.join(SITE, "*.html")) + [os.path.join(SITE, x) for x in ("header.js", "currency.js", "whatsapp.js")]:
+# every page and every site script (plans.js builds the plan cards with icons like 'swap_vert')
+for f in glob.glob(os.path.join(SITE, "*.html")) + [x for x in glob.glob(os.path.join(SITE, "*.js")) if not x.endswith("tailwind.js")]:
     if not os.path.exists(f):
         continue
     t = open(f, encoding="utf-8").read()
@@ -54,3 +55,14 @@ font.flavor = "woff2"
 out = os.path.join(SITE, "fonts", "material-symbols-outlined-subset.woff2")
 font.save(out)
 print(f"{len(keep)} icons → {out} ({os.path.getsize(out) // 1024} KB)")
+
+# point every page at the new file (?v=… so browsers don't keep a cached older subset)
+import hashlib
+v = hashlib.sha1(open(out, "rb").read()).hexdigest()[:8]
+pat = re.compile(r"/fonts/material-symbols-outlined-subset\.woff2(\?v=[a-f0-9]+)?")
+for f in glob.glob(os.path.join(SITE, "*.html")):
+    t = open(f, encoding="utf-8").read()
+    n = pat.sub(f"/fonts/material-symbols-outlined-subset.woff2?v={v}", t)
+    if n != t:
+        open(f, "w", encoding="utf-8").write(n)
+print(f"pages now load ?v={v}")
