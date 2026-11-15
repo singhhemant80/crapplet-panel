@@ -21,10 +21,14 @@ export const BACKUP_DIR = process.env.BACKUP_DIR ?? (fs.existsSync("/var/backups
 export const FILE_RE = /^crapplet-backup-\d{8}-\d{4,6}\.tar$/;
 
 export type DestType = "none" | "s3" | "sftp" | "ftp";
+export type Frequency = "times" | "daily" | "every1h" | "every2h" | "every3h" | "every4h" | "every6h" | "every12h" | "weekly";
+export const EVERY_HOURS: Partial<Record<Frequency, number>> = { every1h: 1, every2h: 2, every3h: 3, every4h: 4, every6h: 6, every12h: 12 };
 export interface BackupConfig {
   enabled: boolean;
-  frequency: "daily" | "every6h" | "every12h" | "weekly";
+  frequency: Frequency;
   runAt: string; // HH:MM IST (daily / weekly)
+  /** HH:MM IST, several a day (frequency "times") */
+  times: string[];
   weekday: number; // 0 = Sunday (weekly)
   includeUploads: boolean;
   keepLocal: number;
@@ -35,15 +39,18 @@ export interface BackupConfig {
     sftp: { host: string; port: number; username: string; path: string };
     ftp: { host: string; port: number; username: string; path: string; secure: boolean };
   };
-  /** encrypted { s3Secret?, sftpPassword?, sftpKey?, ftpPassword? } */
+  /** also email each backup (encrypted) — on top of this server and the offsite destination */
+  email: { enabled: boolean; to: string; maxMb: number };
+  /** encrypted { s3Secret?, sftpPassword?, sftpKey?, ftpPassword?, emailPassphrase? } */
   secretsEnc?: string | null;
 }
-type Secrets = { s3Secret?: string; sftpPassword?: string; sftpKey?: string; ftpPassword?: string };
+type Secrets = { s3Secret?: string; sftpPassword?: string; sftpKey?: string; ftpPassword?: string; emailPassphrase?: string };
 
 const DEFAULTS: BackupConfig = {
   enabled: true,
   frequency: "daily",
   runAt: "03:00",
+  times: ["03:00", "15:00"],
   weekday: 0,
   includeUploads: true,
   keepLocal: 14,
@@ -54,6 +61,7 @@ const DEFAULTS: BackupConfig = {
     sftp: { host: "", port: 22, username: "", path: "/backups/crapplet" },
     ftp: { host: "", port: 21, username: "", path: "/backups/crapplet", secure: true },
   },
+  email: { enabled: false, to: "", maxMb: 18 },
 };
 
 export async function getBackupConfig(): Promise<BackupConfig> {
@@ -63,8 +71,19 @@ export async function getBackupConfig(): Promise<BackupConfig> {
   return {
     ...DEFAULTS,
     ...v,
+    times: normTimes(v.times ?? DEFAULTS.times),
+    email: { ...DEFAULTS.email, ...(v.email ?? {}) },
     destination: { ...DEFAULTS.destination, ...d, s3: { ...DEFAULTS.destination.s3, ...(d.s3 ?? {}) }, sftp: { ...DEFAULTS.destination.sftp, ...(d.sftp ?? {}) }, ftp: { ...DEFAULTS.destination.ftp, ...(d.ftp ?? {}) } },
   };
+}
+/** "9:5" / duplicates / junk → sorted unique "HH:MM" */
+export function normTimes(list: unknown): string[] {
+  const out = new Set<string>();
+  for (const t of Array.isArray(list) ? list : []) {
+    const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(t).trim());
+    if (m) out.add(`${m[1].padStart(2, "0")}:${m[2]}`);
+  }
+  return [...out].sort().slice(0, 24);
 }
 const secretsOf = (c: BackupConfig): Secrets => (c.secretsEnc ? JSON.parse(decrypt(c.secretsEnc)) : {});
 
@@ -78,6 +97,8 @@ export async function saveBackupConfig(patch: Partial<BackupConfig> & { secrets?
   const next: BackupConfig = {
     ...cur,
     ...rest,
+    times: rest.times ? normTimes(rest.times) : cur.times,
+    email: { ...cur.email, ...(rest.email ?? {}) },
     destination: { ...cur.destination, ...d, s3: { ...cur.destination.s3, ...(d.s3 ?? {}) }, sftp: { ...cur.destination.sftp, ...(d.sftp ?? {}) }, ftp: { ...cur.destination.ftp, ...(d.ftp ?? {}) } },
     secretsEnc: Object.values(s).some(Boolean) ? encrypt(JSON.stringify(s)) : null,
   };
@@ -88,7 +109,7 @@ export async function saveBackupConfig(patch: Partial<BackupConfig> & { secrets?
 export function redactBackup(c: BackupConfig) {
   const { secretsEnc, ...rest } = c;
   const s = secretsOf(c);
-  return { ...rest, saved: { s3Secret: !!s.s3Secret, sftpPassword: !!s.sftpPassword, sftpKey: !!s.sftpKey, ftpPassword: !!s.ftpPassword }, directory: BACKUP_DIR };
+  return { ...rest, saved: { s3Secret: !!s.s3Secret, sftpPassword: !!s.sftpPassword, sftpKey: !!s.sftpKey, ftpPassword: !!s.ftpPassword, emailPassphrase: !!s.emailPassphrase }, directory: BACKUP_DIR };
 }
 
 // ───────────────────────── making a backup ─────────────────────────
@@ -157,10 +178,17 @@ export async function createBackup(opts: { trigger: "schedule" | "manual" | "pre
         destinations.push({ type: cfg.destination.type, ok: false, error: (e as Error).message.slice(0, 500) });
       }
     }
+    if (cfg.email.enabled) {
+      try {
+        destinations.push({ type: "email", ok: true, location: await emailBackup(cfg, path.join(BACKUP_DIR, name), name, work) });
+      } catch (e) {
+        destinations.push({ type: "email", ok: false, error: (e as Error).message.slice(0, 500) });
+      }
+    }
     const remoteFailed = destinations.some((d) => !d.ok);
     const done = await prisma.backupRun.update({
       where: { id: runRow.id },
-      data: { status: "COMPLETED", fileName: name, sizeBytes: BigInt(size), includesUploads: withUploads, destinations, finishedAt: new Date(), error: remoteFailed ? "Saved on this server, but the remote copy failed" : null },
+      data: { status: "COMPLETED", fileName: name, sizeBytes: BigInt(size), includesUploads: withUploads, destinations, finishedAt: new Date(), error: remoteFailed ? `Saved on this server, but ${destinations.filter((d) => !d.ok).map((d) => (d.type === "email" ? "the email copy" : "the remote copy")).join(" and ")} failed` : null },
     });
     await pruneLocal(cfg.keepLocal);
     return done;
@@ -320,17 +348,32 @@ export async function testDestination() {
 // ───────────────────────── schedule ─────────────────────────
 
 /** When the next automatic backup is due (null = off). */
-export async function nextBackupAt(cfg?: BackupConfig): Promise<Date | null> {
+export async function nextBackupAt(cfg?: BackupConfig, now = new Date()): Promise<Date | null> {
   const c = cfg ?? (await getBackupConfig());
   if (!c.enabled) return null;
-  const last = await prisma.backupRun.findFirst({ where: { trigger: "schedule", status: "COMPLETED" }, orderBy: { startedAt: "desc" } });
-  if (c.frequency === "every6h" || c.frequency === "every12h") {
-    const h = c.frequency === "every6h" ? 6 : 12;
-    return last ? new Date(last.startedAt.getTime() + h * 3600_000) : new Date();
+  const last = await prisma.backupRun.findFirst({ where: { trigger: "schedule", status: "COMPLETED" }, orderBy: { startedAt: "desc" }, select: { startedAt: true } });
+  return nextSlot(c, last, now);
+}
+
+/** Pure: given the schedule and the last automatic backup, when the next one is due. */
+export function nextSlot(c: Pick<BackupConfig, "enabled" | "frequency" | "runAt" | "times" | "weekday">, last: { startedAt: Date } | null, now = new Date()): Date | null {
+  if (!c.enabled) return null;
+  const every = EVERY_HOURS[c.frequency];
+  if (every) return last ? new Date(last.startedAt.getTime() + every * 3600_000) : now;
+  const mins = (t: string) => {
+    const [hh, mm] = (/^(\d{1,2}):(\d{2})$/.exec(t) ?? ["", "3", "0"]).slice(1).map(Number);
+    return hh * 60 + mm;
+  };
+  const today = istDayStart(now);
+  if (c.frequency === "times") {
+    const slots = (c.times.length ? c.times : [c.runAt]).map(mins);
+    const all = [-1, 0, 1].flatMap((d) => slots.map((m) => today.getTime() + d * 86400_000 + m * 60_000)).sort((a, b) => a - b);
+    const latestPast = all.filter((t) => t <= now.getTime()).pop();
+    // the most recent slot hasn't been done yet (server was busy / down) → now
+    if (latestPast !== undefined && (!last || last.startedAt.getTime() < latestPast - 2 * 60_000)) return new Date(latestPast);
+    return new Date(all.find((t) => t > now.getTime())!);
   }
-  const [hh, mm] = (/^(\d{1,2}):(\d{2})$/.exec(c.runAt) ?? ["", "3", "0"]).slice(1).map(Number);
-  const today = istDayStart();
-  let at = new Date(today.getTime() + (hh * 60 + mm) * 60_000);
+  let at = new Date(today.getTime() + mins(c.runAt) * 60_000);
   if (c.frequency === "weekly") {
     const dow = new Date(today.getTime() + 330 * 60_000).getUTCDay();
     at = new Date(at.getTime() + (((c.weekday - dow) + 7) % 7) * 86400_000);
@@ -352,4 +395,106 @@ export async function maybeBackup() {
   if (restoreRunning(await readRestore())) return { skipped: "a restore is running" };
   const r = await createBackup({ trigger: "schedule" });
   return { id: r.id, file: r.fileName };
+}
+
+// ───────────────────────── email copy ─────────────────────────
+
+/** openssl is on every Ubuntu server; the file opens anywhere with the same command (see emailBackup). */
+export const DECRYPT_CMD = (file: string) => `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in ${file} -out ${file.replace(/\.enc$/, "")}`;
+
+export async function encryptFile(src: string, dest: string, passphrase: string) {
+  await run("openssl", ["enc", "-aes-256-cbc", "-pbkdf2", "-iter", "200000", "-salt", "-in", src, "-out", dest, "-pass", "env:CRAPPLET_BACKUP_PASS"], { env: { ...process.env, CRAPPLET_BACKUP_PASS: passphrase } });
+}
+export async function decryptFile(src: string, dest: string, passphrase: string) {
+  try {
+    await run("openssl", ["enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "200000", "-in", src, "-out", dest, "-pass", "env:CRAPPLET_BACKUP_PASS"], { env: { ...process.env, CRAPPLET_BACKUP_PASS: passphrase } });
+  } catch {
+    await fs.promises.rm(dest, { force: true });
+    throw new Error("Couldn't unlock this file — the passphrase doesn't match the one it was encrypted with");
+  }
+}
+export const emailPassphrase = async () => secretsOf(await getBackupConfig()).emailPassphrase ?? null;
+
+const fmtMb = (b: number) => `${(b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+
+async function sendBackupMail(cfg: BackupConfig, subject: string, bodyHtml: string, attachment?: { path: string; filename: string }) {
+  const { parseRecipients } = await import("../email/staff-alerts");
+  const to = parseRecipients(cfg.email.to);
+  if (!to.length) throw new Error("Add the email address to send backups to");
+  const { getMailConfig } = await import("../email/mail-config");
+  const { makeTransport, buildMessage, layout, friendlySmtpError } = await import("../email/mailer");
+  const { getSettings } = await import("../../lib/settings");
+  const mc = await getMailConfig();
+  if (!mc.enabled || !mc.host) throw new Error("Email sending isn't set up or is turned off (Email Delivery → Mail server)");
+  const settings = await getSettings();
+  const t = makeTransport(mc);
+  try {
+    const info = await t.sendMail(buildMessage(mc, { to: to.join(", "), subject, html: layout(bodyHtml, settings.company, subject), attachments: attachment ? [{ filename: attachment.filename, path: attachment.path, contentType: "application/octet-stream" }] : undefined }));
+    for (const r of to) await prisma.emailLog.create({ data: { to: r, subject, template: "backup", status: "SENT", messageId: info.messageId, response: info.response?.slice(0, 500) } });
+    return to;
+  } catch (e) {
+    const msg = friendlySmtpError(e);
+    for (const r of to) await prisma.emailLog.create({ data: { to: r, subject, template: "backup", status: "FAILED", error: msg.slice(0, 1000) } }).catch(() => undefined);
+    throw new Error(`Email not sent: ${msg}`);
+  } finally {
+    t.close();
+  }
+}
+
+/**
+ * Email the backup, encrypted with the saved passphrase. If the full backup is over the size limit,
+ * send the database only (the most important part); if even that's too big, send a notice instead.
+ */
+async function emailBackup(cfg: BackupConfig, file: string, name: string, work: string): Promise<string> {
+  const pass = secretsOf(cfg).emailPassphrase;
+  if (!pass) throw new Error("Set an encryption passphrase for emailed backups");
+  const limit = Math.max(1, cfg.email.maxMb || 18) * 1024 * 1024;
+  const fullSize = (await fs.promises.stat(file)).size;
+  let src = file;
+  let what = "the full backup (database and uploaded files)";
+  if (fullSize > limit) {
+    // database only
+    const dbOnly = path.join(work, name.replace(/\.tar$/, "-database.tar"));
+    await run("tar", ["-cf", dbOnly, "-C", work, "db.dump", "manifest.json"]);
+    src = dbOnly;
+    what = `the database only — the full backup (${fmtMb(fullSize)}) is over your ${cfg.email.maxMb} MB email limit; the full file stays on this server${cfg.destination.type !== "none" ? " and your offsite storage" : ""}`;
+  }
+  const enc = path.join(work, `${path.basename(src)}.enc`);
+  await encryptFile(src, enc, pass);
+  const encSize = (await fs.promises.stat(enc)).size;
+  const when = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  const host = os.hostname();
+  if (encSize > limit) {
+    await sendBackupMail(cfg, `Backup ${when} — too large to email`, `<p>Your automatic backup finished at <b>${when} IST</b> on <b>${host}</b>, but even the database alone is <b>${fmtMb(encSize)}</b>, over your ${cfg.email.maxMb} MB email limit, so it isn't attached.</p><p>It's saved on the server (Admin → Database Backups). Raise the limit, or add S3 / SFTP storage for offsite copies.</p>`);
+    return `notice sent to ${cfg.email.to} (backup ${fmtMb(encSize)} too large to attach)`;
+  }
+  const fname = path.basename(enc);
+  await sendBackupMail(
+    cfg,
+    `Backup ${when} — ${fmtMb(encSize)}`,
+    `<p>Attached is ${what}, made at <b>${when} IST</b> on <b>${host}</b>.</p>
+<p>It's <b>encrypted</b> with the passphrase you set under Admin → Database Backups → Email copy. Keep this email somewhere safe.</p>
+<p><b>To restore:</b> upload the <code>.enc</code> file under Admin → Database Backups → Restore from your computer — the panel unlocks it with the saved passphrase. On any other computer, unlock it first with:</p>
+<pre style="white-space:pre-wrap;background:#f1f5f9;padding:10px;border-radius:8px;font-size:12px">${DECRYPT_CMD(fname)}</pre>`,
+    { path: enc, filename: fname },
+  );
+  return `emailed to ${cfg.email.to} (${fname}, ${fmtMb(encSize)}${src !== file ? ", database only" : ""})`;
+}
+
+/** "Send test" — a small encrypted file, so the address, mail server and attachment size path are all checked. */
+export async function testEmailBackup() {
+  const cfg = await getBackupConfig();
+  if (!cfg.email.to.trim()) throw new Error("Add the email address to send backups to");
+  const pass = secretsOf(cfg).emailPassphrase;
+  if (!pass) throw new Error("Set an encryption passphrase first");
+  const work = await fs.promises.mkdtemp(path.join(os.tmpdir(), "crapplet-backup-mailtest-"));
+  try {
+    const plain = path.join(work, "crapplet-backup-test.txt");
+    await fs.promises.writeFile(plain, `Crapplet backup email test ${new Date().toISOString()}\nIf you can unlock this file, your passphrase works.\n`);
+    await encryptFile(plain, `${plain}.enc`, pass);
+    const to = await sendBackupMail(cfg, "Test: backup email copy", `<p>This is a test from Admin → Database Backups. Real backups will arrive like this, encrypted with your passphrase.</p><p>To check your passphrase, unlock the attached test file with:</p><pre style="white-space:pre-wrap;background:#f1f5f9;padding:10px;border-radius:8px;font-size:12px">${DECRYPT_CMD("crapplet-backup-test.txt.enc")}</pre>`, { path: `${plain}.enc`, filename: "crapplet-backup-test.txt.enc" });
+    return `Test sent to ${to.join(", ")} — check the inbox (and spam folder).`;
+  } finally {
+    await fs.promises.rm(work, { recursive: true, force: true });
+  }
 }

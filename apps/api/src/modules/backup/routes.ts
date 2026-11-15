@@ -8,7 +8,7 @@ import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
 import { backupQueue } from "../../jobs/queues";
 import { finishUpload, readRestore, reconcileBackupFiles, restoreRunning, startRestore, startUpload, uploadChunk, UPLOAD_CHUNK } from "./restore";
-import { BACKUP_DIR, backupPath, getBackupConfig, nextBackupAt, redactBackup, saveBackupConfig, testDestination } from "./service";
+import { BACKUP_DIR, backupPath, getBackupConfig, nextBackupAt, redactBackup, saveBackupConfig, testDestination, testEmailBackup } from "./service";
 
 export const adminBackups = Router();
 
@@ -52,8 +52,10 @@ adminBackups.put(
     const b = parse(
       z.object({
         enabled: z.boolean().optional(),
-        frequency: z.enum(["daily", "every6h", "every12h", "weekly"]).optional(),
+        frequency: z.enum(["times", "daily", "every1h", "every2h", "every3h", "every4h", "every6h", "every12h", "weekly"]).optional(),
         runAt: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use HH:MM").optional(),
+        times: z.array(z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use HH:MM")).max(24, "Up to 24 times a day").optional(),
+        email: z.object({ enabled: z.boolean(), to: z.string().max(1000), maxMb: z.number().int().min(1).max(100) }).partial().optional(),
         weekday: z.number().int().min(0).max(6).optional(),
         includeUploads: z.boolean().optional(),
         keepLocal: z.number().int().min(1).max(365).optional(),
@@ -66,12 +68,22 @@ adminBackups.put(
             ftp: z.object({ host: nonEmpty, port: z.number().int().min(1).max(65535), username: nonEmpty, path: nonEmpty, secure: z.boolean() }).partial().optional(),
           })
           .optional(),
-        secrets: z.object({ s3Secret: z.string().max(500).nullable(), sftpPassword: z.string().max(500).nullable(), sftpKey: z.string().max(20000).nullable(), ftpPassword: z.string().max(500).nullable() }).partial().optional(),
+        secrets: z.object({ s3Secret: z.string().max(500).nullable(), sftpPassword: z.string().max(500).nullable(), sftpKey: z.string().max(20000).nullable(), ftpPassword: z.string().max(500).nullable(), emailPassphrase: z.string().max(500).nullable() }).partial().optional(),
       }),
       req.body,
     );
+    if (b.frequency === "times" && b.times && !b.times.length) throw badRequest("Add at least one time");
+    if (b.email?.to !== undefined) {
+      const { parseRecipients } = await import("../email/staff-alerts");
+      const bad = b.email.to.split(/[\s,;]+/).filter((x) => x.trim() && !parseRecipients(x).length);
+      if (bad.length) throw badRequest(`Not a valid email address: ${bad.slice(0, 3).join(", ")}`);
+    }
+    if (b.secrets?.emailPassphrase && b.secrets.emailPassphrase.length < 10) throw badRequest("Use a passphrase of at least 10 characters");
+    const cur = await getBackupConfig();
+    const turningOnEmail = (b.email?.enabled ?? cur.email.enabled) && !redactBackup(cur).saved.emailPassphrase && !b.secrets?.emailPassphrase;
+    if (turningOnEmail) throw badRequest("Set an encryption passphrase for emailed backups — they contain your customers' data");
     const next = await saveBackupConfig(b as never);
-    await audit({ actorId: req.user!.id, action: "backup.settings", entity: "Setting", entityId: "backup", details: { enabled: next.enabled, frequency: next.frequency, destination: next.destination.type } });
+    await audit({ actorId: req.user!.id, action: "backup.settings", entity: "Setting", entityId: "backup", details: { enabled: next.enabled, frequency: next.frequency, times: next.frequency === "times" ? next.times : undefined, destination: next.destination.type, email: next.email.enabled ? next.email.to : false, passphraseChanged: !!b.secrets?.emailPassphrase || undefined } });
     res.json({ config: redactBackup(next), nextAt: await nextBackupAt(next) });
   }),
 );
@@ -87,6 +99,18 @@ adminBackups.post(
     await backupQueue().add("backup-now", { runId: run.id }, { removeOnComplete: 50, removeOnFail: 50 });
     await audit({ actorId: req.user!.id, action: "backup.run", entity: "BackupRun", entityId: run.id });
     res.status(202).json({ run: toJson(run) });
+  }),
+);
+
+adminBackups.post(
+  "/backups/test-email",
+  requireStaff("settings.manage"),
+  ah(async (_req, res) => {
+    try {
+      res.json({ ok: true, message: await testEmailBackup() });
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
   }),
 );
 

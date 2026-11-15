@@ -3,7 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { api, confirmPassword, date, isReauth } from "@/lib/api";
 import { Alert, Badge, Button, Card, Field, Icon, Input, Loading, Modal, PageHeader, Select, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
-const FREQ: Record<string, string> = { daily: "Every day", every12h: "Every 12 hours", every6h: "Every 6 hours", weekly: "Once a week" };
+const FREQ: Record<string, string> = { times: "At set times every day", daily: "Once a day", every1h: "Every hour", every2h: "Every 2 hours", every3h: "Every 3 hours", every4h: "Every 4 hours", every6h: "Every 6 hours", every12h: "Every 12 hours", weekly: "Once a week" };
+const freqLabel = (c: any) => (c.frequency === "times" ? `${c.times.length} time${c.times.length === 1 ? "" : "s"} a day` : FREQ[c.frequency]);
+const t12 = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+};
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DEST: Record<string, [string, string]> = {
   none: ["This server only", "dns"],
@@ -88,8 +93,8 @@ export default function BackupsPage() {
         }
         stats={[
           ["Last backup", <span key="l" className={stale ? "text-rose-600" : ""}>{ago(data.lastSuccessAt)}</span>, data.lastSuccessAt ? when(data.lastSuccessAt) : "no backup yet"],
-          ["Next automatic", c.enabled && data.nextAt ? when(data.nextAt) : "Off", c.enabled ? FREQ[c.frequency] : undefined],
-          ["Offsite copy", DEST[c.destination.type][0], c.destination.type === "none" ? "add one below" : `keep last ${c.destination.keepRemote || "all"}`],
+          ["Next automatic", c.enabled && data.nextAt ? (new Date(data.nextAt).getTime() <= Date.now() ? "Due now" : when(data.nextAt)) : "Off", c.enabled ? freqLabel(c) : undefined],
+          ["Offsite copy", DEST[c.destination.type][0] + (c.email.enabled ? " + email" : ""), c.destination.type === "none" ? (c.email.enabled ? "encrypted copy by email" : "add one below") : `keep last ${c.destination.keepRemote || "all"}`],
           ["Stored here", size(data.storedBytes), data.disk ? `${size(data.disk.free)} disk free` : undefined],
         ]}
       />
@@ -115,6 +120,7 @@ export default function BackupsPage() {
         <div className="space-y-5">
           <Schedule c={c} onSaved={reload} />
           <Destination c={c} onSaved={reload} />
+          <EmailCopy c={c} onSaved={reload} />
           <UploadBackup onUploaded={reload} />
           <Restore dir={c.directory} />
         </div>
@@ -179,7 +185,7 @@ function History({ data, reload, onRestore }: { data: any; reload: () => void; o
                     {r.destinations.map((d: any, i: number) => (
                       <span key={i} title={d.error ?? d.location} className={cx("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] font-bold", d.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700")}>
                         <Icon name={d.ok ? "check" : "close"} className="text-[14px]" />
-                        {d.type === "local" ? (r.available ? "this server" : "this server (removed)") : d.type.toUpperCase()}
+                        {d.type === "local" ? (r.available ? "this server" : "this server (removed)") : d.type === "email" ? "email" : d.type.toUpperCase()}
                       </span>
                     ))}
                   </div>
@@ -216,12 +222,13 @@ function History({ data, reload, onRestore }: { data: any; reload: () => void; o
 }
 
 function Schedule({ c, onSaved }: { c: any; onSaved: () => void }) {
-  const [f, setF] = useState({ enabled: c.enabled, frequency: c.frequency, runAt: c.runAt, weekday: c.weekday, includeUploads: c.includeUploads, keepLocal: c.keepLocal });
+  const [f, setF] = useState({ enabled: c.enabled, frequency: c.frequency, runAt: c.runAt, times: c.times as string[], weekday: c.weekday, includeUploads: c.includeUploads, keepLocal: c.keepLocal });
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
     try {
-      await api("/admin/backups/settings", { method: "PUT", body: { ...f, keepLocal: Number(f.keepLocal) } });
+      if (f.frequency === "times" && !f.times.filter(Boolean).length) throw new Error("Add at least one time");
+      await api("/admin/backups/settings", { method: "PUT", body: { ...f, times: f.times.filter(Boolean), keepLocal: Number(f.keepLocal) } });
       toast.success("Backup schedule saved");
       onSaved();
     } catch (e: any) {
@@ -254,7 +261,8 @@ function Schedule({ c, onSaved }: { c: any; onSaved: () => void }) {
             </Field>
           )}
         </div>
-        <Field label="Keep on this server" hint="Older backups are deleted automatically.">
+        {f.frequency === "times" && <div className={cx(!f.enabled && "pointer-events-none opacity-50")}><TimesEditor times={f.times} onChange={(times) => setF({ ...f, times })} /></div>}
+        <Field label="Keep on this server" hint={`Older backups are deleted automatically.${f.frequency === "times" && f.times.length > 1 ? ` With ${f.times.length} a day, ${f.keepLocal} covers about ${Math.max(1, Math.round(Number(f.keepLocal) / f.times.length))} day${Math.round(Number(f.keepLocal) / f.times.length) === 1 ? "" : "s"}.` : ""}`}>
           <div className="flex items-center gap-2">
             <div className="w-24 shrink-0"><Input type="number" min={1} max={365} value={f.keepLocal} onChange={(e) => setF({ ...f, keepLocal: e.target.value as any })} /></div>
             <span className="whitespace-nowrap text-[13px] text-slate-500">latest backups</span>
@@ -531,7 +539,7 @@ function UploadBackup({ onUploaded }: { onUploaded: () => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [up, setUp] = useState<{ name: string; sent: number; total: number } | null>(null);
   async function send(file: File) {
-    if (!/\.tar$/i.test(file.name)) return toast.error("Choose a backup file made by the panel (crapplet-backup-….tar)");
+    if (!/\.tar(\.enc)?$/i.test(file.name)) return toast.error("Choose a backup file made by the panel (crapplet-backup-….tar, or the .tar.enc from a backup email)");
     try {
       const s = await api<{ id: string; chunkSize: number }>("/admin/backups/upload", { body: { name: file.name, size: file.size } });
       let offset = 0;
@@ -580,8 +588,8 @@ function UploadBackup({ onUploaded }: { onUploaded: () => void }) {
   const pct = up ? Math.floor((up.sent / Math.max(1, up.total)) * 100) : 0;
   return (
     <Card title={<span className="inline-flex items-center gap-2"><Icon name="upload_file" className="text-[20px] text-primary" />Restore from your computer</span>}>
-      <p className="text-[13px] text-slate-600">Upload a backup file you downloaded earlier (<span className="font-mono">crapplet-backup-….tar</span>). It&apos;s checked, added to the list, and you can restore it from there.</p>
-      <input ref={input} type="file" accept=".tar,application/x-tar" className="hidden" onChange={(e) => e.target.files?.[0] && send(e.target.files[0])} />
+      <p className="text-[13px] text-slate-600">Upload a backup file you downloaded earlier (<span className="font-mono">crapplet-backup-….tar</span>), or the encrypted <span className="font-mono">.tar.enc</span> from a backup email. It&apos;s checked, added to the list, and you can restore it from there.</p>
+      <input ref={input} type="file" accept=".tar,.enc,application/x-tar" className="hidden" onChange={(e) => e.target.files?.[0] && send(e.target.files[0])} />
       {up ? (
         <div className="mt-3">
           <div className="flex justify-between text-[12.5px] font-semibold text-slate-600"><span className="truncate">{up.name}</span><span>{pct}%</span></div>
@@ -591,6 +599,121 @@ function UploadBackup({ onUploaded }: { onUploaded: () => void }) {
       ) : (
         <Button variant="outline" icon="upload" className="mt-3" onClick={() => input.current?.click()}>Choose backup file</Button>
       )}
+    </Card>
+  );
+}
+
+const PRESET_TIMES: [string, string[]][] = [
+  ["Twice a day", ["03:00", "15:00"]],
+  ["3 times", ["03:00", "11:00", "19:00"]],
+  ["4 times", ["00:00", "06:00", "12:00", "18:00"]],
+  ["Business hours", ["09:00", "13:00", "17:00", "21:00"]],
+];
+
+/** every 15 minutes, plus the current value if it's off the grid; times already used elsewhere are left out */
+function timeOptions(current: string, used: string[]) {
+  const all = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
+  if (!all.includes(current)) all.push(current);
+  return all.filter((o) => o === current || !used.includes(o)).sort();
+}
+
+function TimesEditor({ times, onChange }: { times: string[]; onChange: (t: string[]) => void }) {
+  const sorted = (t: string[]) => [...new Set(t.filter(Boolean))].sort();
+  const next = () => {
+    const last = times.filter(Boolean).sort().pop() ?? "00:00";
+    for (let k = 1; k <= 24; k++) {
+      const h = (Number(last.split(":")[0]) + 3 * k) % 24;
+      const c = `${String(h).padStart(2, "0")}:00`;
+      if (!times.includes(c)) return c;
+    }
+    return timeOptions("", times).find((o) => o && !times.includes(o)) ?? "00:00";
+  };
+  return (
+    <div className="rounded-xl border border-line bg-[#fbf9ff] p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-ink">Backup times (IST)</span>
+        <span className="text-[12px] font-semibold text-mute">{times.length}/24</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {times.map((t, i) => (
+          <div key={t} className="relative flex items-center rounded-lg border border-line bg-white pl-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+            <Icon name="schedule" className="pointer-events-none text-[17px] text-primary" />
+            <select value={t} aria-label={`Backup time ${i + 1}`} onChange={(e) => onChange(sorted(times.map((x, j) => (j === i ? e.target.value : x))))} className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent py-2 pl-1.5 pr-1 text-sm font-bold tabular-nums text-ink outline-none">
+              {timeOptions(t, times).map((o) => <option key={o} value={o}>{t12(o)}</option>)}
+            </select>
+            <button type="button" onClick={() => onChange(times.filter((_, j) => j !== i))} disabled={times.length <= 1} className="grid h-9 w-8 place-items-center text-slate-400 hover:text-rose-600 disabled:opacity-30" aria-label="Remove this time">
+              <Icon name="close" className="text-[17px]" />
+            </button>
+          </div>
+        ))}
+        {times.length < 24 && (
+          <button type="button" onClick={() => onChange(sorted([...times, next()]))} className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-primary/40 py-2 text-sm font-bold text-primary-dark hover:bg-primary/5">
+            <Icon name="add" className="text-[18px]" />Add time
+          </button>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[12px] font-semibold text-mute">Quick:</span>
+        {PRESET_TIMES.map(([label, t]) => (
+          <button key={label} type="button" onClick={() => onChange(t)} className="rounded-full border border-line bg-white px-2.5 py-1 text-[12px] font-bold text-slate-600 hover:border-primary hover:text-primary-dark">{label}</button>
+        ))}
+      </div>
+      {times.filter(Boolean).length > 0 && <p className="mt-2.5 text-[12.5px] text-slate-600">Runs at {sorted(times).map(t12).join(", ")} every day.</p>}
+    </div>
+  );
+}
+
+function EmailCopy({ c, onSaved }: { c: any; onSaved: () => void }) {
+  const [e, setE] = useState<{ enabled: boolean; to: string; maxMb: number | string }>(() => ({ ...c.email }));
+  const [pass, setPass] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const hasPass = c.saved.emailPassphrase;
+  async function save(andTest = false) {
+    setBusy(andTest ? "test" : "save");
+    setResult(null);
+    try {
+      await api("/admin/backups/settings", { method: "PUT", body: { email: { enabled: e.enabled, to: e.to.trim(), maxMb: Number(e.maxMb) || 18 }, ...(pass ? { secrets: { emailPassphrase: pass } } : {}) } });
+      setPass("");
+      onSaved();
+      if (andTest) setResult(await api("/admin/backups/test-email", { method: "POST" }));
+      else toast.success("Email copy saved");
+    } catch (err: any) {
+      if (andTest) setResult({ ok: false, message: err.message });
+      else toast.error(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+  return (
+    <Card title={<span className="inline-flex items-center gap-2"><Icon name="forward_to_inbox" className="text-[20px] text-primary" />Email copy</span>}>
+      <div className="space-y-4">
+        <Toggle checked={e.enabled} onChange={(v) => setE({ ...e, enabled: v })} label="Email each backup, encrypted" />
+        <p className="-mt-1 text-[13px] text-slate-600">Works alongside the offsite destination. Every backup — automatic or “Back up now” — is sent as an encrypted attachment.</p>
+        <div className={cx("space-y-3", !e.enabled && "opacity-60")}>
+          <Field label="Send to" hint="One or more addresses, separated by commas. Use a private mailbox only you can open.">
+            <Input type="text" inputMode="email" value={e.to} onChange={(x) => setE({ ...e, to: x.target.value })} placeholder="backups@yourcompany.com" autoComplete="off" />
+          </Field>
+          <Field label="Encryption passphrase" hint={hasPass ? "Saved — leave blank to keep it. Changing it only affects new backups." : "At least 10 characters. You'll need it to open the backups — store it in your password manager."}>
+            <div className="flex items-center gap-2">
+              <Input type={show ? "text" : "password"} value={pass} onChange={(x) => setPass(x.target.value)} placeholder={hasPass ? "••••••••••" : "Choose a strong passphrase"} autoComplete="new-password" />
+              <Button variant="outline" size="sm" icon={show ? "visibility_off" : "visibility"} onClick={() => setShow(!show)} aria-label={show ? "Hide" : "Show"} />
+            </div>
+          </Field>
+          <Field label="Largest attachment" hint="Most mailboxes accept about 20 MB. If a full backup is bigger, the database alone is emailed; if that's still too big, you get a notice instead.">
+            <div className="flex items-center gap-2">
+              <div className="w-24 shrink-0"><Input type="number" min={1} max={100} value={e.maxMb} onChange={(x) => setE({ ...e, maxMb: x.target.value })} /></div>
+              <span className="text-[13px] text-slate-500">MB</span>
+            </div>
+          </Field>
+        </div>
+        {result && <Alert tone={result.ok ? "success" : "error"}><span className="break-words">{result.message}</span></Alert>}
+        <div className="flex flex-wrap gap-2">
+          <Button icon="save" loading={busy === "save"} onClick={() => save(false)}>Save</Button>
+          <Button variant="secondary" icon="send" loading={busy === "test"} onClick={() => save(true)} disabled={!e.to.trim()}>Save &amp; send test</Button>
+        </div>
+      </div>
     </Card>
   );
 }

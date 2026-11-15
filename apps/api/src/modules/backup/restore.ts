@@ -258,7 +258,7 @@ const upPart = (id: string) => path.join(BACKUP_DIR, `.upload-${id}.part`);
 const upMeta = (id: string) => path.join(BACKUP_DIR, `.upload-${id}.json`);
 
 export async function startUpload(name: string, size: number, by: string) {
-  if (!/\.tar$/i.test(name)) throw new Error("Choose a backup file made by the panel (crapplet-backup-….tar)");
+  if (!/\.tar(\.enc)?$/i.test(name)) throw new Error("Choose a backup file made by the panel (crapplet-backup-….tar, or the .tar.enc from a backup email)");
   if (!(size > 0) || size > MAX_UPLOAD) throw new Error("That file is too large");
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
   // forget abandoned uploads older than a day
@@ -298,6 +298,16 @@ export async function finishUpload(id: string) {
   if (have !== m.size) throw new Error(`Upload incomplete: ${have} of ${m.size} bytes received`);
   let info;
   try {
+    if (/\.enc$/i.test(m.name)) {
+      // an emailed backup: unlock it with the saved passphrase
+      const { emailPassphrase, decryptFile } = await import("./service");
+      const pass = await emailPassphrase();
+      if (!pass) throw new Error("This backup is encrypted, but no email passphrase is saved here. Set it under Email copy, or unlock the file on your computer first and upload the .tar");
+      const plain = `${upPart(id)}.plain`;
+      await decryptFile(upPart(id), plain, pass);
+      await fs.promises.rename(plain, upPart(id));
+      m.size = (await fs.promises.stat(upPart(id))).size;
+    }
     info = await inspectBackup(upPart(id));
   } catch (e) {
     await fs.promises.rm(upPart(id), { force: true });
