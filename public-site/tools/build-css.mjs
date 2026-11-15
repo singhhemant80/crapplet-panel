@@ -63,8 +63,11 @@ for (const name of fs.readdirSync(SITE).filter((f) => f.endsWith(".html")).sort(
   fs.writeFileSync(path.join(OUT, `${slug}.css`), result.css);
   const v = createHash("sha1").update(result.css).digest("hex").slice(0, 8);
   const link = `<link rel="stylesheet" href="/css/${slug}.css?v=${v}" data-tailwind/>\n`;
-  // last in <head>, where the browser build of Tailwind used to put its styles (same cascade order)
-  html = LINK.test(html) ? html.replace(LINK, link) : html.replace(/<\/head>/i, `${link}</head>`);
+  const INLINE = new RegExp(`<style data-tailwind="${slug}">[\\s\\S]*?</style>`);
+  // pages inline their CSS (fewer round trips on mobile); otherwise it's linked last in <head>,
+  // where the browser build of Tailwind used to put its styles (same cascade order)
+  if (INLINE.test(html)) html = html.replace(INLINE, () => `<style data-tailwind="${slug}">${result.css}</style>`);
+  else html = LINK.test(html) ? html.replace(LINK, link) : html.replace(/<\/head>/i, `${link}</head>`);
   if (html !== before) fs.writeFileSync(file, html);
   built++;
   console.log(`${name.padEnd(30)} ${(result.css.length / 1024).toFixed(1).padStart(6)} KB`);

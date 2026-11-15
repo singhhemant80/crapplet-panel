@@ -479,5 +479,12 @@ app.post("/crapplet-webhook", express.raw({ type: "application/json" }), (req, r
   });
 </script>
 <script src="/whatsapp.js" defer></script>
+<script>/* start looping decorations after load — keeps the first paint fast on phones */
+(function(){var on=false;function each(f){try{document.getAnimations().forEach(function(a){var t=a.effect&&a.effect.getTiming&&a.effect.getTiming();if(t&&t.iterations===Infinity)f(a)})}catch(e){}}
+function hold(){if(!on)each(function(a){a.pause()})}
+function go(){if(on)return;on=true;each(function(a){a.play()});["pointerdown","keydown","touchstart","scroll","mousemove"].forEach(function(e){removeEventListener(e,go,true)})}
+if(!document.getAnimations)return;hold();document.addEventListener("DOMContentLoaded",hold);
+["pointerdown","keydown","touchstart","scroll","mousemove"].forEach(function(e){addEventListener(e,go,{capture:true,passive:true})});
+addEventListener("load",function(){hold();setTimeout(go,3500)})})();</script>
 </body>
 </html>
