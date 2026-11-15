@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { LiveClock } from "@/components/live-clock";
 import type { ReactNode } from "react";
 import { useSession } from "@/lib/session";
 import { CYCLES, date, gb, invNo, money } from "@/lib/api";
@@ -35,7 +36,7 @@ export default function Dashboard() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:linear-gradient(90deg,transparent,black)]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold text-white/75">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+            <p className="text-sm font-semibold text-white/75"><LiveClock /></p>
             <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-[32px]">{greet()}, {me?.firstName}</h1>
             <p className="mt-2 max-w-xl text-sm text-white/80">
               {s.overdueInvoices ? `You have ${s.overdueInvoices} overdue invoice${s.overdueInvoices > 1 ? "s" : ""} — pay now to keep your services running.` : s.activeServices ? `All ${s.activeServices} of your services are managed from here — servers, hosting, domains, billing and support.` : "Welcome to Crapplet Cloud. Deploy your first VPS or hosting plan in minutes."}

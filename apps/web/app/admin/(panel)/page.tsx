@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, date, money } from "@/lib/api";
 import { can, useSession } from "@/lib/session";
+import { LiveClock } from "@/components/live-clock";
 import { Badge, Button, Icon, Loading, PageHeader, cx, toast, useApi } from "@/components/ui";
 
 /** ₹1,26,930 → "₹1.27L"; ₹2.4 cr → "₹2.42Cr" — for big tiles and chart labels */
@@ -278,7 +279,7 @@ export default function AdminDashboard() {
       <PageHeader
         icon="space_dashboard"
         title={`${greet()}, ${me?.firstName ?? "Admin"}`}
-        subtitle={new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
+        subtitle={<LiveClock />}
         meta={<>
           <span className="inline-flex items-center gap-1.5"><Icon name="group" className="text-[16px] text-white/60" />{d.clients.online} client{d.clients.online === 1 ? "" : "s"} online</span>
           <span className="inline-flex items-center gap-1.5"><Icon name="badge" className="text-[16px] text-white/60" />{d.staffOnline.length} staff online</span>
