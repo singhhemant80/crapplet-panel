@@ -1,0 +1,13 @@
+{
+  "name": "crapplet-site-tools",
+  "private": true,
+  "description": "Builds each page's Tailwind CSS (public-site/css/*.css) so pages don't load Tailwind in the browser.",
+  "scripts": { "build-css": "node build-css.mjs" },
+  "dependencies": {
+    "tailwindcss": "3.4.17",
+    "@tailwindcss/forms": "0.5.9",
+    "@tailwindcss/container-queries": "0.1.1",
+    "postcss": "8.4.49",
+    "cssnano": "7.0.6"
+  }
+}

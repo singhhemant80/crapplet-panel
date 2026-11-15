@@ -32,28 +32,11 @@
 <!-- Open Graph / Facebook -->
 <!-- Twitter -->
 <!-- Performance: connect early to third-party origins -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin/>
+<style>@font-face{font-family:"Material Symbols Outlined";font-style:normal;font-weight:100 700;font-display:block;src:url(/fonts/material-symbols-outlined-subset.woff2) format("woff2")}.material-symbols-outlined{font-family:"Material Symbols Outlined";font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga";-webkit-font-smoothing:antialiased}</style>
 
 <!-- Structured data: Organization + Service + FAQPage for rich results -->
-<script id="tailwind-config">
-tailwind.config = {
-  darkMode: "class",
-  theme: {
-    extend: {
-      colors: {
-        "primary": "#a365fe",
-        "background-light": "#ffffff",
-      },
-      fontFamily: {
-        "display": ["Inter"],
-        "body": ["Inter"],
-      },
-    },
-  },
-}
-</script>
 <style>
   :root {
     --primary: #a365fe;
@@ -254,6 +237,8 @@ tailwind.config = {
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
 <link rel="stylesheet" href="/header.css">
+<script type="application/json" id="tailwind-config" data-plugins="forms,container-queries">{"darkMode":"class","theme":{"extend":{"colors":{"primary":"#a365fe","background-light":"#ffffff"},"fontFamily":{"display":["Inter"],"body":["Inter"]}}}}</script>
+<link rel="stylesheet" href="/css/colocation.css?v=a0a7f48b" data-tailwind/>
 </head>
 <body>
 <div id="cursor-glow"></div>
@@ -264,7 +249,7 @@ tailwind.config = {
   <div class="drawer-glow-bottom"></div>
   <div class="drawer-inner">
     <div class="drawer-header">
-      <img decoding="async" alt="Crapplet" src="/Crapplet_logo.png" class="h-12 w-auto"
+      <img decoding="async" alt="Crapplet" src="/img/crapplet-logo.webp" class="h-12 w-auto"
            onerror="this.outerHTML='&lt;span style=&quot;color:#a365fe;font-weight:900;font-size:18px;font-family:Inter,sans-serif&quot;&gt;Crapplet&lt;/span&gt;'"/>
       <button id="close-drawer" class="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition">
         <span class="material-symbols-outlined" style="font-size:20px;">close</span>
@@ -357,7 +342,7 @@ tailwind.config = {
   </div></div>
   <div class="chdr-main"><div class="chdr-wrap">
     <div class="chdr-row1">
-      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img decoding="async" src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img decoding="async" src="/img/crapplet-logo.webp" alt="Crapplet Cloud"></a>
       <div class="chdr-search" role="search">
         <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
         <div class="chdr-results" role="listbox"></div>
@@ -1010,7 +995,7 @@ tailwind.config = {
 <footer class="bg-white border-t border-slate-100 pt-12 pb-4 px-6 lg:px-20 mt-12">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-12 mb-12 reveal rv1">
       <div class="flex flex-col gap-4">
-        <img decoding="async" src="/Crapplet_logo.png" alt="Crapplet Infotech - Colocation and Web Hosting Provider" class="h-10 w-auto object-contain" loading="lazy" width="160" height="40"/>
+        <img decoding="async" src="/img/crapplet-logo.webp" alt="Crapplet Infotech - Colocation and Web Hosting Provider" class="h-10 w-auto object-contain" loading="lazy" width="160" height="40"/>
         <div class="flex flex-col gap-1">
           <img src="/Payment1.png" alt="Accepted payment methods: credit and debit cards" class="h-16 w-auto object-contain" loading="lazy"/>
           <img src="/Payment2.png" alt="Accepted payment methods: UPI and net banking" class="h-16 w-auto object-contain" loading="lazy"/>

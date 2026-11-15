@@ -6,25 +6,9 @@
 <title>Coming Soon | Crapplet Cloud</title>
 <meta name="robots" content="noindex, follow"/>
 <link rel="icon" type="image/png" href="/Crapplet_Icon.png"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-
-<script>
-tailwind.config = {
-  darkMode: "class",
-  theme: {
-    extend: {
-      colors: {
-        primary: "#a365fe",
-        "background-dark": "#101922"
-      },
-      fontFamily: { display: ["Inter", "sans-serif"] }
-    }
-  }
-}
-</script>
+<link rel="preload" href="/fonts/material-symbols-outlined-subset.woff2" as="font" type="font/woff2" crossorigin/>
+<style>@font-face{font-family:"Material Symbols Outlined";font-style:normal;font-weight:100 700;font-display:block;src:url(/fonts/material-symbols-outlined-subset.woff2) format("woff2")}.material-symbols-outlined{font-family:"Material Symbols Outlined";font-weight:normal;font-style:normal;font-size:24px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga";-webkit-font-smoothing:antialiased}</style>
 
 <style>
 body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
@@ -267,6 +251,8 @@ header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
 <link rel="stylesheet" href="/header.css">
+<script type="application/json" id="tailwind-config" data-plugins="forms,container-queries">{"darkMode":"class","theme":{"extend":{"colors":{"primary":"#a365fe","background-dark":"#101922"},"fontFamily":{"display":["Inter","sans-serif"]}}}}</script>
+<link rel="stylesheet" href="/css/coming-soon.css?v=f5908ec7" data-tailwind/>
 </head>
 
 <body class="bg-slate-50">
@@ -283,7 +269,7 @@ header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
 
     <div class="drawer-header">
      <a href="/index.html">
-      <img alt="Crapplet" src="/Crapplet_logo.png"
+      <img alt="Crapplet" src="/img/crapplet-logo.webp"
            class="h-10 w-auto"
            onerror="this.outerHTML='&lt;span style=&quot;color:#f0c060;font-weight:900;font-size:20px;font-family:Playfair Display,serif&quot;&gt;Crapplet&lt;/span&gt;'"
       /></a>
@@ -413,7 +399,7 @@ header.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,.07); }
   </div></div>
   <div class="chdr-main"><div class="chdr-wrap">
     <div class="chdr-row1">
-      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+      <a class="chdr-logo" href="/index.html" aria-label="Crapplet Cloud home"><img src="/img/crapplet-logo.webp" alt="Crapplet Cloud"></a>
       <div class="chdr-search" role="search">
         <label class="chdr-search-box"><span class="ms">search</span><input type="search" placeholder="Search VPS, hosting, servers..." aria-label="Search the site" autocomplete="off"><span class="chdr-kbd">Ctrl K</span></label>
         <div class="chdr-results" role="listbox"></div>
