@@ -16,6 +16,7 @@ import { listAvailableIps, reserveIp } from "../ipam/service";
 import { liveStatus } from "../provisioning/provisioner";
 import { isHostingProduct, isVpsProduct } from "../../lib/product-kind";
 import { encrypt } from "../../lib/crypto";
+import { rootPasswordSchema } from "../orders/pricing";
 import { assertPublicHttps, notifyReseller, RESELLER_EVENTS, serviceEventData } from "./webhooks";
 
 export const resellerRouter = Router();
@@ -230,11 +231,11 @@ resellerRouter.post(
 resellerRouter.post(
   "/vps/:id/action",
   ah(async (req, res) => {
-    const b = parse(z.object({ action: z.enum(["start", "stop", "shutdown", "reboot", "suspend", "unsuspend", "reinstall", "reset_password"]), osTemplateId: z.string().optional(), reason: z.string().optional() }), req.body);
+    const b = parse(z.object({ action: z.enum(["start", "stop", "shutdown", "reboot", "suspend", "unsuspend", "reinstall", "reset_password"]), osTemplateId: z.string().optional(), reason: z.string().optional(), password: rootPasswordSchema.optional() }), req.body);
     const s = await ownVps(req.user!.resellerId!, req.params.id);
     if (b.action === "unsuspend" && s.suspendReason?.startsWith("Overdue")) throw badRequest("Suspended for non-payment — pay the overdue invoice to restore");
     if (["start", "stop", "shutdown", "reboot", "reinstall", "reset_password"].includes(b.action) && s.status !== "ACTIVE") throw badRequest(`VPS is ${s.status}`);
-    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, reason: b.reason ? `Reseller: ${b.reason}` : "Suspended by reseller" }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, reason: b.reason ? `Reseller: ${b.reason}` : "Suspended by reseller", ...((b.action === "reinstall" || b.action === "reset_password") && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     res.status(202).json({ queued: true });
   }),
 );
@@ -344,13 +345,13 @@ resellerRouter.get(
 resellerRouter.post(
   "/services/:id/action",
   ah(async (req, res) => {
-    const b = parse(z.object({ action: z.enum(["start", "stop", "shutdown", "reboot", "suspend", "unsuspend", "reinstall", "reset_password"]), osTemplateId: z.string().optional(), reason: z.string().max(200).optional() }), req.body);
+    const b = parse(z.object({ action: z.enum(["start", "stop", "shutdown", "reboot", "suspend", "unsuspend", "reinstall", "reset_password"]), osTemplateId: z.string().optional(), reason: z.string().max(200).optional(), password: rootPasswordSchema.optional() }), req.body);
     const s = await ownVps(req.user!.resellerId!, req.params.id);
     const vps = isVpsProduct(s.product);
     if (!vps && ["start", "stop", "shutdown", "reboot", "reinstall"].includes(b.action)) throw badRequest(`${b.action} is only for VPS plans`);
     if (b.action === "unsuspend" && s.suspendReason?.startsWith("Overdue")) throw badRequest("Suspended for non-payment — pay the overdue invoice to restore");
     if (["start", "stop", "shutdown", "reboot", "reinstall", "reset_password"].includes(b.action) && s.status !== "ACTIVE") throw badRequest(`The service is ${s.status}`);
-    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, reason: b.reason ? `Reseller: ${b.reason}` : "Suspended by reseller" }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, reason: b.reason ? `Reseller: ${b.reason}` : "Suspended by reseller", ...((b.action === "reinstall" || b.action === "reset_password") && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     res.status(202).json({ queued: true });
   }),
 );

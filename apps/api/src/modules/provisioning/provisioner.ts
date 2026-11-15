@@ -852,7 +852,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         if (prov === "CPANEL") throw new ProvisionError("Reinstall doesn't apply to hosting accounts", false);
         const osTemplateId = String(params.osTemplateId ?? svc.osTemplateId);
         const os = await prisma.osTemplate.findUniqueOrThrow({ where: { id: osTemplateId } });
-        const password = generatePassword(18);
+        // the password chosen in the reinstall window, otherwise a strong random one
+        const password = (params.passwordEnc ? decrypt(String(params.passwordEnc)) : "") || generatePassword(18);
         if (prov === "PROXMOX") {
           const { server, remoteId, node } = requireRemote(svc);
           const c = proxmoxFor(server);

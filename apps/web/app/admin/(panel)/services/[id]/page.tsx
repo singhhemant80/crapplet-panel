@@ -127,7 +127,7 @@ export default function AdminService() {
                 </Group>
                 <Group label="Operating system">
                   <Button variant="outline" size="sm" icon="install_desktop" onClick={() => setReinstall(true)}>Reinstall</Button>
-                  <ReinstallModal staff open={reinstall} onClose={() => setReinstall(false)} svc={s} onSubmit={(osId) => { setReinstall(false); act("reinstall", { osTemplateId: osId }); }} />
+                  <ReinstallModal staff open={reinstall} onClose={() => setReinstall(false)} svc={s} onSubmit={(osId, _c, password) => { setReinstall(false); act("reinstall", { osTemplateId: osId, ...(password ? { password } : {}) }); }} />
                 </Group>
               </>
             )}

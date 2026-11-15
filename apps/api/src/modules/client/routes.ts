@@ -347,7 +347,7 @@ const actionSchema = z.object({
   action: z.enum(["start", "stop", "shutdown", "reboot", "hard_reset", "reinstall", "reset_password"]),
   osTemplateId: z.string().optional(),
   confirm: z.string().optional(),
-  /** reset_password: the customer's own password (otherwise one is generated) */
+  /** reset_password / reinstall: the customer's own password (otherwise one is generated) */
   password: rootPasswordSchema.optional(),
 });
 
@@ -365,7 +365,7 @@ clientRouter.post(
     // anti double-click: one request per 10 s (finished jobs' own log lines don't count)
     const recent = await prisma.provisioningLog.count({ where: { serviceId: s.id, action: { endsWith: "_requested" }, createdAt: { gt: new Date(Date.now() - 10_000) } } });
     if (recent) throw conflict("You just sent a request for this server — please wait a few seconds");
-    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, ...(b.action === "reset_password" && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action, params: { osTemplateId: b.osTemplateId, ...((b.action === "reset_password" || b.action === "reinstall") && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     await prisma.provisioningLog.create({ data: { serviceId: s.id, action: `${b.action}_requested`, success: true, message: "Queued by customer" } });
     res.status(202).json({ queued: true });
   }),

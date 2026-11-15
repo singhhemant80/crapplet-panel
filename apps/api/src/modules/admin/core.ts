@@ -922,7 +922,7 @@ adminCore.post(
         package: z.string().max(120).optional(),
         osTemplateId: z.string().optional(),
         notify: z.boolean().optional(),
-        /** reset_password: staff-chosen password (otherwise one is generated) */
+        /** reset_password / reinstall: staff-chosen password (otherwise one is generated) */
         password: rootPasswordSchema.optional(),
       }),
       req.body,
@@ -941,7 +941,7 @@ adminCore.post(
       // remove a finished/failed create job so it can be queued again under the same id
       if (old && (state === "failed" || state === "completed")) await old.remove();
     }
-    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify, package: b.package, ...(b.action === "reset_password" && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: b.action as ProvisionAction, params: { reason: b.reason, osTemplateId: b.osTemplateId, notify: b.notify, package: b.package, ...((b.action === "reset_password" || b.action === "reinstall") && b.password ? { passwordEnc: encrypt(b.password) } : {}) }, actorId: req.user!.id });
     // never put the password in the audit log
     const { password: chosen, ...logged } = b;
     await audit({ actorId: req.user!.id, userId: s.userId, action: `service.${b.action}`, entity: "service", entityId: s.id, details: { ...logged, ...(chosen ? { passwordChosen: true } : {}) } });

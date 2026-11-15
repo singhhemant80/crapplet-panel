@@ -323,11 +323,11 @@ const { serviceId } = body;</pre></div>
 <div class="tw"><table>
   <tr><th>action</th><th>For</th><th>Notes</th></tr>
   <tr><td><code>start</code> · <code>stop</code> · <code>shutdown</code> · <code>reboot</code></td><td>VPS</td><td><code>stop</code> is a hard power-off; <code>shutdown</code> asks the OS.</td></tr>
-  <tr><td><code>reinstall</code></td><td>VPS</td><td>Pass <code>osTemplateId</code>. <b>Erases the disk.</b> New password.</td></tr>
+  <tr><td><code>reinstall</code></td><td>VPS</td><td>Pass <code>osTemplateId</code>. <b>Erases the disk.</b> Optional <code>password</code> (10–64 characters, upper case, lower case and a number); otherwise a new one is generated.</td></tr>
   <tr><td><code>reset_password</code></td><td>VPS, hosting</td><td>New root / Administrator / cPanel password.</td></tr>
   <tr><td><code>suspend</code> · <code>unsuspend</code></td><td>All</td><td>Optional <code>reason</code>. Services we suspended for non-payment unsuspend only when the invoice is paid.</td></tr>
 </table></div>
-<pre>{ "action": "reinstall", "osTemplateId": "cmos2" }</pre>
+<pre>{ "action": "reinstall", "osTemplateId": "cmos2", "password": "N3w-Strong-Pass" }</pre>
 
 <div class="ep" id="login"><span class="verb POST">POST</span><code>/services/{id}/login</code></div>
 <p>For hosting: a one-time link that logs your customer straight into cPanel (or webmail with <code>{"service":"webmaild"}</code>). Valid for 60 seconds — redirect to it immediately.</p>
