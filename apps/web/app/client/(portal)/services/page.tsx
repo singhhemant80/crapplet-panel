@@ -104,7 +104,10 @@ function Services() {
                     <span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink group-hover:text-primary-dark">{s.product.name}</span><span className="block truncate text-xs text-mute">{s.hostname ?? "—"}</span></span>
                     <span className="hidden w-36 font-mono text-[12.5px] text-slate-700 md:block">{ip ?? "—"}</span>
                     <span className="w-24">{live.states[s.id] ? <LiveBadge state={live.states[s.id].state} /> : <Badge status={s.status} />}</span>
-                    <span className="hidden w-32 text-right text-xs text-mute sm:block">{s.nextDueDate ? `due ${date(s.nextDueDate)}` : "—"}</span>
+                    <span className="hidden w-44 text-right text-xs leading-relaxed text-mute sm:block">
+                      <span className="block">Purchased <b className="font-semibold text-slate-700">{date(s.registrationDate)}</b></span>
+                      <span className="block">{["TERMINATED", "CANCELLED"].includes(s.status) ? <>Ended <b className="font-semibold text-slate-700">{s.terminationDate ? date(s.terminationDate) : "—"}</b></> : s.billingCycle === "ONETIME" ? "One-time · no renewal" : <>Renews <b className="font-semibold text-slate-700">{s.nextDueDate ? date(s.nextDueDate) : "—"}</b></>}</span>
+                    </span>
                     <Icon name="chevron_right" className="text-mute" />
                   </Link>
                 </li>
@@ -180,8 +183,9 @@ function ServiceCard({ s, st }: { s: any; st?: { state: string; reason?: string 
           {["TERMINATED", "CANCELLED"].includes(s.status) ? (
             <div className="text-mute" title={s.terminationReason ?? undefined}>{s.status === "CANCELLED" ? "Cancelled" : "Terminated"}{s.terminationDate ? ` ${date(s.terminationDate)}` : ""}{s.terminationReason ? ` · ${s.terminationReason}` : ""}</div>
           ) : (
-            <div className={cx(days !== null && days <= 7 && s.status === "ACTIVE" ? "font-semibold text-rose-600" : "text-mute")}>{s.nextDueDate ? `Renews ${date(s.nextDueDate)}${days !== null && days >= 0 && days <= 30 ? ` · ${days}d` : ""}` : "—"}</div>
+            <div className={cx(days !== null && days <= 7 && s.status === "ACTIVE" ? "font-semibold text-rose-600" : "text-mute")}>{s.billingCycle === "ONETIME" ? "One-time · no renewal" : s.nextDueDate ? `Renews ${date(s.nextDueDate)}${days !== null && days >= 0 && days <= 30 ? ` · ${days}d` : ""}` : "—"}</div>
           )}
+          <div className="text-mute">Purchased {date(s.registrationDate)}</div>
         </div>
         <Link href={`/client/services/${s.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary-tint px-3.5 text-[13px] font-bold text-primary-dark transition group-hover:bg-primary-dark group-hover:text-white">
           Manage <Icon name="arrow_forward" className="text-[16px]" />

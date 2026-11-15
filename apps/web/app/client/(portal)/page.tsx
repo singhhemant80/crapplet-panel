@@ -99,7 +99,7 @@ export default function Dashboard() {
                     <div className="w-[96px] shrink-0">{st ? <LiveBadge state={st.state} reason={st.reason} /> : x.status === "ACTIVE" ? <LiveBadge state="running" /> : <span className="text-xs text-mute">—</span>}</div>
                     <div className="hidden w-[118px] shrink-0 text-right sm:block">
                       <div className="text-[13px] font-bold text-ink">{money(x.amount, x.currency ?? cur)}</div>
-                      <div className={cx("text-[11.5px]", due !== null && due <= 7 ? "font-semibold text-rose-600" : "text-mute")}>{x.nextDueDate ? `due ${date(x.nextDueDate)}` : CYCLES[x.cycle]}</div>
+                      <div className={cx("text-[11.5px]", due !== null && due <= 7 ? "font-semibold text-rose-600" : "text-mute")}>{x.nextDueDate ? `Renews ${date(x.nextDueDate)}` : CYCLES[x.cycle]}</div>
                     </div>
                     <Link href={`/client/services/${x.id}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line text-slate-500 transition group-hover:border-primary group-hover:bg-primary group-hover:text-white" aria-label="Manage">
                       <Icon name="arrow_forward" className="text-[18px]" />

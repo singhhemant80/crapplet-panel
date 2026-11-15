@@ -82,10 +82,11 @@ export default function ServicePage() {
           {svc.status === "ACTIVE" && svc.billingCycle !== "ONETIME" && !svc.resellerId && <Button size="sm" variant="outline" icon="swap_vert" href={`/client/services/${id}/upgrade`}>Upgrade / Downgrade</Button>}
         </>}
         stats={[
-          ["Registered", date(svc.registrationDate), `Service #${String(svc.id).slice(-6).toUpperCase()}`],
+          ["Purchased on", date(svc.registrationDate), `Service #${String(svc.id).slice(-6).toUpperCase()}`],
           ended
             ? [svc.status === "CANCELLED" ? "Cancelled on" : "Terminated on", svc.terminationDate ? date(svc.terminationDate) : "—", svc.terminationReason ? <span key="r" className="line-clamp-1" title={svc.terminationReason}>{svc.terminationReason}</span> : undefined]
-            : ["Next due", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
+            : svc.billingCycle === "ONETIME" ? ["Renewal", "None", "One-time purchase"]
+            : ["Next renewal", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
           ["Billing cycle", CYCLES[svc.billingCycle] ?? svc.billingCycle],
           ["Recurring", money(svc.recurringAmount, svc.currency), svc.currency === "INR" ? "+ GST" : undefined],
           [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status === "PENDING" ? (data.unpaidInvoiceId ? "Awaiting payment" : "Being set up") : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
@@ -241,10 +242,10 @@ export default function ServicePage() {
 
         <Card title="Billing">
           <dl className="grid grid-cols-[130px_1fr] gap-y-3 text-sm">
-            <dt className="text-mute">Registered</dt>
-            <dd className="font-semibold text-ink">{date(svc.registrationDate)}</dd>
             <dt className="text-mute">Billing cycle</dt>
             <dd className="font-semibold text-ink">{CYCLES[svc.billingCycle]}</dd>
+            <dt className="text-mute">Purchased on</dt>
+            <dd className="font-semibold text-ink">{date(svc.registrationDate)}</dd>
             <dt className="text-mute">Recurring</dt>
             <dd className="font-semibold text-ink">{money(svc.recurringAmount, svc.currency)}{svc.currency === "INR" ? " + GST" : ""}</dd>
             {ended ? <>
@@ -253,8 +254,8 @@ export default function ServicePage() {
               <dt className="text-mute">Reason</dt>
               <dd className="font-semibold text-ink">{svc.terminationReason ?? "—"}</dd>
             </> : <>
-              <dt className="text-mute">Next due date</dt>
-              <dd className="font-semibold text-ink">{date(svc.nextDueDate)}</dd>
+              <dt className="text-mute">Next renewal</dt>
+              <dd className="font-semibold text-ink">{svc.billingCycle === "ONETIME" ? "None — one-time purchase" : <>{date(svc.nextDueDate)}{days !== null && days >= 0 && <span className="ml-1.5 font-medium text-mute">({days === 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`})</span>}</>}</dd>
             </>}
           </dl>
           {data.invoices.length > 0 && (
