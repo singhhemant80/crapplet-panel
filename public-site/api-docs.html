@@ -1,11 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-IN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reseller API | Crapplet Cloud</title>
-<meta name="description" content="Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices.">
-<link rel="icon" href="/Crapplet_Icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Reseller API Documentation | Crapplet Cloud</title>
+<meta name="description" content="Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices. Authentication, orders, services and wallet endpoints."/>
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1"/>
+<link rel="canonical" href="https://crapplet.co.in/api-docs.html"/>
+<meta name="theme-color" content="#7c3aed"/>
+<link rel="icon" type="image/png" href="/Crapplet_Icon.png"/>
+<link rel="apple-touch-icon" href="/Crapplet_Icon.png"/>
+<meta property="og:site_name" content="Crapplet Cloud"/>
+<meta property="og:locale" content="en_IN"/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://crapplet.co.in/api-docs.html"/>
+<meta property="og:title" content="Reseller API Documentation | Crapplet Cloud"/>
+<meta property="og:description" content="Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices. Authentication, orders, services and wallet endpoints."/>
+<meta property="og:image" content="https://crapplet.co.in/og/api-docs.jpg"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="Reseller API Documentation | Crapplet Cloud"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Reseller API Documentation | Crapplet Cloud"/>
+<meta name="twitter:description" content="Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices. Authentication, orders, services and wallet endpoints."/>
+<meta name="twitter:image" content="https://crapplet.co.in/og/api-docs.jpg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://crapplet.co.in/#org","name":"Crapplet Cloud","legalName":"Crapplet Infotech Private Limited","url":"https://crapplet.co.in/","logo":{"@type":"ImageObject","url":"https://crapplet.co.in/Crapplet_logo.png","width":849,"height":201},"email":"info@crapplet.in","telephone":"+91-9039573607","taxID":"23AAHCC8426G1ZR","address":{"@type":"PostalAddress","streetAddress":"City Center","addressLocality":"Gwalior","addressRegion":"Madhya Pradesh","postalCode":"474011","addressCountry":"IN"},"contactPoint":[{"@type":"ContactPoint","contactType":"customer support","telephone":"+91-9039573607","email":"info@crapplet.in","areaServed":"IN","availableLanguage":["en","hi"]},{"@type":"ContactPoint","contactType":"sales","telephone":"+91-9039573607","areaServed":"IN","availableLanguage":["en","hi"]}]},{"@type":"BreadcrumbList","@id":"https://crapplet.co.in/api-docs.html#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://crapplet.co.in/"},{"@type":"ListItem","position":2,"name":"Reseller API","item":"https://crapplet.co.in/api-docs.html"}]},{"@type":"WebPage","@id":"https://crapplet.co.in/api-docs.html#webpage","url":"https://crapplet.co.in/api-docs.html","name":"Reseller API Documentation | Crapplet Cloud","description":"Crapplet Cloud Reseller API — sell VPS, hosting and servers from your own website at wholesale prices. Authentication, orders, services and wallet endpoints.","isPartOf":{"@id":"https://crapplet.co.in/#website"},"about":{"@id":"https://crapplet.co.in/#org"},"inLanguage":"en-IN","breadcrumb":{"@id":"https://crapplet.co.in/api-docs.html#breadcrumb"}}]}</script>
 <style>
   :root{--p:#7c3aed;--p2:#a365fe;--pt:#f5f0ff;--ink:#14102a;--txt:#374151;--mute:#6b7280;--line:#ece7f6;--bg:#ffffff;--code:#17122b;--codetxt:#ede9fe;--ok:#047857;--okbg:#ecfdf5;--warn:#92400e;--warnbg:#fffbeb}
   *{box-sizing:border-box}
@@ -72,7 +93,7 @@
 <body>
 <header class="top">
   <button class="menu" onclick="document.querySelector('nav.side').classList.toggle('open')" aria-label="Contents">☰</button>
-  <a href="/"><img src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
+  <a href="/"><img decoding="async" src="/Crapplet_logo.png" alt="Crapplet Cloud"></a>
   <span class="sp"></span>
   <a class="lnk" href="/">Website</a>
   <a class="btn" href="/client/reseller">Dashboard</a>

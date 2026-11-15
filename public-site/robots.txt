@@ -1,5 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /client/
+Disallow: /admin/
+Disallow: /api/
 Disallow: /clientarea/
+Disallow: /order/cart
+Disallow: /coming-soon.html
 
 Sitemap: https://crapplet.co.in/sitemap.xml
