@@ -90,13 +90,23 @@ export function htmlToText(html: string) {
 
 type Company = Awaited<ReturnType<typeof getSettings>>["company"];
 
+/** Logo for email headers: an absolute https URL (mail apps can't load relative paths). */
+export function emailLogoUrl(company: Company) {
+  const lp = (company as { logoPath?: string }).logoPath ?? "";
+  if (/^https?:\/\//.test(lp)) return lp;
+  const site = (company.website || config.appUrl).replace(/\/+$/, "");
+  // the default logo has an email-sized copy (440×104, 11 KB)
+  return !lp || lp === "Crapplet_logo.png" ? `${site}/img/email-logo.png` : `${site}/${lp.replace(/^\/+/, "")}`;
+}
+
 export function layout(body: string, company: Company, preheader = "", footer?: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(company.brand)}</title></head>
 <body style="margin:0;background:#f6f0ff;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #ece4fb">
-<tr><td bgcolor="#7c3aed" style="background:#7c3aed;background:linear-gradient(135deg,#a365fe,#7c3aed);padding:22px 28px;color:#ffffff;font-size:20px;font-weight:800">${esc(company.brand)}</td></tr>
+<tr><td style="padding:20px 28px 16px;background:#ffffff"><a href="${esc(company.website || config.appUrl)}" style="text-decoration:none"><img src="${esc(emailLogoUrl(company))}" width="200" alt="${esc(company.brand)}" style="display:block;width:200px;max-width:60%;height:auto;border:0;outline:none;color:#7c3aed;font-size:22px;font-weight:800"></a></td></tr>
+<tr><td bgcolor="#7c3aed" style="height:4px;line-height:4px;font-size:0;background:#7c3aed;background:linear-gradient(90deg,#a365fe,#7c3aed)">&nbsp;</td></tr>
 <tr><td style="padding:28px;font-size:15px;line-height:1.6">${body}</td></tr>
 <tr><td style="padding:18px 28px;background:#faf7ff;color:#64748b;font-size:12px;line-height:1.6">
 ${esc(company.legalName)} · ${esc(company.address)}<br>
