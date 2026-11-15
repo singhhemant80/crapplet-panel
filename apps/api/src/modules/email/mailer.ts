@@ -7,6 +7,7 @@ import { prisma, Prisma } from "../../db";
 import { emailQueue, type EmailJob } from "../../jobs/queues";
 import { getSettings } from "../../lib/settings";
 import { DEFAULT_TEMPLATES } from "./templates";
+import { decrypt, encrypt } from "../../lib/crypto";
 import { domainOf, getMailConfig, type MailConfig } from "./mail-config";
 
 let transport: { sig: string; t: Transporter } | null = null;
@@ -168,6 +169,53 @@ export async function isSuppressed(to: string) {
   return !!(await prisma.emailLog.findFirst({ where: { to: { equals: to, mode: "insensitive" }, status: "BOUNCED", createdAt: { gte: since } }, select: { id: true } }));
 }
 
+/**
+ * Email variables that must never be stored readable — server passwords, sign-in / reset links and codes.
+ * They're encrypted in the queue and the email log (so Resend still works) and masked in previews.
+ */
+export const SENSITIVE_VAR = /pass(word)?$|password|^pass|secret|token|otp|^link$|reset|verify|^code$|apikey|api_key/i;
+type Sealed = { __enc: string };
+const isSealed = (v: unknown): v is Sealed => !!v && typeof v === "object" && typeof (v as Sealed).__enc === "string";
+
+export function sealVars(vars: Record<string, unknown> = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(vars)) out[k] = SENSITIVE_VAR.test(k) && v != null && v !== "" && !isSealed(v) && typeof v !== "object" ? { __enc: encrypt(String(v)) } : v;
+  return out;
+}
+export function openVars(vars: Record<string, unknown> = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(vars)) {
+    if (!isSealed(v)) out[k] = v;
+    else {
+      try {
+        out[k] = decrypt(v.__enc);
+      } catch {
+        out[k] = "";
+      }
+    }
+  }
+  return out;
+}
+/** For previews: secrets shown as dots. */
+export function maskVars(vars: Record<string, unknown> = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(vars)) out[k] = isSealed(v) || (SENSITIVE_VAR.test(k) && typeof v !== "object" && v) ? "••••••••" : v;
+  return out;
+}
+
+/** Subject + full HTML of an email as it was (or would be) sent; `mask` hides passwords and links. */
+export async function renderEmail(job: EmailJob, opts: { mask?: boolean } = {}) {
+  const settings = await getSettings();
+  const db = await prisma.emailTemplate.findUnique({ where: { key: job.template } });
+  const fallback = DEFAULT_TEMPLATES[job.template];
+  const tpl = db ?? (fallback ? { subject: fallback.subject, body: fallback.body } : null);
+  if (!tpl) throw new Error(`Unknown email template ${job.template}`);
+  const vars = { company: settings.company, appUrl: config.appUrl, ...(opts.mask ? maskVars(job.vars) : openVars(job.vars)) };
+  const subject = render(tpl.subject, vars);
+  const bodyHtml = render(tpl.body, vars);
+  return { subject, html: layout(bodyHtml, settings.company, htmlToText(bodyHtml).split("\n").find((l) => l.trim() && !/^hi\b/i.test(l))?.slice(0, 140) ?? "") };
+}
+
 export async function sendTemplatedEmail(job: EmailJob, opts: { ignoreSuppression?: boolean } = {}) {
   const settings = await getSettings();
   const db = await prisma.emailTemplate.findUnique({ where: { key: job.template } });
@@ -175,7 +223,9 @@ export async function sendTemplatedEmail(job: EmailJob, opts: { ignoreSuppressio
   if (db && !db.enabled) return { skipped: true };
   const tpl = db ?? (fallback ? { subject: fallback.subject, body: fallback.body } : null);
   if (!tpl) throw new Error(`Unknown email template ${job.template}`);
-  const vars = { company: settings.company, appUrl: config.appUrl, ...job.vars };
+  // secrets travel and are logged encrypted; only the message itself carries them in clear
+  job = { ...job, vars: sealVars(job.vars) };
+  const vars = { company: settings.company, appUrl: config.appUrl, ...openVars(job.vars) };
   const subject = render(tpl.subject, vars);
   const bodyHtml = render(tpl.body, vars);
   const html = layout(bodyHtml, settings.company, htmlToText(bodyHtml).split("\n").find((l) => l.trim() && !/^hi\b/i.test(l))?.slice(0, 140) ?? "");
@@ -229,7 +279,7 @@ export async function sendRaw(c: MailConfig, to: string, subject: string, bodyHt
 
 /** Queue an email; falls back to direct send if Redis is unavailable. */
 export async function queueEmail(template: string, to: string, vars: Record<string, unknown>, userId?: string, attachments?: EmailJob["attachments"]) {
-  const job: EmailJob = { template, to, vars, userId, attachments };
+  const job: EmailJob = { template, to, vars: sealVars(vars), userId, attachments };
   // the WhatsApp version of client notifications (when switched on for this event)
   if (userId) await import("../whatsapp/service").then((m) => m.notifyWhatsapp(template, userId, vars)).catch(() => undefined);
   try {
@@ -238,4 +288,28 @@ export async function queueEmail(template: string, to: string, vars: Record<stri
     console.warn("[mail] queue unavailable, sending inline", e);
     await sendTemplatedEmail(job).catch((err) => console.error("[mail] send failed", err));
   }
+}
+
+/**
+ * One-time: encrypt passwords / links that older email-log rows kept in clear (re-send still works).
+ * Safe to run repeatedly; runs in the background when the API starts.
+ */
+export async function sealOldEmailLogs() {
+  let cursor: string | undefined;
+  let changed = 0;
+  for (;;) {
+    const rows = await prisma.emailLog.findMany({ where: { job: { not: Prisma.AnyNull } }, orderBy: { id: "asc" }, take: 500, ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}), select: { id: true, job: true } });
+    if (!rows.length) break;
+    for (const r of rows) {
+      const job = r.job as unknown as EmailJob | null;
+      if (!job?.vars) continue;
+      const sealed = sealVars(job.vars);
+      if (JSON.stringify(sealed) !== JSON.stringify(job.vars)) {
+        await prisma.emailLog.update({ where: { id: r.id }, data: { job: { ...job, vars: sealed } as unknown as Prisma.InputJsonValue } });
+        changed++;
+      }
+    }
+    cursor = rows[rows.length - 1].id;
+  }
+  return changed;
 }

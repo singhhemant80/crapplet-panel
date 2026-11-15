@@ -10,6 +10,14 @@ const server = app.listen(config.port, "127.0.0.1", () => {
 });
 attachConsoleProxy(server);
 
+// older email-log rows: encrypt any passwords / links they stored in clear
+setTimeout(() => {
+  import("./modules/email/mailer")
+    .then((m) => m.sealOldEmailLogs())
+    .then((n) => n && console.log(`[mail] encrypted secrets in ${n} older email-log rows`))
+    .catch((e) => console.error("[mail] sealing old email logs failed", e));
+}, 5_000).unref();
+
 async function shutdown() {
   server.close();
   await closeQueues().catch(() => undefined);

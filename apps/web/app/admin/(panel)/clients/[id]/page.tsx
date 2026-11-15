@@ -241,7 +241,7 @@ export default function ClientDetail() {
             ) : <Blank icon="upload_file">No files uploaded</Blank>}
           </Panel>
 
-          <Panel icon="outgoing_mail" title="Recent emails" action={<HeadBtn icon="send" onClick={() => setModal("email")}>Send</HeadBtn>}>
+          <Panel icon="outgoing_mail" title="Recent emails" action={<div className="flex gap-1.5"><HeadBtn icon="list" onClick={() => { setTab("emails"); document.getElementById("client-tabs")?.scrollIntoView({ behavior: "smooth" }); }}>All</HeadBtn><HeadBtn icon="send" onClick={() => setModal("email")}>Send</HeadBtn></div>}>
             {sum?.emails?.length ? (
               <ol className="relative ml-1.5 space-y-3 border-l border-line pl-4">
                 {sum.emails.map((e: any) => (
@@ -297,7 +297,7 @@ function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab
   const empty = (icon: string, text: string) => (
     <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-sm text-mute"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary-dark"><Icon name={icon} /></span>{text}</div>
   );
-  const isEmpty = tab !== "statement" && !(rows[tab]?.length);
+  const isEmpty = tab !== "statement" && tab !== "emails" && !(rows[tab]?.length);
   const unpaid = (data.invoices as any[]).filter((i) => i.status === "UNPAID").length;
   return (
     <section id="client-tabs" className="scroll-mt-24 overflow-hidden rounded-2xl border border-line bg-white shadow-card">
@@ -386,6 +386,7 @@ function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab
             </Table></div>
           )}
           {tab === "statement" && <Statement id={id} />}
+          {tab === "emails" && <ClientEmails id={id} />}
           {tab === "transactions" && <Table head={["Date", "Gateway", "Reference", "Type", "Amount"]}>{data.transactions.map((t: any) => <tr key={t.id} className="hover:bg-[#fbf9ff]"><Td className="whitespace-nowrap text-slate-600">{date(t.createdAt, true)}</Td><Td className="font-semibold uppercase">{t.gateway}</Td><Td className="max-w-[220px] truncate font-mono text-xs">{t.gatewayTxnId}</Td><Td><Badge status={t.type === "REFUND" ? "REFUNDED" : t.type === "PAYMENT" ? "PAID" : "DRAFT"}>{t.type.replace("_", " ").toLowerCase()}</Badge></Td><Td className={cx("whitespace-nowrap font-bold tabular-nums", t.type === "REFUND" ? "text-sky-700" : "text-emerald-700")}>{t.type === "REFUND" ? "−" : ""}{money(Math.abs(t.amount), t.currency)}</Td></tr>)}</Table>}
           {tab === "tickets" && <Table head={["Ticket", "Subject", "Department", "Last reply", "Status"]}>{data.tickets.map((t: any) => <tr key={t.id} className="hover:bg-[#fbf9ff]"><Td className="font-mono text-mute">#{t.number}</Td><Td><Link className="font-bold text-ink hover:text-primary-dark" href={`/admin/tickets/${t.id}`}>{t.subject}</Link></Td><Td className="text-slate-600">{t.department.name}</Td><Td className="whitespace-nowrap text-slate-600"><Ago at={t.lastReplyAt} /></Td><Td><Badge status={t.status} /></Td></tr>)}</Table>}
           {tab === "domains" && <Table head={["Domain", "Status", "Expiry", "Auto-renew"]}>{data.domains.map((d: any) => <tr key={d.id} className="hover:bg-[#fbf9ff]"><Td className="font-bold"><span className="inline-flex items-center gap-2"><Icon name="public" className="text-[18px] text-primary-dark" />{d.name}</span></Td><Td><Badge status={d.status} /></Td><Td className="whitespace-nowrap text-slate-600">{d.expiryDate ? <>{date(d.expiryDate)} <span className="text-mute">(<Ago at={d.expiryDate} />)</span></> : "—"}</Td><Td>{d.autoRenew ? <span className="font-semibold text-emerald-600">On</span> : <span className="text-mute">Off</span>}</Td></tr>)}</Table>}
@@ -397,7 +398,7 @@ function Records({ tab, setTab, data, services, id, cur }: { tab: string; setTab
   );
 }
 
-const TABS: [string, string, string | undefined, string][] = [["services", "Services", "services", "dns"], ["invoices", "Invoices", "invoices", "receipt_long"], ["statement", "Statement", undefined, "summarize"], ["orders", "Orders", "orders", "shopping_bag"], ["transactions", "Payments", "transactions", "payments"], ["tickets", "Tickets", "tickets", "support_agent"], ["domains", "Domains", "domains", "public"], ["credit", "Credit log", "credit", "account_balance_wallet"], ["logins", "Logins", "logins", "login"]];
+const TABS: [string, string, string | undefined, string][] = [["services", "Services", "services", "dns"], ["invoices", "Invoices", "invoices", "receipt_long"], ["statement", "Statement", undefined, "summarize"], ["orders", "Orders", "orders", "shopping_bag"], ["transactions", "Payments", "transactions", "payments"], ["tickets", "Tickets", "tickets", "support_agent"], ["domains", "Domains", "domains", "public"], ["credit", "Credit log", "credit", "account_balance_wallet"], ["logins", "Logins", "logins", "login"], ["emails", "Emails", undefined, "mail"]];
 
 // ───── building blocks ─────
 function Panel({ icon, title, count, action, children }: { icon: string; title: string; count?: number; action?: ReactNode; children: ReactNode }) {
@@ -932,6 +933,115 @@ function InvoiceModal({ open, onClose, id, currency = "INR", onDone }: any) {
         <Field label="Due date"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
         <Button onClick={() => api("/admin/invoices", { body: { userId: id, dueDate: due || undefined, items: items.filter((x) => x.description).map((x) => ({ description: x.description, unitPrice: Math.round(Number(x.price) * 100), taxable: x.taxable })) } }).then(() => { toast.success("Invoice created and emailed"); onClose(); onDone(); }).catch((e) => toast.error(e.message))}>Create &amp; email</Button>
       </div>
+    </Modal>
+  );
+}
+
+const EMAIL_STATUS: Record<string, { label: string; tone: string; dot: string }> = {
+  SENT: { label: "Delivered to mail server", tone: "text-emerald-700 bg-emerald-50 ring-emerald-200", dot: "bg-emerald-500" },
+  LOGGED: { label: "Not sent", tone: "text-slate-600 bg-slate-100 ring-slate-200", dot: "bg-slate-400" },
+  FAILED: { label: "Failed", tone: "text-rose-700 bg-rose-50 ring-rose-200", dot: "bg-rose-500" },
+  BOUNCED: { label: "Bounced", tone: "text-rose-700 bg-rose-50 ring-rose-200", dot: "bg-rose-500" },
+  SUPPRESSED: { label: "Skipped (address bounced)", tone: "text-amber-700 bg-amber-50 ring-amber-200", dot: "bg-amber-500" },
+};
+
+/** Every email this client was sent: status, preview (secrets hidden) and re-send. */
+function ClientEmails({ id }: { id: string }) {
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
+  const [qs, setQs] = useState("");
+  useEffect(() => { const t = setTimeout(() => { setQs(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
+  const { data, loading, reload } = useApi<any>(`/admin/clients/${id}/emails?page=${page}&pageSize=20${status ? `&status=${status}` : ""}${qs ? `&q=${encodeURIComponent(qs)}` : ""}`);
+  const [view, setView] = useState<string | null>(null);
+  const [busy, setBusy] = useState("");
+  const counts = data?.counts ?? {};
+  const all = Object.values(counts).reduce((a: number, b: any) => a + b, 0) as number;
+  const problems = (counts.FAILED ?? 0) + (counts.BOUNCED ?? 0) + (counts.SUPPRESSED ?? 0) + (counts.LOGGED ?? 0);
+  async function resend(e: any) {
+    setBusy(e.id);
+    try {
+      const r = await api<{ ok: boolean; message: string }>(`/admin/email/log/${e.id}/resend`, { body: {} });
+      r.ok ? toast.success(r.message) : toast.error(r.message);
+      reload();
+    } catch (err: any) { toast.error(err.message); } finally { setBusy(""); }
+  }
+  const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+        {([["", `All ${all}`], ["SENT", `Delivered ${counts.SENT ?? 0}`], ["problem", `Not delivered ${problems}`]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => { setStatus(k); setPage(1); }} className={cx("rounded-full px-3 py-1.5 text-[12.5px] font-bold ring-1 transition", status === k ? "bg-primary-dark text-white ring-primary-dark" : "bg-white text-slate-600 ring-line hover:text-primary-dark")}>{l}</button>
+        ))}
+        <div className="relative ml-auto w-full sm:w-64">
+          <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-mute" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search subject" className="w-full rounded-lg border border-line bg-white py-2 pl-8 pr-3 text-sm outline-none focus:border-primary" />
+        </div>
+      </div>
+      {loading && !data ? <Loading /> : !data?.items?.length ? (
+        <div className="px-6 py-12 text-center text-sm text-mute">{all ? "No emails match" : "No emails sent to this client yet"}</div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {data.items.map((e: any) => {
+            const st = EMAIL_STATUS[e.status] ?? { label: e.status, tone: "text-slate-600 bg-slate-100 ring-slate-200", dot: "bg-slate-400" };
+            return (
+              <li key={e.id} className="flex flex-col gap-2 px-4 py-3 hover:bg-[#fbf9ff] sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cx("h-2 w-2 shrink-0 rounded-full", st.dot)} />
+                    <button onClick={() => setView(e.id)} className="truncate text-left text-sm font-bold text-ink hover:text-primary-dark" title={e.subject}>{e.subject}</button>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-4 text-[12px] text-mute">
+                    <span className="whitespace-nowrap">{date(e.createdAt, true)} · <Ago at={e.createdAt} /></span>
+                    <span className="rounded bg-slate-100 px-1.5 py-px font-semibold text-slate-600">{e.kind}</span>
+                    <span className="truncate">to {e.to}</span>
+                  </div>
+                  {e.error && e.status !== "SENT" && <div className="mt-1 pl-4 text-[12px] text-rose-700">{e.error}</div>}
+                </div>
+                <div className="flex shrink-0 items-center gap-2 pl-4 sm:pl-0">
+                  <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-bold ring-1", st.tone)}>{st.label}</span>
+                  <Button size="sm" variant="outline" icon="visibility" onClick={() => setView(e.id)}>View</Button>
+                  {e.canResend && <Button size="sm" variant="ghost" icon="forward_to_inbox" loading={busy === e.id} onClick={() => resend(e)}>Resend</Button>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {data && pages > 1 && (
+        <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-[12.5px] text-mute">
+          <span>Page {page} of {pages} · {data.total} emails</span>
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="ghost" icon="chevron_left" disabled={page <= 1} onClick={() => setPage(page - 1)}>Newer</Button>
+            <Button size="sm" variant="ghost" disabled={page >= pages} onClick={() => setPage(page + 1)}>Older<Icon name="chevron_right" className="text-[17px]" /></Button>
+          </div>
+        </div>
+      )}
+      {view && <EmailPreview clientId={id} emailId={view} onClose={() => setView(null)} />}
+    </div>
+  );
+}
+
+function EmailPreview({ clientId, emailId, onClose }: { clientId: string; emailId: string; onClose: () => void }) {
+  const { data, loading } = useApi<any>(`/admin/clients/${clientId}/emails/${emailId}`);
+  const st = data ? EMAIL_STATUS[data.status] : null;
+  return (
+    <Modal open onClose={onClose} title={data?.subject ?? "Email"} wide>
+      {loading || !data ? <Loading /> : (
+        <div className="space-y-3">
+          <div className="grid gap-1 text-[13px] text-slate-600 sm:grid-cols-2">
+            <div><span className="text-mute">To:</span> <b className="text-ink">{data.to}</b></div>
+            <div><span className="text-mute">Sent:</span> <b className="text-ink">{date(data.createdAt, true)}</b></div>
+            <div><span className="text-mute">Status:</span> <b className="text-ink">{st?.label ?? data.status}</b></div>
+            {data.response && <div className="truncate" title={data.response}><span className="text-mute">Mail server:</span> {data.response}</div>}
+          </div>
+          {data.error && data.status !== "SENT" && <Alert tone="error">{data.error}</Alert>}
+          {data.html ? (
+            <iframe title="Email preview" sandbox="" srcDoc={data.html} className="h-[60vh] w-full rounded-xl border border-line bg-white" />
+          ) : null}
+          {data.note && <p className="text-[12px] text-mute">{data.note}</p>}
+        </div>
+      )}
     </Modal>
   );
 }

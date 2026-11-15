@@ -22,6 +22,59 @@ import { getSettings } from "../../lib/settings";
 
 export const adminClients = Router();
 
+/** Every email sent to this client (by account or address), newest first. */
+adminClients.get(
+  "/clients/:id/emails",
+  requireStaff("clients.view"),
+  ah(async (req, res) => {
+    const u = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, email: true } });
+    if (!u) throw notFound("Client not found");
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const take = Math.min(100, Math.max(5, Number(req.query.pageSize) || 25));
+    const status = String(req.query.status ?? "");
+    const q = String(req.query.q ?? "").trim();
+    const mine = { OR: [{ userId: u.id }, { to: { equals: u.email, mode: "insensitive" as const } }] };
+    const where = { AND: [mine, ...(status === "problem" ? [{ status: { in: ["FAILED", "BOUNCED", "SUPPRESSED", "LOGGED"] } }] : status ? [{ status }] : []), ...(q ? [{ subject: { contains: q, mode: "insensitive" as const } }] : [])] };
+    const [items, total, byStatus] = await Promise.all([
+      prisma.emailLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * take, take, select: { id: true, to: true, subject: true, template: true, status: true, error: true, response: true, createdAt: true, job: true } }),
+      prisma.emailLog.count({ where }),
+      prisma.emailLog.groupBy({ by: ["status"], where: mine, _count: true }),
+    ]);
+    res.json({
+      items: items.map(({ job, ...r }) => ({ ...r, canResend: !!job, kind: emailKind(r.template) })),
+      total,
+      page,
+      pageSize: take,
+      counts: Object.fromEntries(byStatus.map((s) => [s.status, s._count])),
+    });
+  }),
+);
+
+/** Preview of one email sent to this client (passwords and sign-in links masked). */
+adminClients.get(
+  "/clients/:id/emails/:emailId",
+  requireStaff("clients.view"),
+  ah(async (req, res) => {
+    const u = await prisma.user.findUnique({ where: { id: req.params.id }, select: { id: true, email: true } });
+    const row = await prisma.emailLog.findUnique({ where: { id: req.params.emailId }, select: { userId: true, to: true } });
+    if (!u || !row || (row.userId !== u.id && row.to.toLowerCase() !== u.email.toLowerCase())) throw notFound("Email not found");
+    const { emailPreview } = await import("../email/routes");
+    res.json(await emailPreview(req.params.emailId));
+  }),
+);
+
+/** What kind of email a template is, for the list (Billing, Service, Support, Account, …). */
+function emailKind(t: string | null) {
+  const k = t ?? "";
+  if (/^(invoice|payment|credit|refund|quote|statement|autopay)/.test(k)) return "Billing";
+  if (/^(service|vps|hosting|order|upgrade|domain)/.test(k)) return "Service";
+  if (/^ticket/.test(k)) return "Support";
+  if (/^(auth|account|client|security|login)/.test(k)) return "Account";
+  if (k === "campaign") return "Campaign";
+  if (k === "staff.message") return "Message";
+  return "Other";
+}
+
 const FILES_DIR = path.resolve(config.uploadDir, "client-files");
 fs.mkdirSync(FILES_DIR, { recursive: true });
 const upload = multer({

@@ -6,7 +6,7 @@ import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
 import type { EmailJob } from "../../jobs/queues";
 import { PRESETS, generateDkimKey, getMailConfig, publicMailConfig, saveMailConfig, domainOf, type MailConfig } from "./mail-config";
-import { friendlySmtpError, makeTransport, sendRaw, sendTemplatedEmail } from "./mailer";
+import { friendlySmtpError, makeTransport, renderEmail, sendRaw, sendTemplatedEmail } from "./mailer";
 import { checkDeliverability, guessPublicIp } from "./deliverability";
 
 export const adminEmail = Router();
@@ -147,6 +147,28 @@ adminEmail.get(
       pageSize,
       last7Days: Object.fromEntries(stats.map((s) => [s.status, s._count])),
     });
+  }),
+);
+
+/** The email as it was sent — passwords and sign-in links masked. */
+export async function emailPreview(id: string) {
+  const row = await prisma.emailLog.findUnique({ where: { id } });
+  if (!row) throw notFound();
+  const base = { id: row.id, to: row.to, subject: row.subject, template: row.template, status: row.status, error: row.error, response: row.response, createdAt: row.createdAt, canResend: !!row.job };
+  if (!row.job) return { ...base, html: null, note: "The content of this email wasn't kept (sent before the log stored message data, or a bulk campaign)." };
+  try {
+    const { html } = await renderEmail(row.job as unknown as EmailJob, { mask: true });
+    return { ...base, html, note: "Shown with today's template; passwords and sign-in links are hidden." };
+  } catch (e) {
+    return { ...base, html: null, note: (e as Error).message };
+  }
+}
+
+adminEmail.get(
+  "/email/log/:id/preview",
+  perm,
+  ah(async (req, res) => {
+    res.json(await emailPreview(req.params.id));
   }),
 );
 
