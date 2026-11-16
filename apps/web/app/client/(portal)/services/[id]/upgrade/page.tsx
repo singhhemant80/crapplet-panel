@@ -58,7 +58,7 @@ export default function UpgradePage() {
 
   return (
     <>
-      <PageHeader back={`/client/services/${id}`} icon="swap_vert" title="Upgrade or downgrade" subtitle={`Currently ${s.productName} · ${money(s.recurringAmount, s.currency)} ${(CYCLES[s.billingCycle] ?? "").toLowerCase()}${s.nextDueDate ? ` · paid until ${date(s.nextDueDate)}` : ""}`} />
+      <PageHeader back={`/client/services/${id}`} icon="swap_vert" title={data.allowDowngrades === false ? "Upgrade your plan" : "Upgrade or downgrade"} subtitle={`Currently ${s.productName} · ${money(s.recurringAmount, s.currency)} ${(CYCLES[s.billingCycle] ?? "").toLowerCase()}${s.nextDueDate ? ` · paid until ${date(s.nextDueDate)}` : ""}`} />
       {data.blocked && <Alert tone="warn" className="mb-5">{data.blocked} {/renewal invoice/.test(data.blocked) && <Link className="font-bold underline" href="/client/invoices?status=UNPAID">View unpaid invoices</Link>}</Alert>}
       {data.pending && (
         <Alert tone="info" className="mb-5">
@@ -67,7 +67,7 @@ export default function UpgradePage() {
         </Alert>
       )}
       {!data.blocked && !data.pending && !plans.some((p) => p.direction !== "current") && plans.every((p) => p.cycles.length <= 1) && (
-        <Alert tone="info" className="mb-5">There are no other plans you can switch to from here. Need more resources? <Link className="font-bold underline" href="/client/tickets/new">Open a ticket</Link> and we'll move you.</Alert>
+        <Alert tone="info" className="mb-5">{data.allowDowngrades === false ? "You're already on the biggest plan in this range." : "There are no other plans you can switch to from here."} Need more resources? <Link className="font-bold underline" href="/client/tickets/new">Open a ticket</Link> and we'll move you.</Alert>
       )}
       {!data.blocked && !data.pending && (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">

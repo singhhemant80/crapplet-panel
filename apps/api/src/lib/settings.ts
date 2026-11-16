@@ -92,8 +92,8 @@ export const DEFAULT_SETTINGS = {
     // plan changes (upgrade / downgrade)
     /** customers can upgrade their own services from the client area */
     clientUpgrades: true,
-    /** customers can also move to a cheaper plan */
-    clientDowngrades: true,
+    /** customers can also move to a cheaper plan (off: upgrades only — downgrades go through support) */
+    clientDowngrades: false,
     /** the unused part of the old plan on a downgrade goes to account credit */
     downgradeCredit: true,
     // orders

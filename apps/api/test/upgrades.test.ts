@@ -123,6 +123,18 @@ test("proration maths", async () => {
 
 test("customer upgrades: sees allowed plans, gets a prorated invoice, paying it moves the service", async () => {
   const s = await mkService(P.mid);
+  const { updateSettings } = await import("../src/lib/settings");
+  // default: upgrades only — smaller plans aren't offered and can't be ordered
+  await updateSettings("automation", { clientDowngrades: false } as never);
+  const only = await client.req("GET", `/client/services/${s.id}/upgrade-options`);
+  assert.equal(only.json.allowDowngrades, false);
+  assert.ok(!only.json.plans.some((p: any) => p.id === P.small), "no downgrade offered");
+  assert.ok(only.json.plans.some((p: any) => p.id === P.big));
+  const refused = await client.req("POST", `/client/services/${s.id}/upgrade`, { productId: P.small, cycle: "MONTHLY" });
+  assert.equal(refused.status, 409);
+  assert.match(refused.json.error?.message ?? refused.json.message ?? JSON.stringify(refused.json), /Only upgrades/);
+
+  await updateSettings("automation", { clientDowngrades: true } as never);
   const o = await client.req("GET", `/client/services/${s.id}/upgrade-options`);
   assert.equal(o.status, 200, JSON.stringify(o.json));
   const names = o.json.plans.map((p: any) => p.id);

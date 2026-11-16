@@ -11,7 +11,7 @@ import multer from "multer";
 import { z } from "zod";
 import { prisma } from "../../db";
 import { config } from "../../config";
-import { ah, badRequest, conflict, notFound, parse } from "../../lib/http";
+import { HttpError, ah, badRequest, conflict, notFound, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { encrypt, generatePassword, randomToken, sha256 } from "../../lib/crypto";
 import { requireStaff } from "../../middleware/auth";
@@ -415,11 +415,31 @@ adminClients.post(
   ah(async (req, res) => {
     const u = await client(req.params.id);
     if (u.status !== "ACTIVE") throw badRequest(`The account is ${u.status.toLowerCase()}`);
+    if (u.ownerResellerId) throw badRequest("This is a reseller's customer — they sign in through the reseller, so we don't email them");
     const token = randomToken();
     await prisma.verificationToken.create({ data: { userId: u.id, type: "PASSWORD_RESET", tokenHash: sha256(token), expiresAt: new Date(Date.now() + 3600_000) } });
     await queueEmail("auth.password_reset", u.email, { name: u.firstName, link: `${config.appUrl}/client/reset-password?token=${token}` }, u.id);
     await audit({ actorId: req.user!.id, userId: u.id, action: "client.password_reset_sent" });
     res.json({ ok: true });
+  }),
+);
+
+/** Email the customer a fresh link to verify their email address. */
+adminClients.post(
+  "/clients/:id/send-verification",
+  requireStaff("clients.manage"),
+  ah(async (req, res) => {
+    const u = await client(req.params.id);
+    if (u.status === "CLOSED") throw badRequest("The account is closed");
+    if (u.ownerResellerId) throw badRequest("This is a reseller's customer — they sign in through the reseller, so we don't email them");
+    if (u.emailVerifiedAt) throw conflict("This email address is already verified");
+    const recent = await prisma.verificationToken.findFirst({ where: { userId: u.id, type: "EMAIL_VERIFY", createdAt: { gt: new Date(Date.now() - 60_000) } }, select: { id: true } });
+    if (recent) throw new HttpError(429, "A verification email was sent less than a minute ago — please wait a moment");
+    const token = randomToken();
+    await prisma.verificationToken.create({ data: { userId: u.id, type: "EMAIL_VERIFY", tokenHash: sha256(token), expiresAt: new Date(Date.now() + 86400_000) } });
+    await queueEmail("auth.verify_email", u.email, { name: u.firstName, link: `${config.appUrl}/client/verify-email?token=${token}` }, u.id);
+    await audit({ actorId: req.user!.id, userId: u.id, action: "client.verification_sent" });
+    res.json({ ok: true, to: u.email });
   }),
 );
 

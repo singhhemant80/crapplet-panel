@@ -178,11 +178,11 @@ adminCore.get(
       prisma.transaction.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 30 }),
       prisma.loginHistory.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 15 }),
       prisma.creditLedger.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 30 }),
-      prisma.user.findUnique({ where: { id: req.params.id }, select: { status: true } }),
+      prisma.user.findUnique({ where: { id: req.params.id }, select: { status: true, ownerResellerId: true } }),
       prisma.order.findMany({ where: { userId: req.params.id }, orderBy: { createdAt: "desc" }, take: 50, select: { id: true, number: true, status: true, total: true, currency: true, createdAt: true } }),
     ]);
     const { withInvoiceLinks } = await import("../billing/invoice-links");
-    res.json({ client: { ...user, status: notesUser?.status }, services, invoices: await withInvoiceLinks(invoices, { includeStatus: true }), tickets, domains, transactions, logins, ledger, orders });
+    res.json({ client: { ...user, status: notesUser?.status, resellerCustomer: !!notesUser?.ownerResellerId }, services, invoices: await withInvoiceLinks(invoices, { includeStatus: true }), tickets, domains, transactions, logins, ledger, orders });
   }),
 );
 

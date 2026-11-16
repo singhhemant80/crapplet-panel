@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/session";
 import { api, money } from "@/lib/api";
 import { readCart } from "@/lib/cart";
-import { Alert, Button, Icon, Loading, cx, toast } from "@/components/ui";
+import { Alert, Button, Icon, Loading, Modal, cx, toast } from "@/components/ui";
 
 type Shell = { unpaidInvoices: number; overdueInvoices: number; outstanding: number; ticketsAwaitingReply: number; services: number; creditBalance: number; currency: string };
 type NavItem = { href: string; label: string; icon: string; exact?: boolean; external?: boolean; badge?: (s: Shell) => number | string | null; tone?: "rose" | "amber" | "violet" };
@@ -249,14 +249,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             {!me.emailVerified && (
               <Alert tone="warn" className="mb-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>Please verify your email address — we sent a link to {me.email}.</span>
-                  <Button size="sm" variant="outline" onClick={() => api("/auth/resend-verification", { body: {} }).then(() => toast.success("Verification email sent")).catch((e) => toast.error(e.message))}>
-                    Resend
+                  <span>Your email address <b>{me.email}</b> isn't verified yet.</span>
+                  <Button size="sm" variant="outline" onClick={() => api("/auth/resend-verification", { body: {} }).then(() => toast.success(`Verification email sent to ${me.email}`)).catch((e) => toast.error(e.message))}>
+                    Send verification email
                   </Button>
                 </div>
               </Alert>
             )}
             {children}
+            {!me.emailVerified && !me.impersonatedBy && !path.startsWith("/client/verify-email") && <VerifyEmailPopup email={me.email} />}
           </div>
         </main>
         <footer className="px-4 pb-8 text-center text-xs text-mute sm:px-6 lg:px-8">
@@ -359,5 +360,89 @@ function UserMenu({ me, initials, onLogout }: { me: any; initials: string; onLog
         </div>
       )}
     </div>
+  );
+}
+
+/** Asks customers who haven't verified their email to do it — once per browser session ("Later" hides it). */
+function VerifyEmailPopup({ email }: { email: string }) {
+  const { reload } = useSession();
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"ask" | "sent">("ask");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let later = false;
+    try {
+      later = sessionStorage.getItem("verify-email.later") === "1";
+    } catch {
+      /* storage blocked */
+    }
+    if (!later) {
+      const t = setTimeout(() => setOpen(true), 1200);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  const close = () => {
+    try {
+      sessionStorage.setItem("verify-email.later", "1");
+    } catch {
+      /* storage blocked */
+    }
+    setOpen(false);
+  };
+  const send = async () => {
+    setBusy(true);
+    try {
+      const r = await api<{ alreadyVerified?: boolean }>("/auth/resend-verification", { body: {} });
+      if (r.alreadyVerified) {
+        await reload();
+        toast.success("Your email is already verified");
+        setOpen(false);
+      } else setStep("sent");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const check = async () => {
+    setBusy(true);
+    const r = await api<{ user: { emailVerified: boolean } }>("/auth/me").catch(() => null);
+    setBusy(false);
+    if (r?.user.emailVerified) {
+      toast.success("Thanks — your email address is verified");
+      await reload();
+    } else toast.info("Not verified yet — open the link in the email we sent, then try again.");
+  };
+  return (
+    <Modal open={open} onClose={close} title={step === "ask" ? "Verify your email address" : "Check your inbox"}>
+      <div className="text-center">
+        <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3edff] to-[#e9e1ff] text-[#7c3aed] ring-1 ring-inset ring-[#e4d8ff]">
+          <Icon name={step === "ask" ? "mark_email_unread" : "forward_to_inbox"} className="text-[32px]" />
+        </span>
+        {step === "ask" ? (
+          <>
+            <p className="text-[14.5px] leading-relaxed text-slate-600">
+              Please confirm that <b className="break-all text-ink">{email}</b> is yours. We use it for invoices, server login details and account security.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <Button icon="send" onClick={send} loading={busy}>Send verification email</Button>
+              <Button variant="ghost" onClick={close}>Later</Button>
+            </div>
+            <Link href="/client/profile" onClick={close} className="mt-4 inline-block text-[12.5px] font-semibold text-mute hover:text-primary-dark">Wrong email address? Change it in your profile</Link>
+          </>
+        ) : (
+          <>
+            <p className="text-[14.5px] leading-relaxed text-slate-600">
+              We've sent a link to <b className="break-all text-ink">{email}</b>. Open it to verify your address — it works for 24 hours. Don't see it? Check your spam folder.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <Button variant="outline" icon="refresh" onClick={check} loading={busy}>I've verified</Button>
+              <Button variant="ghost" onClick={close}>Close</Button>
+            </div>
+            <button onClick={() => setStep("ask")} className="mt-4 text-[12.5px] font-semibold text-mute hover:text-primary-dark">Send it again</button>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }

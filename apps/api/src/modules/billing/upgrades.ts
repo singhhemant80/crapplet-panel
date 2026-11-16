@@ -98,6 +98,7 @@ export async function upgradeOptions(serviceId: string, opts: { forClient?: bool
     plans,
     blocked,
     downgradeCredit: s.downgradeCredit !== false,
+    allowDowngrades: !opts.forClient || s.clientDowngrades !== false,
   };
 }
 
@@ -157,7 +158,12 @@ export async function startUpgrade(args: {
   }
   const newPrice = args.recurringOverride ?? listPrice;
   const q = quote(svc, newPrice, args.toCycle);
-  if (args.byClient && q.amountDue < 0 && s.clientDowngrades === false) throw conflict("Downgrades are handled by our team — please open a support ticket");
+  if (args.byClient && s.clientDowngrades === false) {
+    // upgrades only: no cheaper plan, and nothing that would pay money back
+    const cur = priceOf(svc.product, svc.currency, svc.billingCycle) ?? svc.recurringAmount;
+    const same = priceOf(to, svc.currency, svc.billingCycle);
+    if (q.amountDue < 0 || (to.id !== svc.productId && same != null && same < cur)) throw conflict("Only upgrades can be made here — to move to a smaller plan, please open a support ticket");
+  }
   const free = args.billing === "free";
   const amountDue = free ? 0 : q.amountDue;
 

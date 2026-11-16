@@ -40,6 +40,7 @@ export default function ClientDetail() {
         refresh();
       })
       .catch((e) => toast.error(e.message));
+  const sendVerify = () => confirm(`Email ${c.email} a link to verify their email address?`) && run(() => api(`/admin/clients/${id}/send-verification`, { body: {} }), `Verification email sent to ${c.email}`);
 
   const loginAs = async () => {
     if (!confirm(`Sign in to the client area as ${c.email}? You'll leave the admin until you click "Back to admin".`)) return;
@@ -69,7 +70,7 @@ export default function ClientDetail() {
         icon={<span className="text-lg font-extrabold">{initials}</span>}
         title={fullName(c)}
         badge={<Badge status={c.status} />}
-        subtitle={<>{p.companyName ? <b className="font-semibold text-white">{p.companyName} · </b> : null}Client #{c.id.slice(-6).toUpperCase()} · since {date(c.createdAt)}{sum ? ` (${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"})` : ""}{!c.emailVerified && <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40">Email not verified</span>}{c.reseller && <span className="ml-2 rounded-full bg-sky-400/20 px-2 py-0.5 text-[11px] font-bold text-sky-100 ring-1 ring-sky-300/40">Reseller</span>}</>}
+        subtitle={<>{p.companyName ? <b className="font-semibold text-white">{p.companyName} · </b> : null}Client #{c.id.slice(-6).toUpperCase()} · since {date(c.createdAt)}{sum ? ` (${sum.other.clientForDays} day${sum.other.clientForDays === 1 ? "" : "s"})` : ""}{!c.emailVerified && (c.resellerCustomer ? <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40">Email not verified</span> : <button onClick={sendVerify} title="Email the customer a verification link" className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40 transition hover:bg-amber-400/30">Email not verified · <span className="underline underline-offset-2">Send link</span></button>)}{c.reseller && <span className="ml-2 rounded-full bg-sky-400/20 px-2 py-0.5 text-[11px] font-bold text-sky-100 ring-1 ring-sky-300/40">Reseller</span>}</>}
         meta={<>
           <span className="inline-flex items-center gap-1.5 break-all"><Icon name="mail" className="text-[16px] text-white/60" />{c.email}<span className="[&_button]:text-white/80"><Copy text={c.email} /></span></span>
           {c.phone && <span className="inline-flex items-center gap-1.5"><Icon name="call" className="text-[16px] text-white/60" />{c.phone}</span>}
@@ -126,6 +127,7 @@ export default function ClientDetail() {
             </dl>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
               <Button size="sm" variant="ghost" icon="password" onClick={() => setModal("setpw")}>Set new password</Button>
+              {!c.emailVerified && !c.resellerCustomer && <Button size="sm" variant="ghost" icon="mark_email_read" onClick={sendVerify}>Send verification email</Button>}
               <Button size="sm" variant="ghost" icon="lock_reset" onClick={() => confirm(`Email ${c.email} a password reset link?`) && run(() => api(`/admin/clients/${id}/password-reset`, { body: {} }), "Password reset email sent")}>Send password reset</Button>
               {c.totpEnabled && <Button size="sm" variant="ghost" icon="phonelink_lock" onClick={() => confirm("Turn off two-factor sign-in for this customer?") && run(() => api(`/admin/clients/${id}/reset-2fa`, { body: {} }), "2FA reset")}>Reset 2FA</Button>}
               {sum?.other.affiliate ? <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary-tint px-3 text-[13px] font-semibold text-primary-dark"><Icon name="handshake" className="text-[17px]" />Affiliate <span className="font-mono">{sum.other.affiliate.code}</span></span>

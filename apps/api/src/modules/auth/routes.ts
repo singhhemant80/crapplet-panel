@@ -355,6 +355,9 @@ authRouter.post(
   ah(async (req, res) => {
     const u = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
     if (u.emailVerifiedAt) return res.json({ ok: true, alreadyVerified: true });
+    if (u.ownerResellerId) throw badRequest("Please contact your provider to verify your email");
+    const recent = await prisma.verificationToken.findFirst({ where: { userId: u.id, type: "EMAIL_VERIFY", createdAt: { gt: new Date(Date.now() - 60_000) } }, select: { id: true } });
+    if (recent) return res.json({ ok: true, recent: true });
     await sendVerification(u);
     res.json({ ok: true });
   }),
