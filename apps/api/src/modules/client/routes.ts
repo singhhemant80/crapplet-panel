@@ -126,12 +126,16 @@ clientRouter.get(
   "/shell",
   ah(async (req, res) => {
     const userId = req.user!.id;
-    const [unpaid, answered, active, profile] = await Promise.all([
+    const [unpaid, answered, live, profile, domains] = await Promise.all([
       prisma.invoice.findMany({ where: { userId, status: "UNPAID" }, select: { total: true, amountPaid: true, dueDate: true } }),
       prisma.ticket.count({ where: { userId, status: "ANSWERED" } }),
-      prisma.service.count({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED", "PROVISIONING", "PENDING"] } } }),
+      prisma.service.findMany({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED", "PROVISIONING", "PENDING"] } }, select: { product: { select: { type: true } } } }),
       prisma.clientProfile.findUnique({ where: { userId }, select: { creditBalance: true, currency: true } }),
+      prisma.domain.count({ where: { userId, status: "ACTIVE" } }),
     ]);
+    const active = live.length;
+    const byType: Record<string, number> = {};
+    for (const s of live) byType[s.product.type] = (byType[s.product.type] ?? 0) + 1;
     const now = Date.now();
     res.json({
       unpaidInvoices: unpaid.length,
@@ -139,6 +143,8 @@ clientRouter.get(
       outstanding: unpaid.reduce((s, i) => s + i.total - i.amountPaid, 0),
       ticketsAwaitingReply: answered,
       services: active,
+      byType,
+      domains,
       creditBalance: profile?.creditBalance ?? 0,
       currency: profile?.currency ?? "INR",
     });

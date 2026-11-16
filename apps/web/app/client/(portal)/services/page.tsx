@@ -1,4 +1,5 @@
 "use client";
+import { SERVICE_KINDS } from "@/components/client/sidebar";
 import { bandwidth } from "@/lib/units";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
 import { LiveBadge, useLiveStates } from "@/components/live-state";
@@ -21,6 +22,7 @@ const kindOf = (s: any) => (s.product.provisioner === "CPANEL" ? "hosting" : s.p
 function Services() {
   const sp = useSearchParams();
   const status = sp.get("status") ?? "";
+  const kind = SERVICE_KINDS.find((k) => k.key === sp.get("type"));
   const { data, loading } = useApi(`/client/services`);
   const live = useLiveStates("/client/services-live");
   const [q, setQ] = useState("");
@@ -37,6 +39,7 @@ function Services() {
   const list = all.filter((s) => {
     const st = s.status === "PROVISIONING" || s.status === "FAILED" ? "PENDING" : s.status;
     if (status && st !== status) return false;
+    if (kind && !kind.types.includes(s.product.type)) return false;
     if (!q.trim()) return true;
     const t = q.trim().toLowerCase();
     return [s.product.name, s.hostname, ...s.ips.map((i: any) => i.address)].some((x) => String(x ?? "").toLowerCase().includes(t));
@@ -54,10 +57,30 @@ function Services() {
         </Link>
       </div>
 
+      {/* services by type */}
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {SERVICE_KINDS.map((k) => {
+          const mine = all.filter((s) => k.types.includes(s.product.type) && ["ACTIVE", "SUSPENDED", "PROVISIONING", "PENDING"].includes(s.status)).length;
+          const on = kind?.key === k.key;
+          const p = new URLSearchParams(sp.toString());
+          if (on) p.delete("type");
+          else p.set("type", k.key);
+          return (
+            <Link key={k.key} href={`/client/services${p.toString() ? `?${p}` : ""}`} className={cx("flex items-center gap-3 rounded-2xl border bg-white p-3.5 transition", on ? "border-primary/50 shadow-[0_10px_24px_-14px_rgba(124,58,237,.6)] ring-2 ring-primary/15" : "border-[#ece7f7] hover:border-[#dccafb]")}>
+              <span className={cx("grid h-11 w-11 shrink-0 place-items-center rounded-xl", on ? "bg-gradient-to-br from-[#a365fe] to-[#7c3aed] text-white" : "bg-[#f1ecfd] text-[#7c3aed]")}><Icon name={k.icon} className="text-[22px]" fill={on} /></span>
+              <span className="min-w-0 leading-tight">
+                <b className={cx("block text-[22px] font-extrabold", mine ? "text-ink" : "text-slate-300")}>{mine}</b>
+                <span className="block truncate text-[12.5px] font-semibold text-mute">{k.label}</span>
+              </span>
+              {on && <Icon name="close" className="ml-auto text-[18px] text-mute" />}
+            </Link>
+          );
+        })}
+      </div>
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#ece7f7] bg-white p-2 shadow-card md:flex-row md:items-center">
         <div className="flex gap-1 overflow-x-auto">
           {TABS.map(([k, l]) => (
-            <Link key={k} href={k ? `/client/services?status=${k}` : "/client/services"} className={cx("inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-bold transition", status === k ? "bg-primary-dark text-white shadow" : "text-slate-600 hover:bg-primary-tint hover:text-primary-dark")}>
+            <Link key={k} href={`/client/services${k || kind ? `?${new URLSearchParams({ ...(k ? { status: k } : {}), ...(kind ? { type: kind.key } : {}) })}` : ""}`} className={cx("inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-bold transition", status === k ? "bg-primary-dark text-white shadow" : "text-slate-600 hover:bg-primary-tint hover:text-primary-dark")}>
               {l}
               <span className={cx("rounded-full px-1.5 text-[11px]", status === k ? "bg-white/20" : "bg-slate-100 text-slate-500")}>{counts[k] ?? 0}</span>
             </Link>
