@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { date, money } from "@/lib/api";
 import { Badge, Card, Input, Loading, PageHeader, Pager, Select, Table, Td, useApi } from "@/components/ui";
 import { LiveBadge, useLiveStates } from "@/components/live-state";
+import { BulkBar, Check, RemindButton, useSelection } from "@/components/admin/bulk";
 
 function Services() {
   const sp = useSearchParams();
@@ -23,6 +24,9 @@ function Services() {
   const { data, loading, reload } = useApi(`/admin/services?${qs}`, [qs]);
   const liveIds = (data?.items ?? []).filter((s: any) => s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s: any) => s.id).join(",");
   const live = useLiveStates(liveIds ? `/admin/live-states?ids=${liveIds}` : null);
+  const pick = useSelection();
+  const pageIds: string[] = (data?.services ?? []).map((s: any) => s.id);
+  const suspendedPicked = (data?.services ?? []).filter((s: any) => pick.has(s.id) && s.status === "SUSPENDED").length;
   return (
     <>
       <PageHeader title="VPS & Services" subtitle="Every customer service. Open a VPS to run power actions, reinstall or suspend." actions={<VirtualizorSyncAll onDone={reload} />} />
@@ -38,12 +42,17 @@ function Services() {
       <div className="mb-4">
         <DateRangeFilter className="max-w-2xl" value={range} onChange={(r) => { setRange(r); setPage(1); }} fields={[["created", "Created"], ["due", "Next due"], ["terminated", "Terminated"]]} field={dateField} onField={(f) => { setDateField(f); setPage(1); }} />
       </div>
+      <BulkBar count={pick.sel.length} onClear={pick.clear}>
+        <RemindButton ids={pick.sel} path="/admin/reminders/suspended" what="Payment reminder" confirmText={`Send a "pay to restore your service" reminder for the ${pick.sel.length} selected service(s)?\nOnly suspended services with an unpaid invoice get one — the rest are skipped.`} onDone={() => { pick.clear(); reload(); }} />
+        <span className="text-xs font-semibold text-mute">{suspendedPicked} of {pick.sel.length} suspended{status !== "SUSPENDED" && <> · <button className="font-bold text-primary-dark hover:underline" onClick={() => { setStatus("SUSPENDED"); setPage(1); }}>show only suspended</button></>}</span>
+      </BulkBar>
       <Card pad={false}>
         {loading ? <Loading /> : (
           <>
-            <Table head={["Service", "Customer", "IP", "Server / VMID", "Status", "Recurring", "Next due"]}>
+            <Table head={[<Check key="all" label="Select all on this page" checked={pick.allOn(pageIds)} onChange={(on) => pick.togglePage(pageIds, on)} />, "Service", "Customer", "IP", "Server / VMID", "Status", "Recurring", "Next due"]}>
               {data.services.map((s: any) => (
-                <tr key={s.id} className="hover:bg-primary-tint">
+                <tr key={s.id} className={pick.has(s.id) ? "bg-primary-tint/70" : "hover:bg-primary-tint"}>
+                  <Td><Check label={`Select ${s.hostname ?? s.product.name}`} checked={pick.has(s.id)} onChange={(on) => pick.toggle(s.id, on)} /></Td>
                   <Td><Link href={`/admin/services/${s.id}`} className="font-bold text-ink hover:text-primary-dark">{s.product.name}</Link><div className="text-xs text-mute">{s.hostname}</div></Td>
                   <Td><Link href={`/admin/clients/${s.user.id}`} className="text-sm text-primary-dark">{s.user.email}</Link></Td>
                   <Td className="font-mono text-xs">{s.ips.map((i: any) => i.address).join(", ") || "—"}</Td>

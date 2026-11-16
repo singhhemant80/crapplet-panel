@@ -183,6 +183,15 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
       callout("blue", "Pay any outstanding invoices and it's restored automatically — usually within a minute.") +
       btn("View my invoices", "{{appUrl}}/client/invoices"),
   },
+  "service.suspended_reminder": {
+    name: "Suspended service — payment reminder",
+    subject: "Reminder: {{productName}} is suspended — pay {{amountDue}} to restore it",
+    body: hero("amber", "Reminder", "{{productName}} is still suspended", "Hi {{name}}, your service <b>{{productName}}</b> ({{hostname}}) is suspended because an invoice is unpaid.") +
+      amountBox("Amount to pay", "{{amountDue}}", "Invoice {{invoiceNumber}}", "amber") +
+      callout("blue", "As soon as it's paid, your service is restored automatically — usually within a minute. Services that stay unpaid may be removed later, together with their data.") +
+      btn("Pay & restore", "{{appUrl}}/client/invoices/{{invoiceId}}") +
+      note("Already paid? Thank you — please ignore this email, or reply and we'll check it for you."),
+  },
   "service.unsuspended": {
     name: "Service reactivated",
     subject: "Service reactivated: {{productName}}",

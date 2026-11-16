@@ -28,6 +28,7 @@ import { adminBackups, publicRestore } from "./modules/backup/routes";
 import { adminCampaigns, publicCampaigns } from "./modules/campaigns/routes";
 import { adminLatency, publicLatency } from "./modules/latency/routes";
 import { adminInvoices } from "./modules/admin/invoices";
+import { adminReminders } from "./modules/admin/reminders";
 import { adminUpgrades } from "./modules/admin/upgrades";
 import { adminVirtualizorCheck } from "./modules/admin/virtualizor-check";
 import { adminBillingExtras } from "./modules/admin/billing-extras";
@@ -70,7 +71,7 @@ export function createApp() {
     rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => (String(req.headers.authorization ?? "").match(/^Bearer (ck_[^_]+)_/)?.[1] ?? `ip:${req.ip ?? ""}`), message: { error: "Too many requests — max 300 a minute per API key", code: "RATE_LIMITED" } }),
     resellerRouter,
   );
-  api.use("/admin", reauthGuard, customerTargetGuard, adminInvoices, adminUpgrades, adminVirtualizorCheck, adminBillingExtras, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency, adminCampaigns);
+  api.use("/admin", reauthGuard, customerTargetGuard, adminInvoices, adminReminders, adminUpgrades, adminVirtualizorCheck, adminBillingExtras, adminCore, adminClients, adminCatalog, adminInfra, adminEmail, adminSupport, migrationRouter, adminAutomation, adminDashboard, adminWhatsapp, adminBackups, adminLatency, adminCampaigns);
 
   // public content
   api.get("/content/announcements", ah(async (_req, res) => {

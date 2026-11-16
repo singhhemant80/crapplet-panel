@@ -278,6 +278,7 @@ async function emailInvoice(id: string, kind: keyof typeof TEMPLATES) {
   const inv = await prisma.invoice.findUnique({ where: { id }, include: { user: true } });
   if (!inv) throw notFound("Invoice not found");
   if (inv.status === "DRAFT") throw conflict("Issue the draft before emailing it");
+  if (inv.user.ownerResellerId) throw conflict("Reseller's customer — not emailed by us");
   if (kind === "paid" ? inv.status !== "PAID" : inv.status !== "UNPAID") throw conflict(kind === "paid" ? "The invoice isn't paid" : "The invoice isn't unpaid");
   await queueEmail(TEMPLATES[kind], inv.user.email, invoiceEmailVars(inv, inv.user.firstName), inv.userId);
   if (kind === "reminder" || kind === "overdue") await prisma.invoice.update({ where: { id }, data: { remindersSent: { increment: 1 }, lastReminderAt: new Date() } });

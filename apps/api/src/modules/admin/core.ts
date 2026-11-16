@@ -105,6 +105,7 @@ adminCore.get(
       new: { createdAt: { gte: monthAgo } },
       noservices: { services: { none: {} } },
       inactive: { status: { in: ["INACTIVE", "CLOSED"] } },
+      unverified: { status: "ACTIVE", emailVerifiedAt: null, ownerResellerId: null },
     };
     const signed = dateRange(req.query);
     // each filter is its own AND condition, so none can overwrite another (search uses OR too)
@@ -1109,6 +1110,7 @@ adminCore.post(
   ah(async (req, res) => {
     const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: req.params.id }, include: { user: true } });
     if (inv.status !== "UNPAID") throw badRequest("Invoice is not unpaid");
+    if (inv.user.ownerResellerId) throw badRequest("Reseller's customer — not emailed by us");
     await queueEmail(inv.dueDate < new Date() ? "invoice.overdue" : "invoice.reminder", inv.user.email, invoiceEmailVars(inv, inv.user.firstName), inv.userId);
     await prisma.invoice.update({ where: { id: inv.id }, data: { remindersSent: { increment: 1 }, lastReminderAt: new Date() } });
     res.json({ ok: true });

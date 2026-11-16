@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, CYCLES, money } from "@/lib/api";
 import { Badge, Button, Empty, Icon, Input, Loading, PageHeader, Pager, Spinner, cx, toast, useApi } from "@/components/ui";
 import { Ago, Avatar, FilterSelect, ListShell, SearchBox, StatusTabs, initialsOf, planIcon, type Tab } from "@/components/admin/list-kit";
+import { BulkBar, Check, RemindButton, useSelection } from "@/components/admin/bulk";
 
 const TABS: Tab[] = [
   { key: "", label: "All orders" },
@@ -32,6 +33,8 @@ function Orders() {
   const r = period === "custom" ? custom : presetRange(period);
   const qs = new URLSearchParams({ page: String(page), ...(status && { status }), ...(q && { q }), ...(r.from && { from: r.from }), ...(r.to && { to: r.to }), ...(payment && { payment }) });
   const { data, loading, reload } = useApi(`/admin/orders?${qs}`, [qs.toString()]);
+  const pick = useSelection();
+  const pageIds: string[] = (data?.orders ?? []).map((o: any) => o.id);
   const reset = (f: () => void) => { f(); setPage(1); };
   const filtered = !!(q || period || payment);
 
@@ -93,6 +96,9 @@ function Orders() {
         }
         footer={data && <Pager page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />}
       >
+        <BulkBar count={pick.sel.length} onClear={pick.clear}>
+          <RemindButton ids={pick.sel} path="/admin/reminders/orders" what="Reminder" confirmText={`Send reminders for the ${pick.sel.length} selected order(s)?\n• Unpaid order → payment reminder for its invoice\n• Suspended service → "pay to restore" reminder\nPaid orders with nothing suspended are skipped.`} onDone={() => { pick.clear(); reload(); }} />
+        </BulkBar>
         {loading && !data ? <Loading /> : !data?.orders.length ? (
           <Empty icon="shopping_bag" title={filtered || status ? "No orders match" : "No orders yet"}>
             <p className="text-sm text-mute">{filtered || status ? "Try another tab or clear the filters." : "Orders appear here when customers check out."}</p>
@@ -102,10 +108,11 @@ function Orders() {
             {/* desktop table */}
             <div className="hidden xl:block">
               <table className="w-full table-fixed text-left text-sm">
-                <colgroup><col style={{ width: "13%" }} /><col style={{ width: "20%" }} /><col style={{ width: "23%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "176px" }} /></colgroup>
+                <colgroup><col style={{ width: "44px" }} /><col style={{ width: "13%" }} /><col style={{ width: "20%" }} /><col style={{ width: "23%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "176px" }} /></colgroup>
                 <thead>
                   <tr className="border-b border-line bg-[#fbf9ff] text-[11.5px] font-bold uppercase tracking-wider text-mute">
-                    <th className="py-3 pl-5 pr-3">Order</th>
+                    <th className="py-3 pl-5"><Check label="Select all on this page" checked={pick.allOn(pageIds)} onChange={(on) => pick.togglePage(pageIds, on)} /></th>
+                    <th className="py-3 pl-2 pr-3">Order</th>
                     <th className="px-3 py-3">Customer</th>
                     <th className="px-3 py-3">Items</th>
                     <th className="px-3 py-3 text-right">Amount</th>
@@ -116,8 +123,9 @@ function Orders() {
                 </thead>
                 <tbody className="divide-y divide-line">
                   {data.orders.map((o: any) => (
-                    <tr key={o.id} className="group cursor-pointer align-top transition hover:bg-[#fbf9ff]" onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button")) router.push(`/admin/orders/${o.id}`); }}>
-                      <td className="py-3.5 pl-5 pr-3">
+                    <tr key={o.id} className={cx("group cursor-pointer align-top transition", pick.has(o.id) ? "bg-primary-tint/60" : "hover:bg-[#fbf9ff]")} onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,input")) router.push(`/admin/orders/${o.id}`); }}>
+                      <td className="py-4 pl-5"><Check label={`Select ${o.number}`} checked={pick.has(o.id)} onChange={(on) => pick.toggle(o.id, on)} /></td>
+                      <td className="py-3.5 pl-2 pr-3">
                         <Link href={`/admin/orders/${o.id}`} className="font-mono text-[13px] font-bold text-primary-dark hover:underline">{o.number}</Link>
                         <div className="mt-0.5 text-[12px] text-mute"><Ago at={o.createdAt} /></div>
                         {o.resellerBrand && <span title={`Ordered through reseller ${o.resellerBrand}`} className="mt-1 inline-flex max-w-[130px] items-center gap-1 whitespace-nowrap rounded-md bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-bold text-sky-700 ring-1 ring-sky-200"><Icon name="storefront" className="shrink-0 text-[13px]" /><span className="truncate">{o.resellerBrand}</span></span>}

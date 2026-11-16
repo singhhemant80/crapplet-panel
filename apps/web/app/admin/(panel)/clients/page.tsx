@@ -7,6 +7,7 @@ import { api, money } from "@/lib/api";
 import { Badge, Button, Empty, Field, Icon, Input, Loading, Modal, PageHeader, Pager, cx, toast, useApi } from "@/components/ui";
 import { emptyProfile, ProfileFields } from "@/components/profile-fields";
 import { Ago, Avatar, FilterSelect, ListShell, SearchBox, StatusTabs, initialsOf, type Tab } from "@/components/admin/list-kit";
+import { BulkBar, Check, RemindButton, reportSent, useSelection } from "@/components/admin/bulk";
 
 const TABS: Tab[] = [
   { key: "", label: "All customers" },
@@ -16,6 +17,7 @@ const TABS: Tab[] = [
   { key: "new", label: "New · 30 days", tone: "purple" },
   { key: "noservices", label: "No services", tone: "slate" },
   { key: "inactive", label: "Inactive / closed", tone: "slate" },
+  { key: "unverified", label: "Email not verified", tone: "amber" },
 ];
 const inr = (paise: number) => money(paise, "INR").replace(/\.00$/, "");
 const flag = (cc?: string | null) => (cc && /^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0))) : "");
@@ -34,13 +36,32 @@ function Clients() {
   const qs = new URLSearchParams({ page: String(page), ...(q && { q }), ...(segment && { segment }), ...(jr.from && { from: jr.from }), ...(jr.to && { to: jr.to }), ...(kind && { kind }) });
   const { data, loading, reload } = useApi(`/admin/clients?${qs}`, [qs.toString()]);
   const c = data?.counts;
+  const pick = useSelection();
+  const pageIds: string[] = (data?.clients ?? []).map((u: any) => u.id);
+  const verify = useApi<{ unverified: number; notSentToday: number }>("/admin/reminders/verification", [data]);
+  const [allBusy, setAllBusy] = useState(false);
+  const emailAll = async () => {
+    const n = verify.data?.notSentToday ?? 0;
+    if (!confirm(`Email a verification link to ${n.toLocaleString("en-IN")} customer${n === 1 ? "" : "s"} who haven't verified their email?\n\nCustomers who already got a link in the last 24 hours, reseller customers and inactive accounts are skipped.`)) return;
+    setAllBusy(true);
+    try {
+      reportSent(await api("/admin/reminders/verification", { body: { all: true } }), "Verification email");
+      verify.reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setAllBusy(false);
+  };
 
   return (
     <>
       <PageHeader
         title="Customers"
         subtitle="Everyone with an account — open a customer to see their services, invoices, tickets and notes."
-        actions={<Button icon="person_add" onClick={() => setAdding(true)}>Add customer</Button>}
+        actions={<>
+          {(verify.data?.notSentToday ?? 0) > 0 && <Button variant="outline" icon="mark_email_unread" loading={allBusy} onClick={emailAll} title={`${verify.data!.unverified.toLocaleString("en-IN")} active customers haven't verified their email`}>Verify reminder to all ({verify.data!.notSentToday.toLocaleString("en-IN")})</Button>}
+          <Button icon="person_add" onClick={() => setAdding(true)}>Add customer</Button>
+        </>}
         stats={
           c
             ? [
@@ -75,6 +96,9 @@ function Clients() {
         }
         footer={data && <Pager page={data.page} pageSize={data.pageSize} total={data.total} onPage={setPage} />}
       >
+        <BulkBar count={pick.sel.length} onClear={pick.clear}>
+          <RemindButton ids={pick.sel} path="/admin/reminders/verification" what="Verification email" confirmText={`Email a verification link to the ${pick.sel.length} selected customer(s)?\nAlready-verified, reseller and inactive accounts are skipped.`} onDone={() => { pick.clear(); reload(); verify.reload(); }} />
+        </BulkBar>
         {loading && !data ? <Loading /> : !data?.clients.length ? (
           <Empty icon="group" title={q || segment ? "No customers match" : "No customers yet"}>
             <p className="text-sm text-mute">{q || segment ? "Try another tab or search." : "Add one, or they'll appear when they sign up."}</p>
@@ -83,10 +107,11 @@ function Clients() {
           <div className={cx("transition-opacity", loading && "opacity-60")}>
             <div className="hidden xl:block">
               <table className="w-full table-fixed text-left text-sm">
-                <colgroup><col style={{ width: "22%" }} /><col style={{ width: "19%" }} /><col style={{ width: "14%" }} /><col style={{ width: "8%" }} /><col style={{ width: "15%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /></colgroup>
+                <colgroup><col style={{ width: "44px" }} /><col style={{ width: "22%" }} /><col style={{ width: "19%" }} /><col style={{ width: "14%" }} /><col style={{ width: "8%" }} /><col style={{ width: "15%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /></colgroup>
                 <thead>
                   <tr className="border-b border-line bg-[#fbf9ff] text-[11.5px] font-bold uppercase tracking-wider text-mute">
-                    <th className="py-3 pl-5 pr-3">Customer</th>
+                    <th className="py-3 pl-5"><Check label="Select all on this page" checked={pick.allOn(pageIds)} onChange={(on) => pick.togglePage(pageIds, on)} /></th>
+                    <th className="py-3 pl-2 pr-3">Customer</th>
                     <th className="px-3 py-3">Contact</th>
                     <th className="px-3 py-3">Company / GSTIN</th>
                     <th className="px-3 py-3 text-center">Services</th>
@@ -97,8 +122,9 @@ function Clients() {
                 </thead>
                 <tbody className="divide-y divide-line">
                   {data.clients.map((u: any) => (
-                    <tr key={u.id} className="group cursor-pointer transition hover:bg-[#fbf9ff]" onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button")) router.push(`/admin/clients/${u.id}`); }}>
-                      <td className="py-3 pl-5 pr-3"><Who u={u} /></td>
+                    <tr key={u.id} className={cx("group cursor-pointer transition", pick.has(u.id) ? "bg-primary-tint/60" : "hover:bg-[#fbf9ff]")} onClick={(e) => { if (!(e.target as HTMLElement).closest("a,button,input")) router.push(`/admin/clients/${u.id}`); }}>
+                      <td className="py-3 pl-5"><Check label={`Select ${u.email}`} checked={pick.has(u.id)} onChange={(on) => pick.toggle(u.id, on)} /></td>
+                      <td className="py-3 pl-2 pr-3"><Who u={u} /></td>
                       <td className="px-3 py-3">
                         <a href={`mailto:${u.email}`} className="block truncate text-[13px] text-slate-700 hover:text-primary-dark">{u.email}</a>
                         {u.phone ? <a href={`tel:${u.phone}`} className="block text-[12px] text-mute hover:text-primary-dark">{u.phone}</a> : <span className="text-[12px] text-slate-300">no phone</span>}
