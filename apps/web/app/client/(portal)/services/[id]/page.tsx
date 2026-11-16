@@ -258,18 +258,6 @@ export default function ServicePage() {
               <dd className="font-semibold text-ink">{svc.billingCycle === "ONETIME" ? "None — one-time purchase" : <>{date(svc.nextDueDate)}{days !== null && days >= 0 && <span className="ml-1.5 font-medium text-mute">({days === 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`})</span>}</>}</dd>
             </>}
           </dl>
-          {data.invoices.length > 0 && (
-            <ul className="mt-4 divide-y divide-[#f3effb] border-t border-line">
-              {data.invoices.map((i: any) => (
-                <li key={i.id}>
-                  <Link href={`/client/invoices/${i.id}`} className="flex items-center justify-between py-2.5 text-sm hover:text-primary-dark">
-                    <span className="font-semibold">{invNo(i)}</span>
-                    <span className="flex items-center gap-3">{money(i.total, i.currency)} <Badge status={i.status} /></span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
           {svc.status !== "TERMINATED" && svc.status !== "CANCELLED" && (
             <button onClick={() => setModal("cancel")} className="mt-4 text-sm font-bold text-rose-600 hover:underline">Request cancellation</button>
           )}
@@ -291,6 +279,8 @@ export default function ServicePage() {
           </Card>
         )}
       </div>
+
+      <ServiceInvoices invoices={data.invoices} />
 
       <ReinstallModal open={modal === "reinstall"} onClose={() => setModal(null)} svc={svc} onSubmit={(os, confirmText, password) => act("reinstall", { osTemplateId: os, confirm: confirmText, ...(password ? { password } : {}) })} busy={busy === "reinstall"} />
       <CancelModal open={modal === "cancel"} onClose={() => setModal(null)} id={id} />
@@ -525,5 +515,94 @@ function RdnsModal({ open, onClose, id, ips }: { open: boolean; onClose: () => v
         </Button>
       </div>
     </Modal>
+  );
+}
+
+/** Every invoice for this service: first order, renewals, upgrades and add-ons. */
+function ServiceInvoices({ invoices }: { invoices: any[] }) {
+  const [all, setAll] = useState(false);
+  const unpaid = invoices.filter((i) => i.status === "UNPAID");
+  const due = unpaid.reduce((n, i) => n + i.total - (i.amountPaid ?? 0), 0);
+  const paid = invoices.filter((i) => i.status === "PAID").reduce((n, i) => n + i.total, 0);
+  const cur = invoices[0]?.currency ?? "INR";
+  const shown = all ? invoices : invoices.slice(0, 6);
+  const overdue = (i: any) => i.status === "UNPAID" && new Date(i.dueDate).getTime() < Date.now();
+  return (
+    <Card pad={false} className="mt-6">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#f1ecfd] text-[#7c3aed]"><Icon name="receipt_long" className="text-[21px]" /></span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[15px] font-extrabold text-ink">Invoices for this service</h3>
+          <p className="text-[12.5px] text-mute">{invoices.length ? `${invoices.length} invoice${invoices.length === 1 ? "" : "s"} · ${money(paid, cur)} paid so far` : "No invoices yet"}</p>
+        </div>
+        {unpaid.length > 0 && (
+          <Link href={unpaid.length === 1 ? `/client/invoices/${unpaid[0].id}` : "/client/invoices?status=UNPAID"} className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 px-4 text-[13px] font-bold text-white shadow-[0_10px_22px_-12px_#e11d48] hover:brightness-105">
+            <Icon name="bolt" className="text-[18px]" />Pay {money(due, cur)}
+          </Link>
+        )}
+      </div>
+      {invoices.length ? (
+        <>
+          {/* desktop */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-line bg-[#fbf9ff] text-[11.5px] font-bold uppercase tracking-wider text-mute">
+                  <th className="py-3 pl-5 pr-3">Invoice</th>
+                  <th className="px-3 py-3">For</th>
+                  <th className="px-3 py-3">Date</th>
+                  <th className="px-3 py-3">Due / paid</th>
+                  <th className="px-3 py-3 text-right">Amount</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="py-3 pl-3 pr-5 text-right"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {shown.map((i) => (
+                  <tr key={i.id} className="transition hover:bg-[#fbf9ff]">
+                    <td className="py-3 pl-5 pr-3"><Link href={`/client/invoices/${i.id}`} className="font-mono text-[13px] font-bold text-primary-dark hover:underline">{invNo(i)}</Link></td>
+                    <td className="max-w-[280px] truncate px-3 py-3 text-slate-600" title={i.items?.[0]?.description}>{i.items?.[0]?.description ?? "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-600">{date(i.createdAt)}</td>
+                    <td className={cx("whitespace-nowrap px-3 py-3", overdue(i) ? "font-semibold text-rose-600" : "text-slate-600")}>
+                      {i.status === "PAID" && i.paidAt ? <>Paid {date(i.paidAt)}</> : i.status === "UNPAID" ? <>{overdue(i) ? "Overdue since" : "Due"} {date(i.dueDate)}</> : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-bold text-ink">{money(i.total, i.currency)}</td>
+                    <td className="px-3 py-3"><Badge status={i.status} /></td>
+                    <td className="py-3 pl-3 pr-5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {i.status === "UNPAID" && <Link href={`/client/invoices/${i.id}`} className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-[12.5px] font-bold text-white hover:bg-primary-dark">Pay</Link>}
+                        <a href={`/api/client/invoices/${i.id}/pdf`} target="_blank" rel="noreferrer" title="Download PDF" aria-label={`Download ${invNo(i)} as PDF`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 ring-1 ring-line hover:text-primary-dark"><Icon name="picture_as_pdf" className="text-[18px]" /></a>
+                        <Link href={`/client/invoices/${i.id}`} title="View" aria-label={`View ${invNo(i)}`} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 ring-1 ring-line hover:text-primary-dark"><Icon name="chevron_right" className="text-[20px]" /></Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* phone */}
+          <ul className="divide-y divide-line md:hidden">
+            {shown.map((i) => (
+              <li key={i.id}>
+                <Link href={`/client/invoices/${i.id}`} className="flex items-center gap-3 px-5 py-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[13px] font-bold text-primary-dark">{invNo(i)}</span>
+                    <span className={cx("block text-[12px]", overdue(i) ? "font-semibold text-rose-600" : "text-mute")}>
+                      {i.status === "PAID" && i.paidAt ? `Paid ${date(i.paidAt)}` : i.status === "UNPAID" ? `${overdue(i) ? "Overdue since" : "Due"} ${date(i.dueDate)}` : date(i.createdAt)}
+                    </span>
+                  </span>
+                  <span className="text-right"><b className="block text-[14px] text-ink">{money(i.total, i.currency)}</b><Badge status={i.status} /></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {invoices.length > 6 && (
+            <button onClick={() => setAll(!all)} className="w-full border-t border-line py-3 text-[13px] font-bold text-primary-dark hover:bg-[#fbf9ff]">{all ? "Show fewer" : `Show all ${invoices.length} invoices`}</button>
+          )}
+        </>
+      ) : (
+        <div className="px-5 py-8 text-center text-sm text-mute">Invoices for this service will appear here.</div>
+      )}
+    </Card>
   );
 }

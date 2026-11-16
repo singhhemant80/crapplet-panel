@@ -237,7 +237,13 @@ clientRouter.get(
   "/services/:id",
   ah(async (req, res) => {
     const { passwordEnc, config, notes: _notes, ...s } = await ownService(req.user!.id, req.params.id);
-    const invoices = await prisma.invoice.findMany({ where: { items: { some: { relId: s.id } } }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, proformaNumber: true, total: true, status: true, dueDate: true } });
+    // this service's invoices (first order, renewals, upgrades, add-ons) — drafts aren't shown to customers
+    const invoices = await prisma.invoice.findMany({
+      where: { userId: req.user!.id, status: { not: "DRAFT" }, items: { some: { relId: s.id } } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { id: true, number: true, proformaNumber: true, total: true, amountPaid: true, currency: true, status: true, dueDate: true, createdAt: true, paidAt: true, items: { where: { relId: s.id }, select: { description: true }, take: 1 } },
+    });
     // a build writes several "create" steps (started, node chosen, created…) — customers only see the outcome
     const logs = (
       await prisma.provisioningLog.findMany({ where: { serviceId: s.id, action: { in: ["create", "reinstall", "reboot", "start", "stop", "shutdown", "reset_password"] } }, orderBy: { createdAt: "desc" }, take: 60, select: { action: true, success: true, createdAt: true, message: true } })
