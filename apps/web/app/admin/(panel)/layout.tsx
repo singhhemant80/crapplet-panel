@@ -33,15 +33,15 @@ function Panel({ children }: { children: React.ReactNode }) {
   useEffect(() => setOpen(false), [path]);
 
   return (
-    <div className={cx("min-h-screen bg-[#f6f4fb] lg:grid lg:transition-[grid-template-columns] lg:duration-300", rail ? "lg:grid-cols-[84px_1fr]" : "lg:grid-cols-[276px_1fr]")}>
+    <div className={cx("min-h-screen bg-[#f6f4fb] lg:grid lg:transition-[grid-template-columns] lg:duration-300", rail ? "lg:grid-cols-[92px_1fr]" : "lg:grid-cols-[344px_1fr]")}>
       {/* desktop */}
-      <aside className="sticky top-0 hidden h-screen lg:block">
+      <aside className="sticky top-0 z-40 hidden h-screen lg:block">
         <Sidebar rail={rail} onToggleRail={toggle} />
       </aside>
       {/* phone / tablet drawer */}
-      <aside className={cx("fixed inset-y-0 left-0 z-50 w-[288px] max-w-[85vw] shadow-2xl transition-transform duration-300 lg:hidden", open ? "translate-x-0" : "-translate-x-full")}>
+      <aside className={cx("fixed inset-y-0 left-0 z-50 w-[344px] max-w-[92vw] shadow-2xl transition-transform duration-300 lg:hidden", open ? "translate-x-0" : "-translate-x-full")}>
         <Sidebar rail={false} onToggleRail={toggle} mobile />
-        <button onClick={() => setOpen(false)} className="absolute right-3 top-6 grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-white" aria-label="Close menu"><Icon name="close" className="text-[18px]" /></button>
+        <button onClick={() => setOpen(false)} className="absolute right-3 top-5 grid h-8 w-8 place-items-center rounded-lg bg-white text-slate-500 ring-1 ring-[#e9e6f5] hover:text-slate-800" aria-label="Close menu"><Icon name="close" className="text-[18px]" /></button>
       </aside>
       {open && <div className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] lg:hidden" onClick={() => setOpen(false)} />}
       <div className="min-w-0">

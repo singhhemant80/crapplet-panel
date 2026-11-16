@@ -204,13 +204,14 @@ adminDashboard.get(
   "/nav-counts",
   requireStaff(),
   ah(async (_req, res) => {
-    const [orders, tickets, paymentReviews, failedSetup] = await Promise.all([
+    const [orders, tickets, paymentReviews, failedSetup, overdueInvoices] = await Promise.all([
       prisma.order.count({ where: { status: "PENDING" } }),
       prisma.ticket.count({ where: { status: { in: ["OPEN", "CUSTOMER_REPLY"] } } }),
       prisma.paymentIntent.count({ where: { status: "PENDING_REVIEW" } }),
       prisma.service.count({ where: { status: "FAILED" } }),
+      prisma.invoice.count({ where: { status: "UNPAID", isWalletTopup: false, dueDate: { lt: istDayStart(new Date()) } } }),
     ]);
-    res.json({ orders, tickets, paymentReviews, failedSetup });
+    res.json({ orders, tickets, paymentReviews, failedSetup, overdueInvoices });
   }),
 );
 
