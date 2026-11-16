@@ -174,7 +174,7 @@ function ServiceCard({ s, st }: { s: any; st?: { state: string; reason?: string 
         </div>
         <div className="min-w-0">
           <div className="font-semibold text-mute">{kind === "vps" ? "Operating system" : "Billing"}</div>
-          <div className="mt-0.5 truncate font-bold text-ink">{kind === "vps" ? s.osTemplate?.name ?? "—" : CYCLES[s.billingCycle]}</div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 font-bold text-ink">{kind === "vps" && s.osTemplate && <OsLogo os={s.osTemplate} size={20} className="rounded-md" />}<span className="truncate">{kind === "vps" ? s.osTemplate?.name ?? "—" : CYCLES[s.billingCycle]}</span></div>
         </div>
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 px-5 py-4">

@@ -89,7 +89,7 @@ export default function ServicePage() {
             : ["Next renewal", date(svc.nextDueDate), <span key="d" className={cx(days !== null && days < 0 ? "font-bold text-rose-600" : days !== null && days <= 7 ? "font-bold text-amber-600" : "")}>{days === null ? "—" : days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `in ${days} days`}</span>],
           ["Billing cycle", CYCLES[svc.billingCycle] ?? svc.billingCycle],
           ["Recurring", money(svc.recurringAmount, svc.currency), svc.currency === "INR" ? "+ GST" : undefined],
-          [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? svc.osTemplate?.name ?? "—" : svc.status === "PENDING" ? (data.unpaidInvoiceId ? "Awaiting payment" : "Being set up") : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
+          [isHosting ? "Server" : isVps ? "Operating system" : "Status", isHosting ? live?.server?.name ?? "—" : isVps ? (svc.osTemplate ? <span key="os" className="flex min-w-0 items-center gap-2"><OsLogo os={svc.osTemplate} size={26} className="rounded-lg" /><span className="truncate" title={svc.osTemplate.name}>{svc.osTemplate.name}</span></span> : "—") : svc.status === "PENDING" ? (data.unpaidInvoiceId ? "Awaiting payment" : "Being set up") : svc.status, isHosting && live?.plan ? `Package ${live.plan}` : undefined],
         ]}
       />
 
