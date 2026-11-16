@@ -100,7 +100,7 @@ export default function Dashboard() {
                     <div className="hidden w-[150px] shrink-0 md:block">
                       {x.ip ? <span className="inline-flex items-center gap-1 font-mono text-[12.5px] text-slate-700">{x.ip}<Copy text={x.ip} /></span> : <span className="text-xs text-mute">{x.kind === "hosting" ? "Shared IP" : "—"}</span>}
                     </div>
-                    <div className="w-[96px] shrink-0">{st ? <LiveBadge state={st.state} reason={st.reason} /> : x.status === "ACTIVE" ? <LiveBadge state="running" /> : <span className="text-xs text-mute">—</span>}</div>
+                    <div className="w-[96px] shrink-0">{st && st.state !== "unknown" ? <LiveBadge state={st.state} reason={st.reason} /> : st && x.status ? <Badge status={x.status} /> : x.status === "ACTIVE" ? <LiveBadge state="running" /> : <span className="text-xs text-mute">—</span>}</div>
                     <div className="hidden w-[118px] shrink-0 text-right sm:block">
                       <div className="text-[13px] font-bold text-ink">{money(x.amount, x.currency ?? cur)}</div>
                       <div className={cx("text-[11.5px]", due !== null && due <= 7 ? "font-semibold text-rose-600" : "text-mute")}>{x.nextDueDate ? `Renews ${date(x.nextDueDate)}` : CYCLES[x.cycle]}</div>

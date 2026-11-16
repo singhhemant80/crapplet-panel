@@ -103,7 +103,7 @@ function Services() {
                     <KindIcon kind={kind} os={s.osTemplate} />
                     <span className="min-w-0 flex-1"><span className="block truncate font-bold text-ink group-hover:text-primary-dark">{s.product.name}</span><span className="block truncate text-xs text-mute">{s.hostname ?? "—"}</span></span>
                     <span className="hidden w-36 font-mono text-[12.5px] text-slate-700 md:block">{ip ?? "—"}</span>
-                    <span className="w-24">{live.states[s.id] ? <LiveBadge state={live.states[s.id].state} /> : <Badge status={s.status} />}</span>
+                    <span className="w-24">{live.states[s.id] && live.states[s.id].state !== "unknown" ? <LiveBadge state={live.states[s.id].state} /> : <Badge status={s.status} />}</span>
                     <span className="hidden w-44 text-right text-xs leading-relaxed text-mute sm:block">
                       <span className="block">Purchased <b className="font-semibold text-slate-700">{date(s.registrationDate)}</b></span>
                       <span className="block">{["TERMINATED", "CANCELLED"].includes(s.status) ? <>Ended <b className="font-semibold text-slate-700">{s.terminationDate ? date(s.terminationDate) : "—"}</b></> : s.billingCycle === "ONETIME" ? "One-time · no renewal" : <>Renews <b className="font-semibold text-slate-700">{s.nextDueDate ? date(s.nextDueDate) : "—"}</b></>}</span>
@@ -152,7 +152,7 @@ function ServiceCard({ s, st }: { s: any; st?: { state: string; reason?: string 
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          {st && s.status === "ACTIVE" ? <LiveBadge state={st.state} reason={st.reason} /> : <Badge status={s.status} />}
+          {st && st.state !== "unknown" && s.status === "ACTIVE" ? <LiveBadge state={st.state} reason={st.reason} /> : <Badge status={s.status} />}
           <span className="text-[11px] font-semibold uppercase tracking-wide text-mute">{kind === "hosting" ? (s.product.type === "RESELLER_HOSTING" ? "Reseller" : "cPanel hosting") : kind === "vps" ? `${s.product.virtType ?? "KVM"} VPS` : "Service"}</span>
         </div>
       </Link>

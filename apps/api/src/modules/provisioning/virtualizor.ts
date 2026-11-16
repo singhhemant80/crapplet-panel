@@ -205,11 +205,18 @@ export class VirtualizorClient {
    */
   async vpsStatus(vpsids: (string | number)[]): Promise<Record<string, number>> {
     if (!vpsids.length) return {};
-    const r = await this.call<{ status?: Record<string, unknown> }>("vs", { vs_status: vpsids.join(",") });
+    const r = await this.call<{ status?: unknown; vs_status?: unknown }>("vs", { vs_status: vpsids.join(",") });
     const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(r.status ?? {})) {
-      const code = typeof v === "object" && v !== null ? Number((v as Record<string, unknown>).status ?? (v as Record<string, unknown>).stat) : Number(v);
-      if (Number.isFinite(code)) out[k] = code;
+    // keyed by vpsid ({ "3226": 1 } or { "3226": { status: 1 } }) — or, on some versions, a list of rows with their vpsid
+    const raw = r.status ?? r.vs_status ?? {};
+    const entries: [string, unknown][] = Array.isArray(raw)
+      ? raw.map((v, i) => [String((v as Record<string, unknown>)?.vpsid ?? (v as Record<string, unknown>)?.vps_id ?? vpsids[i]), v])
+      : typeof raw === "object" && raw !== null ? Object.entries(raw) : [];
+    for (const [k, v] of entries) {
+      const o = typeof v === "object" && v !== null ? (v as Record<string, unknown>) : null;
+      const val = o ? o.status ?? o.stat ?? o.state : v;
+      const code = val === "running" || val === "online" ? 1 : val === "stopped" || val === "offline" ? 0 : val === "" || val === null || val === undefined ? NaN : Number(val);
+      if (Number.isFinite(code)) out[String(k)] = code;
     }
     return out;
   }

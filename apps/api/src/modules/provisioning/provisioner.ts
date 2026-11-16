@@ -956,6 +956,19 @@ function refreshMissingIps(ids: string[]) {
   }
 }
 
+const oneStateCache = new Map<string, { at: number; st: { state: LiveState; reason?: string } }>();
+/** One VPS's state from its own status call and row (used when the bulk status call leaves it out). */
+async function oneVpsState(client: VirtualizorClient, serverId: string, vpsid: string): Promise<{ state: LiveState; reason?: string }> {
+  const key = `${serverId}:${vpsid}`;
+  const hit = oneStateCache.get(key);
+  if (hit && hit.at > Date.now() - 60_000) return hit.st;
+  const [codes, r] = await Promise.all([client.vpsStatus([vpsid]).catch(() => ({}) as Record<string, number>), client.getVps(vpsid).catch(() => null)]);
+  const row = pickVps(r, vpsid);
+  const st = r === null ? { state: "unknown" as LiveState, reason: "Virtualizor didn't answer" } : !row ? { state: "unknown" as LiveState, reason: "Not found in Virtualizor" } : virtualizorState(codes[vpsid], row);
+  oneStateCache.set(key, { at: Date.now(), st });
+  return st;
+}
+
 export async function liveStates(serviceIds: string[]) {
   const svcs = await prisma.service.findMany({ where: { id: { in: serviceIds.slice(0, 200) }, remoteId: { not: null } }, include: { server: true, product: { select: { provisioner: true } }, _count: { select: { ips: true } } } });
   refreshMissingIps(svcs.filter((s) => s.product.provisioner === "VIRTUALIZOR" && s.server && !s._count.ips && ["ACTIVE", "SUSPENDED"].includes(s.status)).map((s) => s.id));
@@ -966,8 +979,21 @@ export async function liveStates(serviceIds: string[]) {
   for (const s of svcs) if (s.product.provisioner === "CPANEL") out[s.id] = { state: s.status === "SUSPENDED" ? "suspended" : s.status === "ACTIVE" ? "running" : "unknown" };
   await Promise.all(
     [...byServer.values()].map(async (list) => {
-      const codes = await virtualizorFor(list[0].server!).vpsStatus(list.map((s) => s.remoteId!)).catch(() => null);
-      for (const s of list) out[s.id] = codes ? virtualizorState(codes[s.remoteId!]) : { state: "unknown", reason: "Virtualizor didn't answer" };
+      const client = virtualizorFor(list[0].server!);
+      const codes = await client.vpsStatus(list.map((s) => s.remoteId!)).catch(() => null);
+      const missing: typeof list = [];
+      for (const s of list) {
+        const st = codes ? virtualizorState(codes[s.remoteId!]) : { state: "unknown" as LiveState };
+        if (st.state === "unknown") missing.push(s);
+        else out[s.id] = st;
+      }
+      // the bulk call didn't say for these: read each VPS (a few at a time; remembered for a minute)
+      for (let i = 0; i < missing.length; i += 6)
+        await Promise.all(
+          missing.slice(i, i + 6).map(async (s) => {
+            out[s.id] = await oneVpsState(client, list[0].server!.id, s.remoteId!);
+          }),
+        );
     }),
   );
   await Promise.all(
