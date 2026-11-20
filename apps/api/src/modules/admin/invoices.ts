@@ -10,7 +10,7 @@ import { ah, badRequest, conflict, notFound, parse } from "../../lib/http";
 import { audit } from "../../lib/audit";
 import { requireStaff } from "../../middleware/auth";
 import { queueEmail } from "../email/mailer";
-import { applyCreditToInvoice, applyPayment, assignTaxNumber, cancelInvoice, createInvoice, invoiceEmailVars, invoiceLabel, recomputeInvoiceTx } from "../billing/invoices";
+import { adjustCredit, applyCreditToInvoice, applyPayment, assignTaxNumber, cancelInvoice, createInvoice, invoiceEmailVars, invoiceLabel, recomputeInvoiceTx } from "../billing/invoices";
 
 export const adminInvoices = Router();
 
@@ -28,6 +28,9 @@ const editSchema = z.object({
   issueDate: z.coerce.date().optional(),
   dueDate: z.coerce.date().optional(),
   notes: z.string().max(4000).nullish(),
+  /** change a paid / refunded invoice anyway (staff confirmed, with a reason that goes in the audit log) */
+  override: z.boolean().optional(),
+  reason: z.string().trim().max(300).optional(),
   customerGstin: z
     .string()
     .trim()
@@ -59,9 +62,11 @@ adminInvoices.put(
     const b = parse(editSchema, req.body);
     const before = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { items: true } });
     if (!before) throw notFound("Invoice not found");
-    const linesEditable = EDITABLE.includes(before.status);
+    const forced = !EDITABLE.includes(before.status) && (before.status === "PAID" || before.status === "REFUNDED") && b.override === true;
+    const linesEditable = EDITABLE.includes(before.status) || forced;
+    if (forced && (b.reason ?? "").length < 3) throw badRequest("Say why this paid / refunded invoice is being changed — it's kept in the activity log");
     if (!linesEditable && (b.items || b.issueDate || b.dueDate || b.customerGstin !== undefined))
-      throw conflict(before.status === "PAID" ? "A paid tax invoice can't be re-priced or re-dated — issue a credit note or refund instead (notes can still be edited)" : "Only notes can be changed on a cancelled or refunded invoice");
+      throw conflict(before.status === "PAID" || before.status === "REFUNDED" ? "Confirm that you want to change a paid / refunded tax invoice (with a reason) — or issue a credit note instead (notes can still be edited)" : "Only notes can be changed on a cancelled invoice");
     if (b.dueDate && b.issueDate && b.dueDate < b.issueDate) throw badRequest("The due date can't be before the invoice date");
 
     let paidNow = false;
@@ -96,7 +101,9 @@ adminInvoices.put(
       if (b.items || b.customerGstin !== undefined) {
         const inv = await recomputeInvoiceTx(tx, before.id);
         if (inv.total < 0) throw badRequest("The invoice total can't be negative");
-        if (inv.amountPaid > inv.total) throw conflict(`${(inv.amountPaid / 100).toFixed(2)} has already been paid — the new total can't be lower than that. Refund or credit the difference instead.`);
+        if (inv.amountPaid > inv.total && before.status !== "REFUNDED") throw conflict(`${(inv.amountPaid / 100).toFixed(2)} has already been paid — the new total can't be lower than that. Refund or credit the difference instead.`);
+        // a paid invoice whose total went up now has a balance to pay
+        if (before.status === "PAID" && inv.amountPaid < inv.total) await tx.invoice.update({ where: { id: before.id }, data: { status: "UNPAID", paidAt: null } });
         paidNow = await settleIfCovered(tx, before.id);
       }
     });
@@ -118,9 +125,10 @@ adminInvoices.put(
         ...(b.issueDate ? { issueDate: { from: before.issueDate, to: after.issueDate } } : {}),
         ...(b.notes !== undefined ? { notes: true } : {}),
         ...(b.customerGstin !== undefined ? { customerGstin: { from: before.customerGstin, to: after.customerGstin } } : {}),
+        ...(forced ? { override: before.status, reason: b.reason, status: { from: before.status, to: after.status } } : {}),
       },
     });
-    res.json({ invoice: after, paid: paidNow });
+    res.json({ invoice: after, paid: paidNow, reopened: before.status === "PAID" && after.status === "UNPAID" });
   }),
 );
 
@@ -129,11 +137,51 @@ adminInvoices.post(
   "/invoices/:id/status",
   requireStaff("billing.manage"),
   ah(async (req, res) => {
-    const b = parse(z.object({ status: z.enum(["DRAFT", "UNPAID", "CANCELLED"]), sendEmail: z.boolean().default(false) }), req.body);
-    const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { user: true, transactions: { select: { id: true } } } });
+    const b = parse(
+      z.object({
+        status: z.enum(["DRAFT", "UNPAID", "CANCELLED", "PAID"]),
+        sendEmail: z.boolean().default(false),
+        /** refunded → paid / unpaid */
+        reason: z.string().trim().max(300).optional(),
+        takeBackCredit: z.boolean().default(true),
+        dueDate: z.coerce.date().optional(),
+      }),
+      req.body,
+    );
+    const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { user: true, transactions: { select: { id: true } }, creditNotes: { select: { id: true } } } });
     if (!inv) throw notFound("Invoice not found");
     if (inv.status === b.status) return res.json({ ok: true });
-    if (b.status === "CANCELLED") {
+    let creditTaken = 0;
+    if (inv.status === "REFUNDED" && (b.status === "PAID" || b.status === "UNPAID")) {
+      // the refund was a mistake / reversed outside the panel (→ paid), or the customer has to pay again (→ unpaid)
+      if ((b.reason ?? "").length < 3) throw badRequest("Say why the refund is being undone — it's kept in the activity log");
+      if (b.status === "PAID" && b.takeBackCredit) {
+        // money the refund put in the customer's wallet comes back out
+        const payIds = inv.transactions.map((t) => t.id);
+        const given = await prisma.creditLedger.aggregate({
+          _sum: { amount: true },
+          where: { userId: inv.userId, amount: { gt: 0 }, OR: [{ refType: "creditNote", refId: { in: inv.creditNotes.map((c) => c.id) } }, { refType: "refund", refId: { in: payIds } }] },
+        });
+        creditTaken = given._sum.amount ?? 0;
+      }
+      await prisma.$transaction(async (tx) => {
+        if (creditTaken > 0) {
+          const bal = (await tx.clientProfile.findUnique({ where: { userId: inv.userId }, select: { creditBalance: true } }))?.creditBalance ?? 0;
+          if (bal < creditTaken) throw conflict(`The refund put ${(creditTaken / 100).toFixed(2)} ${inv.currency} in the customer's wallet but only ${(bal / 100).toFixed(2)} is left — untick "take the credit back", or adjust the wallet first`);
+          await adjustCredit(tx, { userId: inv.userId, amount: -creditTaken, description: `Refund of ${invoiceLabel(inv)} undone`, refType: "invoice", refId: inv.id });
+        }
+        await tx.invoice.update({
+          where: { id: inv.id },
+          data:
+            b.status === "PAID"
+              ? { status: "PAID", amountPaid: inv.total, paidAt: inv.paidAt ?? new Date() }
+              : { status: "UNPAID", amountPaid: 0, paidAt: null, dueDate: b.dueDate ?? new Date(Date.now() + 7 * 86400_000) },
+        });
+      });
+      if (b.status === "UNPAID" && b.sendEmail) await queueEmail("invoice.created", inv.user.email, invoiceEmailVars({ ...inv, dueDate: b.dueDate ?? new Date(Date.now() + 7 * 86400_000) }, inv.user.firstName), inv.userId);
+    } else if (b.status === "PAID") {
+      throw conflict("Record a payment to mark an invoice paid");
+    } else if (b.status === "CANCELLED") {
       if (!EDITABLE.includes(inv.status)) throw conflict("Only unpaid or draft invoices can be cancelled — refund a paid one");
       await cancelInvoice(inv.id, "Cancelled by staff");
     } else if (b.status === "DRAFT") {
@@ -146,8 +194,8 @@ adminInvoices.post(
         if (b.sendEmail) await queueEmail("invoice.created", inv.user.email, invoiceEmailVars(inv, inv.user.firstName), inv.userId);
       } else throw conflict("This invoice can't be reopened");
     }
-    await audit({ actorId: req.user!.id, userId: inv.userId, action: "invoice.status_changed", entity: "invoice", entityId: inv.id, details: { from: inv.status, to: b.status } });
-    res.json({ ok: true });
+    await audit({ actorId: req.user!.id, userId: inv.userId, action: "invoice.status_changed", entity: "invoice", entityId: inv.id, details: { from: inv.status, to: b.status, ...(b.reason ? { reason: b.reason } : {}), ...(creditTaken ? { creditTakenBack: creditTaken } : {}) } });
+    res.json({ ok: true, creditTaken });
   }),
 );
 

@@ -17,6 +17,7 @@ export default function AdminInvoice() {
   const [edit, setEdit] = useState(false);
   const [split, setSplit] = useState(false);
   const [mail, setMail] = useState(false);
+  const [undo, setUndo] = useState<"PAID" | "UNPAID" | null>(null);
   const router = useRouter();
   if (loading || !data) return <Loading />;
   const i = data.invoice;
@@ -30,6 +31,7 @@ export default function AdminInvoice() {
     ...(movable && i.items.length > 1 ? ([["Split into two invoices", "call_split", () => setSplit(true)]] as any) : []),
     ...(i.status === "UNPAID" || i.status === "PAID" ? ([["Email the customer…", "forward_to_inbox", () => setMail(true)]] as any) : []),
     ...(i.status === "UNPAID" && movable ? ([["Move back to draft", "edit_note", () => run(`/admin/invoices/${id}/status`, { status: "DRAFT" }, "Moved to draft — hidden from the customer")]] as any) : []),
+    ...(i.status === "REFUNDED" ? ([["Mark as paid (undo the refund)…", "task_alt", () => setUndo("PAID")], ["Mark as unpaid (customer pays again)…", "replay", () => setUndo("UNPAID")]] as any) : []),
     ...(i.status === "CANCELLED" && !i.number && !i.transactions.length ? ([["Reopen as unpaid", "replay", () => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: false }, "Reopened")]] as any) : []),
     ...(movable && !i.order ? ([["Delete invoice", "delete", () => confirm("Delete this invoice permanently? This can't be undone.") && run(`/admin/invoices/${id}`, undefined, "Invoice deleted", () => router.push("/admin/invoices"), "DELETE"), true]] as any) : []),
   ];
@@ -47,7 +49,11 @@ export default function AdminInvoice() {
         back="/admin/invoices" title={<span className="flex items-center gap-3">{data.label} <Badge status={i.status} /></span>} subtitle={<span><Link className="font-bold text-primary-dark" href={`/admin/clients/${i.user.id}`}>{i.user.firstName} {i.user.lastName}</Link> · proforma {i.proformaNumber} · place of supply {i.placeOfSupply ?? "—"}</span>}
         actions={<>
           <Button variant="outline" size="sm" icon="picture_as_pdf" onClick={() => window.open(`/api/admin/invoices/${id}/pdf`, "_blank")}>PDF</Button>
-          {editable && <Button size="sm" variant="secondary" icon="edit" onClick={() => setEdit(true)}>Edit invoice</Button>}
+          {(editable || i.status === "PAID" || i.status === "REFUNDED") && <Button size="sm" variant="secondary" icon="edit" onClick={() => setEdit(true)}>Edit invoice</Button>}
+          {i.status === "REFUNDED" && <>
+            <Button size="sm" variant="outline" icon="task_alt" onClick={() => setUndo("PAID")}>Mark paid</Button>
+            <Button size="sm" variant="outline" icon="replay" onClick={() => setUndo("UNPAID")}>Mark unpaid</Button>
+          </>}
           {i.status === "DRAFT" && <>
             <Button size="sm" icon="send" onClick={() => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: true }, "Invoice issued and emailed")}>Issue &amp; send</Button>
             <Button size="sm" variant="outline" onClick={() => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: false }, "Invoice issued")}>Issue without email</Button>
@@ -90,6 +96,7 @@ export default function AdminInvoice() {
       <PayModal open={pay} onClose={() => setPay(false)} id={id} due={i.total - i.amountPaid} currency={i.currency} onDone={reload} />
       <RefundModal open={refund} onClose={() => setRefund(false)} id={id} onDone={reload} />
       {edit && <EditModal inv={i} onClose={() => setEdit(false)} onDone={() => { setEdit(false); reload(); }} />}
+      {undo && <UndoRefundModal inv={i} to={undo} onClose={() => setUndo(null)} onDone={() => { setUndo(null); reload(); }} />}
       {split && <SplitModal inv={i} onClose={() => setSplit(false)} onDone={(nid) => { setSplit(false); toast.success("Split — opening the new invoice"); router.push(`/admin/invoices/${nid}`); }} />}
       <EmailModal open={mail} onClose={() => setMail(false)} id={id} status={i.status} />
       <CreditNoteModal open={cn} onClose={() => setCn(false)} id={id} max={i.total} currency={i.currency} onDone={reload} />
@@ -233,12 +240,15 @@ function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; on
   const [lines, setLines] = useState<Line[]>(() => linesFromApi(inv.items));
   const [v, setV] = useState({ issueDate: dateInput(inv.issueDate), dueDate: dateInput(inv.dueDate), notes: inv.notes ?? "", customerGstin: inv.customerGstin ?? "" });
   const [busy, setBusy] = useState(false);
+  const locked = inv.status === "PAID" || inv.status === "REFUNDED";
+  const [reason, setReason] = useState("");
+  const [sure, setSure] = useState(false);
   const linked = inv.items.filter((x: any) => x.relId && ["SERVICE", "ADDON", "DOMAIN"].includes(x.type)).map((x: any) => x.id);
   async function save() {
     setBusy(true);
     try {
-      const r = await api(`/admin/invoices/${inv.id}`, { method: "PUT", body: { items: linesToApi(lines), issueDate: v.issueDate || undefined, dueDate: v.dueDate || undefined, notes: v.notes, customerGstin: v.customerGstin } });
-      toast.success(r.paid ? "Saved — the new total is already covered, so it's marked paid" : "Invoice updated");
+      const r = await api(`/admin/invoices/${inv.id}`, { method: "PUT", body: { items: linesToApi(lines), issueDate: v.issueDate || undefined, dueDate: v.dueDate || undefined, notes: v.notes, customerGstin: v.customerGstin, ...(locked ? { override: true, reason: reason.trim() } : {}) } });
+      toast.success(r.reopened ? "Saved — the new total is more than what was paid, so the invoice is unpaid again for the balance" : r.paid ? "Saved — the new total is already covered, so it's marked paid" : "Invoice updated");
       onDone();
     } catch (e: any) {
       toast.error(e.message);
@@ -248,6 +258,12 @@ function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; on
   return (
     <Modal open onClose={onClose} title={`Edit invoice ${inv.number ?? inv.proformaNumber}`} wide>
       <div className="space-y-4">
+        {locked && (
+          <Alert tone="warn">
+            This is a <b>{inv.status === "PAID" ? "paid" : "refunded"} tax invoice</b>{inv.number ? <> ({inv.number})</> : null}. Changing it alters a document the customer may already have and that may be in your GST returns — a credit note is the usual way to correct it.
+            {inv.status === "PAID" && <> If the new total is higher than what was paid, the invoice becomes <b>unpaid</b> for the balance; it can't go below the paid amount.</>}
+          </Alert>
+        )}
         <LineEditor lines={lines} onChange={setLines} currency={inv.currency} />
         {lines.some((l) => linked.includes(l.id)) && <p className="text-xs text-mute"><Icon name="link" className="mr-1 align-[-3px] text-[15px]" />Lines for services, addons and domains stay linked — paying the invoice still renews them. Removing one means it won't be renewed by this invoice.</p>}
         <div className="grid gap-4 sm:grid-cols-3">
@@ -256,10 +272,16 @@ function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; on
           <Field label="Customer GSTIN" hint="Blank = unregistered"><Input value={v.customerGstin} onChange={(e) => setV({ ...v, customerGstin: e.target.value.toUpperCase() })} placeholder="09ABCDE1234F1Z5" /></Field>
         </div>
         <Field label="Notes on the invoice"><Textarea rows={3} value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} /></Field>
-        {inv.amountPaid > 0 && <Alert tone="info">{money(inv.amountPaid, inv.currency)} is already paid on this invoice — the new total can't go below that.</Alert>}
+        {inv.amountPaid > 0 && !locked && <Alert tone="info">{money(inv.amountPaid, inv.currency)} is already paid on this invoice — the new total can't go below that.</Alert>}
+        {locked && (
+          <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+            <Field label="Why are you changing it?" hint="Kept in the activity log with the before / after amounts"><Input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Wrong plan price entered at order time" /></Field>
+            <label className="flex items-start gap-2 text-sm font-semibold text-ink"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={sure} onChange={(e) => setSure(e.target.checked)} />I understand this changes an issued tax invoice</label>
+          </div>
+        )}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button icon="save" loading={busy} onClick={save} disabled={!lines.some((l) => l.description.trim())}>Save changes</Button>
+          <Button icon="save" loading={busy} onClick={save} disabled={!lines.some((l) => l.description.trim()) || (locked && (!sure || reason.trim().length < 3))}>Save changes</Button>
         </div>
         <p className="text-xs text-mute">GST, totals and place of supply are recalculated when you save.</p>
       </div>
@@ -311,6 +333,51 @@ function EmailModal({ open, onClose, id, status }: { open: boolean; onClose: () 
         ))}
       </div>
       <div className="mt-4 flex justify-end"><Button icon="send" onClick={() => api(`/admin/invoices/${id}/email`, { body: { template: t } }).then(() => { toast.success("Email queued"); onClose(); }).catch((e) => toast.error(e.message))}>Send email</Button></div>
+    </Modal>
+  );
+}
+
+/** A refunded invoice made paid again (refund undone) or unpaid (the customer has to pay again). */
+function UndoRefundModal({ inv, to, onClose, onDone }: { inv: any; to: "PAID" | "UNPAID"; onClose: () => void; onDone: () => void }) {
+  const [reason, setReason] = useState("");
+  const [takeBack, setTakeBack] = useState(true);
+  const [due, setDue] = useState(dateInput(new Date(Date.now() + 7 * 86400_000).toISOString()));
+  const [send, setSend] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const toWallet = inv.transactions.some((t: any) => t.type === "REFUND" && t.gateway === "credit");
+  async function go() {
+    setBusy(true);
+    try {
+      const r = await api(`/admin/invoices/${inv.id}/status`, { body: { status: to, reason: reason.trim(), takeBackCredit: to === "PAID" && takeBack, ...(to === "UNPAID" ? { dueDate: due || undefined, sendEmail: send } : {}) } });
+      toast.success(to === "PAID" ? `Marked paid${r.creditTaken ? ` — ${money(r.creditTaken, inv.currency)} taken back from the wallet` : ""}` : "Marked unpaid — the customer can pay it again");
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <Modal open onClose={onClose} title={to === "PAID" ? "Mark as paid — undo the refund" : "Mark as unpaid — customer pays again"}>
+      <div className="space-y-4">
+        <p className="text-sm text-mute">
+          {to === "PAID"
+            ? <>Use this when the refund was a mistake or the money came back. The invoice shows as <b>paid</b> in full again.</>
+            : <>The invoice goes back to <b>unpaid</b> for the full {money(inv.total, inv.currency)}, so the customer can pay it again. Unpaid-invoice reminders and suspension apply as usual.</>}{" "}
+          The refund and any credit note stay on record for your accounts.
+        </p>
+        <Field label="Reason" hint="Kept in the activity log"><Input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder={to === "PAID" ? "e.g. Refunded by mistake" : "e.g. Customer wants the service back"} /></Field>
+        {to === "PAID" && toWallet && <Toggle checked={takeBack} onChange={setTakeBack} label="Take the refunded amount back out of the customer's wallet" />}
+        {to === "UNPAID" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="New due date"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+            <div className="flex items-end pb-2"><Toggle checked={send} onChange={setSend} label="Email the invoice to the customer" /></div>
+          </div>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button icon={to === "PAID" ? "task_alt" : "replay"} loading={busy} disabled={reason.trim().length < 3} onClick={go}>{to === "PAID" ? "Mark as paid" : "Mark as unpaid"}</Button>
+        </div>
+      </div>
     </Modal>
   );
 }
