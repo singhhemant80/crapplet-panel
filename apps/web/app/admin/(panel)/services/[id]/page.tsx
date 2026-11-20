@@ -5,6 +5,7 @@ import { ReinstallModal } from "@/components/reinstall-modal";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
+import { HypervisorSelect } from "@/components/admin/hypervisor-select";
 import { ChangePlanButton } from "@/components/admin/change-plan";
 import { VirtualizorCheck } from "@/components/admin/virtualizor-check";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
@@ -28,7 +29,7 @@ export default function AdminService() {
   const [terminating, setTerminating] = useState(false);
   useEffect(() => {
     if (["ACTIVE", "SUSPENDED"].includes(data?.service?.status) && data.service.remoteId) api(`/admin/services/${id}/live`).then((r) => setLive(r.live)).catch(() => {});
-    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", remoteId: data.service.remoteId ?? "", terminationDate: data.service.terminationDate?.slice(0, 10) ?? "", terminationReason: data.service.terminationReason ?? "" });
+    if (data?.service) setEdit({ nextDueDate: data.service.nextDueDate?.slice(0, 10) ?? "", recurringAmount: data.service.recurringAmount / 100, billingCycle: data.service.billingCycle, hostname: data.service.hostname ?? "", overrideAutoSuspend: data.service.overrideAutoSuspend, osTemplateId: data.service.osTemplateId ?? "", notes: data.service.notes ?? "", node: data.service.node ?? "", serverId: data.service.serverId ?? data.service.server?.id ?? "", remoteId: data.service.remoteId ?? "", terminationDate: data.service.terminationDate?.slice(0, 10) ?? "", terminationReason: data.service.terminationReason ?? "" });
   }, [data, id]);
   if (loading || !data || !edit) return <Loading />;
   const s = data.service;
@@ -314,8 +315,11 @@ export default function AdminService() {
                   </Select>
                 </Field>
               )}
+              {!isColo && (P.provisioner === "VIRTUALIZOR" || P.provisioner === "PROXMOX") && (
+                <HypervisorSelect type={P.provisioner} planServerIds={(P.servers ?? []).map((x: any) => x.serverId ?? x.server?.id)} value={edit.serverId} onChange={(v) => setEdit({ ...edit, serverId: v, node: "" })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? "Built — terminate and recreate to move it" : undefined} />
+              )}
               {isColo ? null : P.provisioner === "VIRTUALIZOR" ? (
-                <NodeSelect serverIds={s.server ? [s.server.id] : []} value={edit.node} onChange={(v) => setEdit({ ...edit, node: v })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId ? "Change only if it was migrated in Virtualizor" : undefined} />
+                <NodeSelect serverIds={edit.serverId ? [edit.serverId] : s.server ? [s.server.id] : []} value={edit.node} onChange={(v) => setEdit({ ...edit, node: v })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId ? "Change only if it was migrated in Virtualizor" : undefined} />
               ) : (
                 <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
               )}
@@ -327,7 +331,7 @@ export default function AdminService() {
               </>}
               <Field label="Staff notes" className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Textarea rows={3} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></Field>
             </div>
-            <Button className="mt-4 w-full" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, osTemplateId: s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? undefined : edit.osTemplateId || null, hostname: edit.hostname || undefined, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null, ...(["TERMINATED", "CANCELLED"].includes(s.status) ? { terminationDate: edit.terminationDate || null, terminationReason: edit.terminationReason.trim() || null } : { terminationDate: undefined, terminationReason: undefined }) } }).then((r) => { const iv = r?.invoices; toast.success(iv && iv.cancelled.length + iv.trimmed.length ? `Saved — ${iv.cancelled.length} unpaid invoice(s) cancelled${iv.trimmed.length ? `, ${iv.trimmed.length} adjusted` : ""}${iv.skipped.length ? `, ${iv.skipped.length} part-paid left for review` : ""}` : "Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save changes</Button>
+            <Button className="mt-4 w-full" icon="save" onClick={() => api(`/admin/services/${id}`, { method: "PUT", body: { ...edit, serverId: (edit.serverId || null) === (s.serverId ?? s.server?.id ?? null) || !(P.provisioner === "VIRTUALIZOR" || P.provisioner === "PROXMOX") ? undefined : edit.serverId || null, osTemplateId: s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? undefined : edit.osTemplateId || null, hostname: edit.hostname || undefined, nextDueDate: edit.nextDueDate || null, recurringAmount: Math.round(Number(edit.recurringAmount) * 100), node: edit.node || null, remoteId: edit.remoteId || null, ...(["TERMINATED", "CANCELLED"].includes(s.status) ? { terminationDate: edit.terminationDate || null, terminationReason: edit.terminationReason.trim() || null } : { terminationDate: undefined, terminationReason: undefined }) } }).then((r) => { const iv = r?.invoices; toast.success(iv && iv.cancelled.length + iv.trimmed.length ? `Saved — ${iv.cancelled.length} unpaid invoice(s) cancelled${iv.trimmed.length ? `, ${iv.trimmed.length} adjusted` : ""}${iv.skipped.length ? `, ${iv.skipped.length} part-paid left for review` : ""}` : "Saved"); reload(); }).catch((e) => toast.error(e.message))}>Save changes</Button>
           </Card>
 
           <Card title="Support tickets" action={<Link href={`/admin/tickets?userId=${s.user.id}`} className="text-[13px] font-bold text-primary-dark hover:underline">All tickets</Link>} pad={false}>

@@ -613,7 +613,7 @@ adminCore.get(
   ah(async (req, res) => {
     const s = await prisma.service.findUnique({
       where: { id: req.params.id },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true, status: true, profile: { select: { companyName: true, gstin: true, city: true, state: true, country: true, creditBalance: true, currency: true } } } }, product: { include: { osTemplates: { include: { osTemplate: true } }, group: { select: { name: true } } } }, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true, tickets: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, subject: true, status: true, createdAt: true } } },
+      include: { user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, createdAt: true, status: true, profile: { select: { companyName: true, gstin: true, city: true, state: true, country: true, creditBalance: true, currency: true } } } }, product: { include: { osTemplates: { include: { osTemplate: true } }, group: { select: { name: true } }, servers: { select: { serverId: true } } } }, server: true, osTemplate: true, ips: { include: { subnet: true } }, addons: { include: { addon: true } }, logs: { orderBy: { createdAt: "desc" }, take: 50 }, order: true, reseller: true, tickets: { orderBy: { createdAt: "desc" }, take: 10, select: { id: true, number: true, subject: true, status: true, createdAt: true } } },
     });
     if (!s) throw notFound();
     const { passwordEnc, server, ...rest } = s;
@@ -805,6 +805,17 @@ adminCore.post(
   }),
 );
 
+/** Servers a service can be placed on (for the "Hypervisor" picker); ?type=VIRTUALIZOR|PROXMOX. */
+adminCore.get(
+  "/server-choices",
+  requireStaff("services.view"),
+  ah(async (req, res) => {
+    const type = typeof req.query.type === "string" && ["VIRTUALIZOR", "PROXMOX"].includes(req.query.type) ? (req.query.type as "VIRTUALIZOR" | "PROXMOX") : undefined;
+    const servers = await prisma.server.findMany({ where: { ...(type ? { type } : {}) }, orderBy: { name: "asc" }, select: { id: true, name: true, type: true, enabled: true, location: { select: { name: true } } } });
+    res.json({ servers: servers.map((s) => ({ id: s.id, name: s.name, type: s.type, enabled: s.enabled, location: s.location?.name ?? null })) });
+  }),
+);
+
 adminCore.put(
   "/services/:id",
   requireStaff("services.manage"),
@@ -849,6 +860,21 @@ adminCore.put(
     }
     if (data.terminationReason === "") data.terminationReason = null;
     if (b.osTemplateId !== undefined) await checkOsChange(req.params.id, b.osTemplateId);
+    // moving to another hypervisor: only before the VPS is built, and only to a server of the plan's kind
+    if (b.serverId !== undefined) {
+      const cur = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, select: { serverId: true, remoteId: true, status: true, product: { select: { provisioner: true } } } });
+      if (b.serverId !== cur.serverId) {
+        if (cur.remoteId && ["ACTIVE", "SUSPENDED"].includes(cur.status)) throw conflict("This VPS is already built on its server — to move it, terminate it and create it again on the other server");
+        if (b.serverId) {
+          const sv = await prisma.server.findUnique({ where: { id: b.serverId }, select: { type: true, name: true } });
+          if (!sv) throw badRequest("Server not found");
+          if (["VIRTUALIZOR", "PROXMOX"].includes(cur.product.provisioner) && sv.type !== cur.product.provisioner) throw badRequest(`${sv.name} isn't a ${cur.product.provisioner === "VIRTUALIZOR" ? "Virtualizor" : "Proxmox"} server`);
+        }
+        // node ids belong to the old master; a failed attempt's VPS id too
+        if (b.node === undefined) data.node = null;
+        if (b.remoteId === undefined && !["ACTIVE", "SUSPENDED"].includes(cur.status)) data.remoteId = null;
+      }
+    }
     const before = b.status ? await prisma.service.findUnique({ where: { id: req.params.id }, select: { status: true } }) : null;
     await prisma.service.update({ where: { id: req.params.id }, data: { ...data, ...((b.status === "TERMINATED" || b.status === "CANCELLED") && before?.status !== b.status && b.terminationDate === undefined ? { terminationDate: new Date() } : {}), ...(data.nextDueDate !== undefined ? { nextInvoiceDate: data.nextDueDate } : {}), ...(password ? { passwordEnc: encrypt(password) } : {}) } });
     await audit({ actorId: req.user!.id, action: "service.updated", entity: "service", entityId: req.params.id, details: Object.keys(b) });
