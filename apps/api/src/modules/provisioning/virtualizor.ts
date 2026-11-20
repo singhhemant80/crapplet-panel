@@ -300,8 +300,9 @@ export class VirtualizorClient {
   async findVps(vpsid: string | number): Promise<Record<string, unknown> | null> {
     return pickVps(await this.getVps(vpsid), vpsid);
   }
+  /** Every plan (Virtualizor sends one page of 50 unless asked for more). */
   plans() {
-    return this.call<{ plans: Record<string, Record<string, unknown>> }>("plans");
+    return this.call<{ plans: Record<string, Record<string, unknown>> }>("plans", { page: 1, reslen: 1000 });
   }
   /** All OS templates on the master (`ostemplates` keyed by osid; older versions also send `oslist`). */
   osTemplates() {

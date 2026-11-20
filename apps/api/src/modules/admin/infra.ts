@@ -494,7 +494,7 @@ adminInfra.get(
       servers.map(async (s) => {
         try {
           const r = await virtualizorFor(s).plans();
-          const plans = Object.values(r.plans ?? {}).map((p: any) => ({
+          const plans = Object.values(r.plans ?? {}).filter((p: any) => p && p.plid !== undefined).map((p: any) => ({
             plid: Number(p.plid),
             name: String(p.plan_name ?? `Plan ${p.plid}`),
             virt: String(p.virt ?? "kvm"),
@@ -503,7 +503,7 @@ adminInfra.get(
             cores: num(p.cores),
             bandwidthGb: num(p.bandwidth),
             ips: num(p.ips),
-          }));
+          })).sort((a, b) => a.name.localeCompare(b.name));
           return { serverId: s.id, serverName: s.name, plans, error: null as string | null };
         } catch (e: any) {
           return { serverId: s.id, serverName: s.name, plans: [], error: String(e?.message ?? e) };

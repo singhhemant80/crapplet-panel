@@ -390,48 +390,40 @@ function VirtualizorPlanPicker({ serverIds, planId, virt, onPick }: { serverIds:
   const all = groups.flatMap((g) => g.plans);
   const errors = groups.filter((g) => g.error);
   const current = all.find((x) => String(x.plid) === String(planId));
-  const [manual, setManual] = useState(false);
-  const showManual = manual || (!loading && !all.length) || (planId !== "" && planId !== null && !current && !loading);
+  const missing = !loading && planId !== "" && planId !== null && planId !== undefined && !current;
   return (
     <>
       <Field
-        label={<span className="flex items-center justify-between">Virtualizor plan <button type="button" onClick={reload} className="inline-flex items-center gap-1 text-xs font-bold text-primary-dark hover:underline"><Icon name="refresh" className="text-[15px]" />Refresh</button></span>}
+        label={<span className="flex items-center justify-between">Virtualizor plan <button type="button" onClick={reload} className="inline-flex items-center gap-1 text-xs font-bold text-primary-dark hover:underline"><Icon name="refresh" className={cx("text-[15px]", loading && "animate-spin")} />Refresh</button></span>}
         hint={current ? `${current.cores ?? "?"} vCPU · ${current.ramMb ?? "?"} MB RAM · ${current.diskGb ?? "?"} GB disk · ${current.bandwidthGb ? `${current.bandwidthGb} GB` : "unmetered"} bandwidth` : undefined}
         className="sm:col-span-2"
       >
-        {showManual ? (
-          <div className="flex gap-2">
-            <Input type="number" placeholder="Plan id" value={planId ?? ""} onChange={(e) => onPick(e.target.value === "" ? "" : Number(e.target.value), virt)} />
-            {all.length > 0 && <Button type="button" variant="outline" onClick={() => setManual(false)}>Choose from list</Button>}
-          </div>
-        ) : (
-          <Select
-            value={current ? String(current.plid) : ""}
-            disabled={loading}
-            onChange={(e) => {
-              if (e.target.value === "__manual") return setManual(true);
-              const pl = all.find((x) => String(x.plid) === e.target.value);
-              if (pl) onPick(pl.plid, pl.virt, pl);
-              else onPick("", virt);
-            }}
-          >
-            <option value="">{loading ? "Loading plans from Virtualizor…" : "Select a plan…"}</option>
-            {groups.filter((g) => g.plans.length).map((g) => (
-              <optgroup key={g.serverId} label={g.serverName}>
-                {g.plans.map((pl) => (
-                  <option key={`${g.serverId}-${pl.plid}`} value={pl.plid}>
-                    {pl.name} — {pl.virt.toUpperCase()} · {pl.cores ?? "?"} vCPU · {pl.ramMb ? (pl.ramMb >= 1024 ? `${+(pl.ramMb / 1024).toFixed(1)} GB` : `${pl.ramMb} MB`) : "?"} RAM · {pl.diskGb ?? "?"} GB (id {pl.plid})
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-            <option value="__manual">Enter a plan id manually…</option>
-          </Select>
-        )}
+        <Select
+          value={current ? String(current.plid) : missing ? "__missing" : ""}
+          disabled={loading || !all.length}
+          onChange={(e) => {
+            const pl = all.find((x) => String(x.plid) === e.target.value);
+            if (pl) onPick(pl.plid, pl.virt, pl);
+            else if (e.target.value === "") onPick("", virt);
+          }}
+        >
+          <option value="">{loading ? "Loading plans from Virtualizor…" : all.length ? "Select a plan…" : "No plans found in Virtualizor"}</option>
+          {missing && <option value="__missing" disabled>Plan id {String(planId)} — not found in Virtualizor, choose another</option>}
+          {groups.filter((g) => g.plans.length).map((g) => (
+            <optgroup key={g.serverId} label={g.serverName}>
+              {g.plans.map((pl) => (
+                <option key={`${g.serverId}-${pl.plid}`} value={pl.plid}>
+                  {pl.name} — {pl.virt.toUpperCase()} · {pl.cores ?? "?"} vCPU · {pl.ramMb ? (pl.ramMb >= 1024 ? `${+(pl.ramMb / 1024).toFixed(1)} GB` : `${pl.ramMb} MB`) : "?"} RAM · {pl.diskGb ?? "?"} GB (id {pl.plid})
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </Select>
       </Field>
       {error && <Alert tone="error" className="sm:col-span-2">{error}</Alert>}
       {!loading && !error && !groups.length && <Alert tone="warn" className="sm:col-span-2">Add a Virtualizor server under Infrastructure → Servers to load its plans here.</Alert>}
       {errors.map((g) => <Alert key={g.serverId} tone="error" className="sm:col-span-2">Couldn't load plans from {g.serverName}: {g.error}</Alert>)}
+      {missing && all.length > 0 && <Alert tone="warn" className="sm:col-span-2">This product uses plan id {String(planId)}, which isn't in Virtualizor's plan list{serverIds.length ? " for the servers chosen above" : ""}. Pick the right plan from the list — new VPS orders need a plan that exists.</Alert>}
       <Field label="Virtualizor virt type">
         <Select value={virt} onChange={(e) => onPick(planId === "" ? "" : Number(planId), e.target.value)}>
           {VIRT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
