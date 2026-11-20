@@ -1,3 +1,4 @@
+import { linePeriods } from "./periods";
 import path from "path";
 import fs from "fs";
 import PDFDocument from "pdfkit";
@@ -40,6 +41,7 @@ function amountInWords(rupees: number): string {
  */
 export async function renderInvoicePdf(invoiceId: string): Promise<Buffer> {
   const inv = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] } } });
+  const periodItems = await linePeriods(inv.items, inv);
   const s = await getSettings();
   const c = s.company as typeof s.company & { billingEmail?: string };
   const bill = (inv.billingSnapshot ?? {}) as Record<string, string | null>;
@@ -207,9 +209,9 @@ export async function renderInvoicePdf(invoiceId: string): Promise<Buffer> {
     x += col.w;
   }
   y += 26;
-  inv.items.forEach((it, idx) => {
+  periodItems.forEach((it, idx) => {
     const [first, ...rest] = it.description.split("\n");
-    const sub = [rest.join(" · "), it.periodStart && it.periodEnd ? `${date(it.periodStart)} – ${date(it.periodEnd)}` : ""].filter(Boolean).join("\n");
+    const sub = [rest.join(" · "), it.period ? `Service period: ${date(it.period.from)} – ${date(it.period.to)}` : ""].filter(Boolean).join("\n");
     doc.font("S").fontSize(9.2);
     const h1 = doc.heightOfString(first, { width: cols[1].w - 20 });
     doc.font("R").fontSize(8);

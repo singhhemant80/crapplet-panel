@@ -142,6 +142,7 @@ export function InvoiceSheet({ data, admin, footer }: { data: any; admin?: boole
                   <td className="px-4 py-3.5">
                     <div className={cx("font-semibold", it.amount < 0 ? "text-emerald-700" : "text-ink")}>{it.description.split("\n")[0]}</div>
                     {it.description.includes("\n") && <div className="text-xs text-mute">{it.description.split("\n").slice(1).join(" · ")}</div>}
+                    {it.period && <div className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-primary-dark"><Icon name="date_range" className="text-[14px]" />Service period: {date(it.period.from)} – {date(it.period.to)}</div>}
                     {it.periodStart && it.periodEnd && (
                       <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-mute">
                         <Icon name="date_range" className="text-[14px]" /> {date(it.periodStart)} – {date(it.periodEnd)}

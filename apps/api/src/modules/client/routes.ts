@@ -422,7 +422,8 @@ clientRouter.get(
     });
     if (!inv) throw notFound("Invoice not found");
     const s = await getSettings();
-    res.json({ invoice: inv, label: invoiceLabel(inv), company: s.company, bankDetails: s.invoice.bankDetails, footerNote: s.invoice.footerNote, lutArn: s.currency.lutArn });
+    const { linePeriods } = await import("../billing/periods");
+    res.json({ invoice: { ...inv, items: await linePeriods(inv.items, inv) }, label: invoiceLabel(inv), company: s.company, bankDetails: s.invoice.bankDetails, footerNote: s.invoice.footerNote, lutArn: s.currency.lutArn });
   }),
 );
 

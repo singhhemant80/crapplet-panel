@@ -1052,7 +1052,8 @@ adminCore.get(
     const inv = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: { items: true, transactions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }, creditNotes: { orderBy: { createdAt: "desc" } }, paymentIntents: { orderBy: { createdAt: "desc" } }, user: { select: { id: true, email: true, firstName: true, lastName: true } }, order: true } });
     if (!inv) throw notFound();
     const st = await getSettings();
-    res.json({ invoice: inv, label: invoiceLabel(inv), company: st.company, bankDetails: st.invoice.bankDetails, footerNote: st.invoice.footerNote, lutArn: st.currency.lutArn });
+    const { linePeriods } = await import("../billing/periods");
+    res.json({ invoice: { ...inv, items: await linePeriods(inv.items, inv) }, label: invoiceLabel(inv), company: st.company, bankDetails: st.invoice.bankDetails, footerNote: st.invoice.footerNote, lutArn: st.currency.lutArn });
   }),
 );
 
