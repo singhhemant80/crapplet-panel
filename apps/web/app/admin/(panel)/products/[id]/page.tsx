@@ -552,7 +552,11 @@ function OsPicker({ all, provisioner, serverIds, virt, selected, onChange, onSyn
       )}
       {mismatched.length > 0 && (
         <Alert tone="warn" className="mb-2">
-          {mismatched.map((o: any) => o.name).join(", ")} {mismatched.length === 1 ? "doesn't" : "don't"} belong to this product's {virtualizor ? "Virtualizor server / virt type" : "module"} and may fail to install.
+          {virtualizor ? (
+            <>{mismatched.map((o: any) => o.name).join(", ")} {mismatched.length === 1 ? "was" : "were"} synced from another Virtualizor server{virt ? " or virt type" : ""}. Customers still see {mismatched.length === 1 ? "it" : "them"}, and the VPS gets the OS with the same name on its own server — click <b>Sync from Virtualizor</b> so this product's server has {mismatched.length === 1 ? "it" : "them"} too, otherwise that order stops with an error.</>
+          ) : (
+            <>{mismatched.map((o: any) => o.name).join(", ")} {mismatched.length === 1 ? "doesn't" : "don't"} belong to this product's module and may fail to install.</>
+          )}
         </Alert>
       )}
       {groups.map(([label, list]) =>

@@ -127,8 +127,20 @@ function Configure() {
     }
   }, [countdown, reservation]);
 
-  // templates synced from a specific Virtualizor master only install there
-  const osOptions = (p?.osTemplates ?? []).filter((o: any) => !o.serverId || !serverId || o.serverId === serverId);
+  // a template synced from another Virtualizor master is installed as the same-named OS on the build server
+  // (the provisioner matches it by name), so offer one entry per OS — the build server's own copy when there is one
+  const osOptions = (() => {
+    const list: any[] = p?.osTemplates ?? [];
+    const key = (o: any) => `${o.family}|${String(o.name).toLowerCase().replace(/\s+/g, " ").trim()}`;
+    const byName = new Map<string, any>();
+    for (const o of list) {
+      const k = key(o);
+      const have = byName.get(k);
+      const here = !o.serverId || !serverId || o.serverId === serverId;
+      if (!have || (here && !(!have.serverId || !serverId || have.serverId === serverId))) byName.set(k, o);
+    }
+    return list.filter((o) => byName.get(key(o)) === o);
+  })();
   useEffect(() => {
     if (osOptions.length && !osOptions.some((o: any) => o.id === os)) setOs(defaultOs(osOptions));
   }, [serverId, p]); // eslint-disable-line react-hooks/exhaustive-deps
