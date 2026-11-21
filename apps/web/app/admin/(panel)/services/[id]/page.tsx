@@ -146,7 +146,7 @@ export default function AdminService() {
         </section>
       )}
 
-      {isVps && <ActionTracker url={`/admin/services/${id}/activity`} onFinished={reload} className="mb-6" />}
+      {(isVps || isHosting) && <ActionTracker url={`/admin/services/${id}/activity`} onFinished={reload} className="mb-6" />}
 
       {/* ── live usage ── */}
       {isVps && s.remoteId && !ended && (
@@ -227,7 +227,7 @@ export default function AdminService() {
               )}
               {s.server?.type === "VIRTUALIZOR" && s.remoteId && (
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
-                  <Button size="sm" variant="outline" icon="sync" onClick={async () => { try { const r = await api(`/admin/services/${id}/virtualizor-sync`, { body: {} }); toast.success(`Synced: ${r.ips.join(", ") || "no IPs"} · ${r.state}`); reload(); refreshLive(); } catch (e: any) { toast.error(e.message); } }}>Sync from Virtualizor</Button>
+                  <Button size="sm" variant="outline" icon="sync" onClick={async () => { pingActivity(); try { const r = await api(`/admin/services/${id}/virtualizor-sync`, { body: {} }); pingActivity(); toast.success(`Synced: ${r.ips.join(", ") || "no IPs"} · ${r.state}`); reload(); refreshLive(); } catch (e: any) { toast.error(e.message); } }}>Sync from Virtualizor</Button>
                   <Button size="sm" variant="outline" icon="swap_horiz" onClick={async () => { if (!confirm("Replace this VPS's IPs with free IPs from Virtualizor's pool for its node? The VPS will get new addresses — tell the customer.")) return; try { await api(`/admin/services/${id}/replace-ips`, { body: {} }); toast.success("Changing IPs — progress is shown on this page"); pingActivity(); } catch (e: any) { toast.error(e.message); } }}>Use Virtualizor's free IPs</Button>
                   <VirtualizorCheck serviceId={id} onLinked={() => { reload(); refreshLive(); }} />
                 </div>
@@ -674,7 +674,7 @@ function HostingActions({ s, onDone }: { s: any; onDone: () => void }) {
       <Button variant="outline" size="sm" icon="mail" onClick={() => openLogin(`/admin/services/${s.id}/cpanel-login`, "webmaild")}>Webmail</Button>
       <Button variant="outline" size="sm" icon="key" onClick={() => setPw(generatePassword())}>Change password</Button>
       {pkgs ? (
-        <Select className="h-9 w-56" defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v && confirm(`Change the WHM package to ${v}?`)) api(`/admin/services/${s.id}/action`, { body: { action: "change_package", package: v } }).then(() => { toast.success("Package change queued"); setTimeout(onDone, 2500); }).catch((er) => toast.error(er.message)); }}>
+        <Select className="h-9 w-56" defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v && confirm(`Change the WHM package to ${v}?`)) api(`/admin/services/${s.id}/action`, { body: { action: "change_package", package: v } }).then((r: any) => { pingActivity(); return r; }).then(() => { toast.success("Package change queued"); setTimeout(onDone, 2500); }).catch((er) => toast.error(er.message)); }}>
           <option value="">Change package to…</option>
           {pkgs.map((x) => <option key={x}>{x}</option>)}
         </Select>
@@ -682,7 +682,7 @@ function HostingActions({ s, onDone }: { s: any; onDone: () => void }) {
       <Modal open={pw !== null} onClose={() => setPw(null)} title="Change cPanel password">
         <p className="mb-3 text-sm text-mute">Changes the password for <b className="font-mono">{s.username}</b> on the server right away. The customer isn't emailed — share it with them if needed.</p>
         <PasswordField value={pw ?? ""} onChange={setPw} optionalHint="" />
-        <Button className="mt-4" icon="save" disabled={!pw || !!passwordProblem(pw)} onClick={() => api(`/admin/services/${s.id}/hosting-password`, { body: { password: pw } }).then(() => { toast.success("Password changed"); setPw(null); onDone(); }).catch((e) => toast.error(e.message))}>Set password</Button>
+        <Button className="mt-4" icon="save" disabled={!pw || !!passwordProblem(pw)} onClick={() => api(`/admin/services/${s.id}/hosting-password`, { body: { password: pw } }).then(() => { pingActivity(); toast.success("Password changed"); setPw(null); onDone(); }).catch((e) => toast.error(e.message))}>Set password</Button>
       </Modal>
     </>
   );

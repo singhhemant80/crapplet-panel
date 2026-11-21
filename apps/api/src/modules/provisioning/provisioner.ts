@@ -645,7 +645,7 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
   const name = svc.user.firstName;
   const vars = { name, productName: svc.product.name, hostname: svc.hostname ?? "", serviceId: svc.id };
   // marks when the worker picked the action up — the service page shows it as "running"
-  if (action !== "create" && action !== "sync") await log(svc.id, `${action}_started`, true, "Started");
+  if (action !== "create" && !(action === "sync" && params.quiet)) await log(svc.id, `${action}_started`, true, "Started");
 
   try {
     switch (action) {

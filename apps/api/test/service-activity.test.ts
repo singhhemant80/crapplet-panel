@@ -54,6 +54,20 @@ test("queued action shows as queued; finished ones as done / failed; customers d
   await provisioningQueue().resume();
 });
 
+test("inline actions show as running until their result; automatic syncs stay hidden", async () => {
+  await prisma.provisioningLog.create({ data: { serviceId: ids.svc, action: "sync", success: true, message: "Synced (automatic)" } });
+  let a = await serviceActivity(ids.svc, "admin");
+  assert.ok(!a.items.some((i) => i.action === "sync"), "a sync nobody started from the page isn't shown");
+  await prisma.provisioningLog.create({ data: { serviceId: ids.svc, action: "sync_started", success: true, message: "Started", createdAt: new Date(Date.now() + 1000) } });
+  a = await serviceActivity(ids.svc, "admin");
+  assert.equal(a.items.find((i) => i.action === "sync")?.state, "running");
+  assert.equal(a.active, true);
+  await prisma.provisioningLog.create({ data: { serviceId: ids.svc, action: "sync", success: true, message: "Synced from Virtualizor: 1.2.3.4", createdAt: new Date(Date.now() + 2000) } });
+  a = await serviceActivity(ids.svc, "admin");
+  assert.equal(a.items.find((i) => i.action === "sync")?.state, "done");
+  assert.ok(!(await serviceActivity(ids.svc, "client")).items.some((i) => i.action === "sync"), "staff-only");
+});
+
 test("change IP: never picks locked IPs or IPs of a locked pool", async () => {
   const c = new VirtualizorClient({ host: "v.example.test", port: 4085, apiKey: "k", apiPass: "p", verifyTls: false });
   let posted: any = null;

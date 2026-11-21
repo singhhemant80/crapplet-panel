@@ -35,6 +35,8 @@ const LABELS: Record<string, { doing: string; done: string }> = {
   terminate: { doing: "Terminating", done: "Terminated" },
   change_package: { doing: "Changing the plan", done: "Plan changed" },
   change_plan: { doing: "Changing the plan", done: "Plan changed" },
+  sync: { doing: "Syncing from Virtualizor", done: "Synced from Virtualizor" },
+  reactivate: { doing: "Reactivating", done: "Reactivated" },
 };
 /** what customers are shown (staff see everything) */
 const CLIENT_ACTIONS = new Set(["reinstall", "change_ip", "reset_password", "start", "stop", "shutdown", "reboot", "hard_reset", "change_package", "change_plan"]);
@@ -65,7 +67,7 @@ const PERCENT: Record<ActivityState, number> = { queued: 10, running: 45, retryi
 
 export async function serviceActivity(serviceId: string, audience: "admin" | "client"): Promise<{ items: ActivityItem[]; active: boolean }> {
   const admin = audience === "admin";
-  const show = (a: string) => a !== "create" && a !== "sync" && !!LABELS[a] && (admin || CLIENT_ACTIONS.has(a));
+  const show = (a: string) => a !== "create" && !!LABELS[a] && (admin || CLIENT_ACTIONS.has(a));
   const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { product: { select: { provisioner: true } } } });
   const logs = await prisma.provisioningLog.findMany({ where: { serviceId, createdAt: { gt: new Date(Date.now() - INSTALL_WINDOW) } }, orderBy: { createdAt: "desc" }, take: 100 });
   const items: ActivityItem[] = [];
@@ -107,13 +109,27 @@ export async function serviceActivity(serviceId: string, audience: "admin" | "cl
     });
   }
 
-  // just finished (latest result per action, unless the same action is queued again)
+  // done right inside the request (Sync from Virtualizor, cPanel password …): started, no result yet
   const seen = new Set(jobs.map((j) => j.action));
   for (const l of logs) {
+    if (!l.action.endsWith("_started")) continue;
+    const action = l.action.slice(0, -"_started".length);
+    if (seen.has(action) || !show(action) || Date.now() - l.createdAt.getTime() > 5 * 60_000) continue;
+    const result = logs.find((x) => x.action === action && x.createdAt >= l.createdAt);
+    if (result) continue;
+    seen.add(action);
+    items.push({ id: `run-${l.id}`, action, label: LABELS[action].doing, state: "running", percent: PERCENT.running, steps: stepsFor(action, "running"), message: "Working on it — this page updates by itself", queuedAt: null, startedAt: l.createdAt, finishedAt: null });
+  }
+  seen.clear();
+  for (const i of items) seen.add(i.action);
+
+  // just finished (latest result per action, unless the same action is queued again)
+  for (const l of logs) {
     if (l.action.endsWith("_started") || l.action.endsWith("_requested") || seen.has(l.action) || !show(l.action)) continue;
+    const started = logs.find((x) => x.action === `${l.action}_started` && x.createdAt <= l.createdAt);
+    if (l.action === "sync" && !started) continue;
     seen.add(l.action);
     if (Date.now() - l.createdAt.getTime() > (l.action === "reinstall" ? INSTALL_WINDOW : FINISHED_FOR)) continue;
-    const started = logs.find((x) => x.action === `${l.action}_started` && x.createdAt <= l.createdAt);
     let state: ActivityState = l.success ? "done" : "failed";
     // Virtualizor accepts a reinstall straight away and rebuilds the disk afterwards — wait until the VPS is back up
     if (state === "done" && l.action === "reinstall" && svc?.product.provisioner === "VIRTUALIZOR") {

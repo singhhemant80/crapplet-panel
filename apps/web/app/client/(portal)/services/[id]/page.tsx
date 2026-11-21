@@ -120,7 +120,7 @@ export default function ServicePage() {
 
       {isHosting && svc.status === "ACTIVE" && <HostingPanels id={id} svc={svc} live={live} cred={cred} showPassword={showPassword} onPassword={() => setModal("password")} />}
 
-      {isVps && <ActionTracker url={`/client/services/${id}/activity`} onFinished={reload} className="mb-6" />}
+      {(isVps || isHosting) && <ActionTracker url={`/client/services/${id}/activity`} onFinished={reload} className="mb-6" />}
       {isVps && svc.status === "ACTIVE" && (
         <Card className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -444,7 +444,7 @@ function HostingPasswordModal({ open, onClose, id, username, onDone }: { open: b
       <PasswordField value={pw} onChange={setPw} optionalHint="Click Generate for a strong random password" />
       <Button className="mt-4 w-full" icon="key" loading={busy} disabled={!pw || !!passwordProblem(pw)} onClick={async () => {
         setBusy(true);
-        try { await api(`/client/services/${id}/hosting-password`, { body: { password: pw } }); toast.success("Password changed"); onDone(); onClose(); } catch (e: any) { toast.error(e.message); }
+        try { await api(`/client/services/${id}/hosting-password`, { body: { password: pw } }); pingActivity(); toast.success("Password changed"); onDone(); onClose(); } catch (e: any) { toast.error(e.message); }
         setBusy(false);
       }}>Change password</Button>
     </Modal>

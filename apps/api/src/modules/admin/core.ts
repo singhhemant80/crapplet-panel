@@ -787,7 +787,11 @@ adminCore.post(
   "/services/:id/virtualizor-sync",
   requireStaff("services.manage"),
   ah(async (req, res) => {
-    const r = await syncVirtualizorService(req.params.id);
+    await prisma.provisioningLog.create({ data: { serviceId: req.params.id, action: "sync_started", success: true, message: "Started" } });
+    const r = await syncVirtualizorService(req.params.id).catch(async (e: Error) => {
+      await prisma.provisioningLog.create({ data: { serviceId: req.params.id, action: "sync", success: false, message: e.message.slice(0, 2000) } });
+      throw e;
+    });
     await audit({ actorId: req.user!.id, action: "service.virtualizor_sync", entity: "service", entityId: req.params.id, details: r });
     res.json(r);
   }),
@@ -931,6 +935,7 @@ adminCore.post(
         if (r.count) restored.push(l.entityId);
       }
     }
+    await prisma.provisioningLog.create({ data: { serviceId: s.id, action: "reactivate", success: true, message: `Reactivated by staff${b.note ? ` — ${b.note}` : ""}` } });
     await prisma.service.update({
       where: { id: s.id },
       data: {
