@@ -648,6 +648,50 @@ adminCore.get(
   }),
 );
 
+/** Promo codes staff can apply on the New order page: active ones, marked if they don't fit this plan / cycle / customer. */
+adminCore.get(
+  "/order-promo-codes",
+  requireStaff("orders.manage"),
+  ah(async (req, res) => {
+    // ?items=productId:CYCLE,productId:CYCLE (the order's plans) — or the older ?productId=&cycle=
+    const items = (typeof req.query.items === "string" ? req.query.items.split(",") : [])
+      .map((x) => x.split(":"))
+      .filter((x) => x[0])
+      .map(([productId, cycle]) => ({ productId, cycle: cycle ?? "" }));
+    if (!items.length && typeof req.query.productId === "string") items.push({ productId: req.query.productId, cycle: typeof req.query.cycle === "string" ? req.query.cycle : "" });
+    const userId = typeof req.query.userId === "string" ? req.query.userId : "";
+    const now = new Date();
+    const codes = await prisma.promoCode.findMany({
+      where: { enabled: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }] },
+      orderBy: { code: "asc" },
+    });
+    const existing = userId ? await prisma.invoice.count({ where: { userId, status: "PAID", isWalletTopup: false } }) : 0;
+    res.json({
+      codes: codes
+        .filter((c) => !c.maxUses || c.uses < c.maxUses)
+        .map((c) => {
+          // the code fits when it gives a discount on at least one of the order's plans
+          const planOk = !items.length || items.some((i) => !c.productIds.length || c.productIds.includes(i.productId));
+          const cycleOk = !items.length || items.some((i) => (!c.productIds.length || c.productIds.includes(i.productId)) && (!c.cycles.length || !i.cycle || c.cycles.includes(i.cycle as never)));
+          const why = !planOk ? (items.length > 1 ? "Not for these plans" : "Not for this plan") : !cycleOk ? "Not for this billing cycle" : c.newOnly && existing ? "New customers only" : null;
+          return {
+            code: c.code,
+            productIds: c.productIds,
+            cycles: c.cycles,
+            type: c.type,
+            value: c.value,
+            recurring: c.recurring,
+            newOnly: c.newOnly,
+            usesLeft: c.maxUses ? c.maxUses - c.uses : null,
+            expiresAt: c.expiresAt,
+            eligible: !why,
+            reason: why,
+          };
+        }),
+    });
+  }),
+);
+
 /**
  * Staff places an order for a customer (same checkout as the shop): plan, cycle, OS, hostname and an
  * optional root password; optionally records the payment so setup starts right away.
