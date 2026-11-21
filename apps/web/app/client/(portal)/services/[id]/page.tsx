@@ -2,6 +2,7 @@
 import { bandwidth } from "@/lib/units";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
+import { ActionTracker, pingActivity } from "@/components/action-tracker";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import Link from "next/link";
@@ -46,8 +47,9 @@ export default function ServicePage() {
     setBusy(action);
     try {
       await api(`/client/services/${id}/action`, { body: { action, ...extra } });
-      toast.success(`${action.replace("_", " ")} requested — this takes a few seconds`);
+      toast.success(`${action.replace("_", " ")} requested — progress is shown on this page`);
       setModal(null);
+      pingActivity();
       setTimeout(reload, 4000);
     } catch (e: any) {
       toast.error(e.message);
@@ -118,6 +120,7 @@ export default function ServicePage() {
 
       {isHosting && svc.status === "ACTIVE" && <HostingPanels id={id} svc={svc} live={live} cred={cred} showPassword={showPassword} onPassword={() => setModal("password")} />}
 
+      {isVps && <ActionTracker url={`/client/services/${id}/activity`} onFinished={reload} className="mb-6" />}
       {isVps && svc.status === "ACTIVE" && (
         <Card className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-4">

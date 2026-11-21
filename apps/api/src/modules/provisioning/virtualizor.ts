@@ -231,9 +231,12 @@ export class VirtualizorClient {
     const vps = form.vps;
     if (!vps) throw new VirtualizorError(`Virtualizor didn't return VPS ${vpsid} for editing`, form);
     const current = Object.values((vps.ips ?? {}) as Record<string, string>).map(String).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
-    const free = (Array.isArray(form.ips) ? form.ips : Object.values(form.ips ?? {})).map((x) => String(x?.ip ?? "")).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    const offered = (Array.isArray(form.ips) ? form.ips : Object.values(form.ips ?? {})).map((x) => String(x?.ip ?? "")).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    // the edit form lists every unassigned IP of the node's pools, locked ones included — never hand those out
+    const locked = newIps?.length ? new Set<string>() : await this.lockedIps().catch(() => new Set<string>());
+    const free = offered.filter((ip) => !locked.has(ip));
     const want = newIps?.length ? newIps : free.filter((ip) => !current.includes(ip)).slice(0, Math.max(1, current.length));
-    if (!want.length) throw new VirtualizorError("Virtualizor has no free IPs for this VPS's node", form);
+    if (!want.length) throw new VirtualizorError(offered.length ? `All ${offered.length} free IPs of this VPS's node are locked in Virtualizor — unlock some, or add IPs to an unlocked pool` : "Virtualizor has no free IPs for this VPS's node", form);
     const post: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(vps)) if (v === null || typeof v !== "object") post[k] = v;
     await this.call("editvs", { vpsid }, { ...post, hostname: vps.hostname, ips: want, editvps: 1 });
@@ -316,6 +319,27 @@ export class VirtualizorClient {
   serverUsage(serid: number | string) {
     return this.call<{ usage?: Record<string, any>; info?: Record<string, any> }>("manageserver", { changeserid: serid });
   }
+  /** IPs that must not be handed out: locked IPs, and every IP of a locked / disabled pool. */
+  async lockedIps(): Promise<Set<string>> {
+    const yes = (v: unknown) => v === true || v === 1 || String(v) === "1" || String(v).toLowerCase() === "yes";
+    const pools = await this.ipPools().catch(() => ({ ippools: {} as Record<string, Record<string, unknown>> }));
+    const lockedPools = new Set(
+      Object.entries(pools.ippools ?? {})
+        .filter(([, p]) => yes(p.locked) || yes(p.lock) || yes(p.is_locked) || yes(p.disabled) || yes(p.suspended))
+        .map(([id, p]) => String(p.ippid ?? id)),
+    );
+    const out = new Set<string>();
+    for (let page = 1; page <= 50; page++) {
+      const list = Object.values((await this.ips(page, 1000)).ips ?? {});
+      for (const row of list) {
+        const ip = String(row.ip ?? row.ipaddress ?? "").trim();
+        if (ip && (yes(row.locked) || lockedPools.has(String(row.ippid ?? "")))) out.add(ip);
+      }
+      if (list.length < 1000) break;
+    }
+    return out;
+  }
+
   /** IP pools (ippid → gateway, netmask, servers…). */
   ipPools() {
     return this.call<{ ippools?: Record<string, Record<string, unknown>> }>("ippool", { page: 1, reslen: 1000 });

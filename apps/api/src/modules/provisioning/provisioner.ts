@@ -644,6 +644,8 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
   const settings = await getSettings();
   const name = svc.user.firstName;
   const vars = { name, productName: svc.product.name, hostname: svc.hostname ?? "", serviceId: svc.id };
+  // marks when the worker picked the action up — the service page shows it as "running"
+  if (action !== "create" && action !== "sync") await log(svc.id, `${action}_started`, true, "Started");
 
   try {
     switch (action) {
@@ -876,6 +878,11 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         }
         await log(svc.id, action, true, `Reinstalled with ${os.name}`);
         return { ok: true };
+      }
+      case "change_ip": {
+        if (prov !== "VIRTUALIZOR") throw new ProvisionError("Changing IPs from the panel works for Virtualizor VPS only", false);
+        const ips = Array.isArray(params.ips) ? (params.ips as string[]) : undefined;
+        return { ok: true, ...(await replaceVirtualizorIps(svc.id, ips)) };
       }
       case "sync": {
         if (svc.product.provisioner === "VIRTUALIZOR" && svc.remoteId) return { ok: true, status: await syncVirtualizorService(svc.id) };

@@ -377,6 +377,15 @@ clientRouter.post(
   }),
 );
 
+clientRouter.get(
+  "/services/:id/activity",
+  ah(async (req, res) => {
+    const s = await ownService(req.user!.id, req.params.id);
+    const { serviceActivity } = await import("../provisioning/activity");
+    res.json(await serviceActivity(s.id, "client"));
+  }),
+);
+
 clientRouter.post(
   "/services/:id/rdns",
   ah(async (req, res) => {

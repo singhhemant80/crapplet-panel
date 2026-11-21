@@ -23,6 +23,7 @@ export type ProvisionAction =
   | "change_package"
   | "change_plan"
   | "hard_reset"
+  | "change_ip"
   | "sync";
 
 export interface ProvisionJob {
@@ -80,7 +81,8 @@ export async function enqueueProvision(job: ProvisionJob) {
   }
   return provisioningQueue().add(job.action, job, {
     jobId,
-    attempts: job.action === "create" ? 3 : 2,
+    // new IPs are handed out once — a retry would swap them a second time
+    attempts: job.action === "create" ? 3 : job.action === "change_ip" ? 1 : 2,
     backoff: { type: "exponential", delay: 30_000 },
   });
 }

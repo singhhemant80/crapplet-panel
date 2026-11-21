@@ -2,6 +2,7 @@
 import { VirtualizorSyncAll } from "@/components/admin/virtualizor-sync-all";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
+import { ActionTracker, pingActivity } from "@/components/action-tracker";
 import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
@@ -33,7 +34,7 @@ export default function AdminService() {
   }, [data, id]);
   if (loading || !data || !edit) return <Loading />;
   const s = data.service;
-  const act = (action: string, extra: Record<string, unknown> = {}) => api(`/admin/services/${id}/action`, { body: { action, ...extra } }).then(() => { toast.success(`${action} queued`); setTimeout(reload, 3000); }).catch((e) => toast.error(e.message));
+  const act = (action: string, extra: Record<string, unknown> = {}) => api(`/admin/services/${id}/action`, { body: { action, ...extra } }).then(() => { toast.success(`${action.replace("_", " ")} queued — progress is shown on this page`); pingActivity(); setTimeout(reload, 3000); }).catch((e) => toast.error(e.message));
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
   const isHosting = s.product.provisioner === "CPANEL";
   const isColo = s.product.type === "COLOCATION";
@@ -145,6 +146,8 @@ export default function AdminService() {
         </section>
       )}
 
+      {isVps && <ActionTracker url={`/admin/services/${id}/activity`} onFinished={reload} className="mb-6" />}
+
       {/* ── live usage ── */}
       {isVps && s.remoteId && !ended && (
         <section className="mb-6 rounded-2xl border border-line bg-white shadow-card">
@@ -225,7 +228,7 @@ export default function AdminService() {
               {s.server?.type === "VIRTUALIZOR" && s.remoteId && (
                 <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
                   <Button size="sm" variant="outline" icon="sync" onClick={async () => { try { const r = await api(`/admin/services/${id}/virtualizor-sync`, { body: {} }); toast.success(`Synced: ${r.ips.join(", ") || "no IPs"} · ${r.state}`); reload(); refreshLive(); } catch (e: any) { toast.error(e.message); } }}>Sync from Virtualizor</Button>
-                  <Button size="sm" variant="outline" icon="swap_horiz" onClick={async () => { if (!confirm("Replace this VPS's IPs with free IPs from Virtualizor's pool for its node? The VPS will get new addresses — tell the customer.")) return; try { const r = await api(`/admin/services/${id}/replace-ips`, { body: {} }); toast.success(`IPs changed: ${r.before.join(", ") || "—"} → ${r.after.join(", ")}`); reload(); } catch (e: any) { toast.error(e.message); } }}>Use Virtualizor's free IPs</Button>
+                  <Button size="sm" variant="outline" icon="swap_horiz" onClick={async () => { if (!confirm("Replace this VPS's IPs with free IPs from Virtualizor's pool for its node? The VPS will get new addresses — tell the customer.")) return; try { await api(`/admin/services/${id}/replace-ips`, { body: {} }); toast.success("Changing IPs — progress is shown on this page"); pingActivity(); } catch (e: any) { toast.error(e.message); } }}>Use Virtualizor's free IPs</Button>
                   <VirtualizorCheck serviceId={id} onLinked={() => { reload(); refreshLive(); }} />
                 </div>
               )}

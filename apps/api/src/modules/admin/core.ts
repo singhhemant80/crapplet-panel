@@ -19,7 +19,7 @@ import { adjustCredit, applyPayment, cancelInvoice, createInvoice, invoiceEmailV
 import { renderInvoicePdf } from "../billing/pdf";
 import { reviewOfflinePayment, refundTransaction } from "../payments/service";
 import { releaseOrderReservations } from "../ipam/service";
-import { liveStates, liveStatus, replaceVirtualizorIps, syncVirtualizorService } from "../provisioning/provisioner";
+import { liveStates, liveStatus, syncVirtualizorService } from "../provisioning/provisioner";
 import { provisioningProgress } from "../provisioning/progress";
 import { queueEmail } from "../email/mailer";
 import { profileSchema, resolveStateCode, publicUser } from "../auth/routes";
@@ -793,15 +793,28 @@ adminCore.post(
   }),
 );
 
+/** What's running / just finished on this service (progress card on the service page). */
+adminCore.get(
+  "/services/:id/activity",
+  requireStaff("services.view"),
+  ah(async (req, res) => {
+    const { serviceActivity } = await import("../provisioning/activity");
+    res.json(await serviceActivity(req.params.id, "admin"));
+  }),
+);
+
 /** Replace the VPS's IPs in Virtualizor with free IPs of its node (or the ones given). */
 adminCore.post(
   "/services/:id/replace-ips",
   requireStaff("services.manage"),
   ah(async (req, res) => {
     const b = parse(z.object({ ips: z.array(z.string().ip({ version: "v4" })).max(32).optional() }), req.body ?? {});
-    const r = await replaceVirtualizorIps(req.params.id, b.ips);
-    await audit({ actorId: req.user!.id, action: "service.ips_replaced", entity: "service", entityId: req.params.id, details: r });
-    res.json(r);
+    const s = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, include: { product: { select: { provisioner: true } } } });
+    if (s.product.provisioner !== "VIRTUALIZOR" || !s.remoteId) throw badRequest("This service has no Virtualizor VPS yet");
+    // runs in the background so the service page can show its progress
+    await enqueueProvision({ serviceId: s.id, action: "change_ip", params: { ips: b.ips }, actorId: req.user!.id });
+    await audit({ actorId: req.user!.id, userId: s.userId, action: "service.ips_replaced", entity: "service", entityId: s.id, details: { ips: b.ips ?? "free IPs from Virtualizor" } });
+    res.status(202).json({ queued: true });
   }),
 );
 
