@@ -42,12 +42,35 @@ export function isNoAnswer(e: unknown) {
   return /UND_ERR_HEADERS_TIMEOUT|UND_ERR_BODY_TIMEOUT|UND_ERR_SOCKET|ECONNRESET|EPIPE/.test(code) || /headers timeout|body timeout|socket hang up|other side closed|closed the connection/i.test(err?.message ?? "");
 }
 
+/**
+ * One connection pool per Virtualizor master, shared by every client object in this process.
+ * A new pool per call meant a fresh TCP + TLS handshake for every API request; with hundreds of
+ * services the syncs then opened dozens of connections a second, which flood protection in front
+ * of the master treats as an attack and blocks the panel's IP for a while. Now calls reuse a few
+ * kept-alive connections and queue when they're all busy.
+ */
+const MAX_CONNECTIONS = Math.max(1, Number(process.env.VIRTUALIZOR_MAX_CONNECTIONS) || 4);
+const pools = new Map<string, { agent: Agent; slowAgent: Agent }>();
+function poolFor(creds: VirtualizorCreds) {
+  const key = `${creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase()}|${creds.verifyTls}`;
+  let p = pools.get(key);
+  if (!p) {
+    const connect = { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true };
+    p = {
+      agent: new Agent({ connect, connections: MAX_CONNECTIONS, keepAliveTimeout: 30_000, keepAliveMaxTimeout: 60_000, headersTimeout: 120_000, bodyTimeout: 300_000 }),
+      // creates/rebuilds can run for many minutes: their own small pool so they never hold up the quick calls
+      slowAgent: new Agent({ connect, connections: 2, headersTimeout: CREATE_TIMEOUT_MS, bodyTimeout: CREATE_TIMEOUT_MS, keepAliveTimeout: 1000 }),
+    };
+    pools.set(key, p);
+  }
+  return p;
+}
+
 export class VirtualizorClient {
   private agent: Agent;
   private slowAgent: Agent;
   constructor(private creds: VirtualizorCreds) {
-    this.agent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: 120_000, bodyTimeout: 300_000 });
-    this.slowAgent = new Agent({ connect: { rejectUnauthorized: creds.verifyTls, timeout: 20_000, autoSelectFamily: true }, headersTimeout: CREATE_TIMEOUT_MS, bodyTimeout: CREATE_TIMEOUT_MS, keepAliveTimeout: 1000 });
+    ({ agent: this.agent, slowAgent: this.slowAgent } = poolFor(creds));
   }
 
   private url(act: string, query: Record<string, string | number | undefined> = {}, port = this.creds.port) {
