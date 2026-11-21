@@ -23,7 +23,7 @@ const HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/
 function NewOrder() {
   const router = useRouter();
   const sp = useSearchParams();
-  const { data: pd, loading } = useApi<{ products: any[] }>("/admin/products");
+  const { data: pd, loading } = useApi<{ products: any[] }>("/admin/order-products");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<any[]>([]);
   const [client, setClient] = useState<any>(null);
@@ -46,6 +46,22 @@ function NewOrder() {
   }, [q]);
 
   const products = (pd?.products ?? []).filter((p: any) => p.enabled);
+  // plans by product group (in the shop's order), each with its starting price
+  const groups = useMemo(() => {
+    const out: { name: string; items: any[] }[] = [];
+    for (const p of products) {
+      const name = p.group?.name ?? "Other";
+      let g = out.find((x) => x.name === name);
+      if (!g) out.push((g = { name, items: [] }));
+      g.items.push(p);
+    }
+    return out;
+  }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+  const planLabel = (p: any) => {
+    const prices = (p.pricing ?? []).filter((x: any) => x.currency === "INR" && x.enabled);
+    const monthly = prices.find((x: any) => x.cycle === "MONTHLY") ?? prices[0];
+    return `${p.name}${monthly ? ` — ${money(monthly.price, "INR")}${monthly.cycle === "MONTHLY" ? "/mo" : ` ${(CYCLES[monthly.cycle] ?? monthly.cycle).toLowerCase()}`}` : " — no price set"}${p.hidden ? " · hidden from shop" : ""}`;
+  };
   const productOf = (l: Line) => products.find((x: any) => x.id === l.productId);
   const cyclesOf = (p: any) => (p?.pricing ?? []).filter((x: any) => x.currency === "INR" && x.enabled);
   const osesOf = (p: any) => (p?.osTemplates ?? []).map((x: any) => x.osTemplate).filter((o: any) => o.enabled);
@@ -163,7 +179,11 @@ function NewOrder() {
                   <Field label="Plan">
                     <Select value={l.productId} onChange={(e) => pickPlan(l.key, e.target.value)}>
                       <option value="">Choose…</option>
-                      {products.map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                      {groups.map((g) => (
+                        <optgroup key={g.name} label={g.name}>
+                          {g.items.map((x: any) => <option key={x.id} value={x.id} disabled={!cyclesOf(x).length}>{planLabel(x)}</option>)}
+                        </optgroup>
+                      ))}
                     </Select>
                   </Field>
                   <Field label="Billing cycle">

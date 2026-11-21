@@ -648,6 +648,20 @@ adminCore.get(
   }),
 );
 
+/** Plans for the New order page (staff who can place orders, even without catalogue access). */
+adminCore.get(
+  "/order-products",
+  requireStaff("orders.manage"),
+  ah(async (_req, res) => {
+    const products = await prisma.product.findMany({
+      where: { enabled: true },
+      orderBy: [{ group: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
+      include: { group: { select: { id: true, name: true, sortOrder: true } }, pricing: true, osTemplates: { include: { osTemplate: true } } },
+    });
+    res.json({ products });
+  }),
+);
+
 /** Promo codes staff can apply on the New order page: active ones, marked if they don't fit this plan / cycle / customer. */
 adminCore.get(
   "/order-promo-codes",
