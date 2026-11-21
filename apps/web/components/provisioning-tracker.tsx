@@ -111,7 +111,7 @@ export function ProvisioningTracker({ path, audience, onChange, onRetry, compact
           {audience === "admin" && p.explain && !hideExplain && (failed || retrying || p.stuck) && <FailureExplain x={p.explain} compact className="mt-2" />}
           {retrying && p.job?.nextRetryAt && <p className="mt-1 text-xs font-semibold text-amber-700">Next attempt around {time(p.job.nextRetryAt)}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 pl-[60px] sm:w-auto sm:pl-0">
           {p.invoiceId && audience === "client" && <Button size="sm" icon="payments" href={`/client/invoices/${p.invoiceId}`}>Pay invoice</Button>}
           {p.invoiceId && audience === "admin" && <Button size="sm" variant="outline" icon="receipt_long" href={`/admin/invoices/${p.invoiceId}`}>Invoice</Button>}
           {failed && audience === "admin" && onRetry && <Button size="sm" icon="rocket_launch" onClick={onRetry}>Retry provisioning</Button>}
