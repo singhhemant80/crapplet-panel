@@ -93,6 +93,9 @@ function fromEnv(): MailConfig {
 
 let cache: { at: number; cfg: MailConfig; fromDb: boolean } | null = null;
 
+/** true when a saved SMTP password exists but can't be decrypted (ENCRYPTION_KEY changed) — mail then logs in with no password */
+export let mailPassUnreadable = false;
+
 export async function getMailConfig(): Promise<MailConfig & { fromDb: boolean }> {
   if (cache && Date.now() - cache.at < 15_000) return { ...cache.cfg, fromDb: cache.fromDb };
   const row = await prisma.setting.findUnique({ where: { key: "mail" } });
@@ -106,6 +109,7 @@ export async function getMailConfig(): Promise<MailConfig & { fromDb: boolean }>
         return "";
       }
     };
+    mailPassUnreadable = !!s.passEnc && !safe(s.passEnc);
     cfg = {
       ...cfg,
       ...s,

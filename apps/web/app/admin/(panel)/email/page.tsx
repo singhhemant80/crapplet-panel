@@ -28,6 +28,7 @@ export default function EmailDelivery() {
   return (
     <>
       <PageHeader title="Email Delivery" subtitle="Where invoices, welcome emails and VPS details are sent from — and what it takes for them to land in the inbox, not spam." />
+      <DeliveryHealth onTab={(k) => setTab(k)} />
       <div className="mb-5 flex gap-2 overflow-x-auto">
         {TABS.map((t) => (
           <button key={t.k} onClick={() => setTab(t.k)} className={cx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold", tab === t.k ? "bg-primary-dark text-white" : "bg-white text-slate-600 ring-1 ring-line")}>
@@ -416,6 +417,67 @@ function StaffAlerts() {
           </ul>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/** Is mail going out? Queue + worker, SMTP settings, last 24 hours — each problem with the fix. */
+function DeliveryHealth({ onTab }: { onTab: (k: (typeof TABS)[number]["k"]) => void }) {
+  const { data: h, reload, loading } = useApi<any>("/admin/email/health");
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    const t = setInterval(reload, 30_000);
+    return () => clearInterval(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!h) return null;
+  const run = async (path: string, done: (r: any) => string) => {
+    setBusy(path);
+    try {
+      toast.success(done(await api(path, { body: {} })));
+      reload();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(null);
+  };
+  const q = h.queue;
+  const l = h.last24h ?? {};
+  const errors = h.problems.filter((p: any) => p.level === "error");
+  return (
+    <div className={cx("mb-5 overflow-hidden rounded-2xl border bg-white shadow-card", errors.length ? "border-rose-200" : h.problems.length ? "border-amber-200" : "border-emerald-200")}>
+      <div className="flex flex-wrap items-center gap-3 px-5 py-4">
+        <span className={cx("grid h-11 w-11 place-items-center rounded-xl", errors.length ? "bg-rose-50 text-rose-600" : h.problems.length ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600")}>
+          <Icon name={errors.length ? "mail_lock" : h.problems.length ? "warning" : "mark_email_read"} className="text-[24px]" fill />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold text-ink">{errors.length ? "Emails are not going out" : h.problems.length ? "Emails are going out — with warnings" : "Emails are going out"}</div>
+          <div className="mt-0.5 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-mute">
+            <span>Last 24 h: <b className="text-emerald-700">{l.SENT ?? 0} sent</b>{(l.FAILED ?? 0) + (l.BOUNCED ?? 0) > 0 && <> · <b className="text-rose-600">{(l.FAILED ?? 0) + (l.BOUNCED ?? 0)} failed</b></>}{l.LOGGED ? <> · {l.LOGGED} only logged</> : null}{l.SUPPRESSED ? <> · {l.SUPPRESSED} held back</> : null}</span>
+            {q.reachable ? <span>Queue: {q.waiting} waiting · {q.delayed} retrying · {q.failed} failed · worker {q.workers === null ? "unknown" : q.workers > 0 ? <b className="text-emerald-700">running</b> : <b className="text-rose-600">not running</b>}</span> : <span className="text-amber-700">Queue unreachable — sending directly</span>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {q.waiting + q.delayed > 0 && <Button size="sm" icon="send" loading={busy === "/admin/email/queue/send-now"} onClick={() => confirm(`Send the ${q.waiting + q.delayed} waiting email(s) now from here?`) && run("/admin/email/queue/send-now", (r) => `Sent ${r.sent}${r.failed ? ` · ${r.failed} failed (see the log)` : ""}${r.left ? ` · ${r.left} still waiting` : ""}`)}>Send waiting emails now</Button>}
+          {q.failed > 0 && <Button size="sm" variant="outline" icon="replay" loading={busy === "/admin/email/queue/retry-failed"} onClick={() => run("/admin/email/queue/retry-failed", (r) => `Retrying ${r.retried} email(s)`)}>Retry failed emails</Button>}
+          <Button size="sm" variant="ghost" icon="refresh" loading={loading} onClick={reload}>Check again</Button>
+        </div>
+      </div>
+      {h.problems.length > 0 && (
+        <ul className="divide-y divide-line border-t border-line">
+          {h.problems.map((p: any, i: number) => (
+            <li key={i} className="flex gap-3 px-5 py-3">
+              <Icon name={p.level === "error" ? "error" : "info"} className={cx("mt-0.5 text-[19px]", p.level === "error" ? "text-rose-600" : "text-amber-600")} fill />
+              <div className="min-w-0 text-[13px]">
+                <div className="font-bold text-ink">{p.title}</div>
+                <div className="mt-0.5 break-words text-slate-600">{p.fix}</div>
+                {/Setup tab/.test(p.fix) && <button className="mt-1 text-xs font-bold text-primary-dark hover:underline" onClick={() => onTab("setup")}>Open mail server settings →</button>}
+                {/Deliverability check/.test(p.fix) && <button className="mt-1 text-xs font-bold text-primary-dark hover:underline" onClick={() => onTab("check")}>Run the deliverability check →</button>}
+                {/Log tab/.test(p.fix) && <button className="mt-1 text-xs font-bold text-primary-dark hover:underline" onClick={() => onTab("log")}>Open the delivery log →</button>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

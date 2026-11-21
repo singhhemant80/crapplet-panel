@@ -184,9 +184,10 @@ test("over the size limit: the database alone is emailed; email failures don't l
   const { config } = await import("../src/config");
   const big = path.join(path.resolve(config.uploadDir), `qa-big-${RUN}.bin`);
   fs.mkdirSync(path.dirname(big), { recursive: true });
-  fs.writeFileSync(big, Buffer.alloc(3 * 1024 * 1024, 1).map(() => Math.floor(Math.random() * 256)));
+  fs.writeFileSync(big, Buffer.alloc(14 * 1024 * 1024, 1).map(() => Math.floor(Math.random() * 256)));
   try {
-    await svc.saveBackupConfig({ includeUploads: true, email: { enabled: true, to: TO, maxMb: 2 } } as never);
+    // limit between the database dump (grows with the test database) and the full archive
+    await svc.saveBackupConfig({ includeUploads: true, email: { enabled: true, to: TO, maxMb: 10 } } as never);
     const run = await svc.createBackup({ trigger: "manual" });
     const d = (run.destinations as { type: string; ok: boolean; location?: string }[]).find((x) => x.type === "email")!;
     assert.ok(d.ok, JSON.stringify(run.destinations));

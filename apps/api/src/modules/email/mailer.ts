@@ -316,6 +316,12 @@ export async function queueEmail(template: string, to: string, vars: Record<stri
   // the WhatsApp version of client notifications (when switched on for this event)
   if (userId) await import("../whatsapp/service").then((m) => m.notifyWhatsapp(template, userId, vars)).catch(() => undefined);
   try {
+    // nobody is consuming the queue (worker stopped) → don't let the email sit there; send it now
+    const { emailWorkers } = await import("./health");
+    if ((config.isProd || process.env.MAIL_DIRECT_IF_NO_WORKER === "1") && (await emailWorkers()) === 0) {
+      void sendTemplatedEmail(job).catch((err) => console.error("[mail] direct send failed (no email worker running)", err?.message ?? err));
+      return;
+    }
     await emailQueue().add(template, job, { attempts: 5, backoff: { type: "exponential", delay: 60_000 } });
   } catch (e) {
     console.warn("[mail] queue unavailable, sending inline", e);

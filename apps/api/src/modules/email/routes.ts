@@ -123,6 +123,38 @@ adminEmail.get(
   }),
 );
 
+/** Why emails may not be arriving: queue + worker, SMTP settings, last 24 h, blocked addresses. */
+adminEmail.get(
+  "/email/health",
+  perm,
+  ah(async (_req, res) => {
+    const { emailHealth } = await import("./health");
+    res.json(await emailHealth());
+  }),
+);
+
+adminEmail.post(
+  "/email/queue/send-now",
+  perm,
+  ah(async (req, res) => {
+    const { sendWaitingNow } = await import("./health");
+    const r = await sendWaitingNow();
+    await audit({ actorId: req.user!.id, action: "email.queue_sent_now", details: r });
+    res.json(r);
+  }),
+);
+
+adminEmail.post(
+  "/email/queue/retry-failed",
+  perm,
+  ah(async (req, res) => {
+    const { retryFailed } = await import("./health");
+    const r = await retryFailed();
+    await audit({ actorId: req.user!.id, action: "email.queue_retry_failed", details: r });
+    res.json(r);
+  }),
+);
+
 adminEmail.get(
   "/email/log",
   perm,
