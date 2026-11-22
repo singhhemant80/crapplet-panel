@@ -37,8 +37,8 @@ test("no selector typed: mailcow's dkim._domainkey is found automatically", asyn
   assert.match(d.detail, /mailcow/);
 });
 
-test("no selector and no common key published: still asks for the selector", async () => {
+test("no selector and no common key published on your own mail server: flagged as a problem", async () => {
   const { ["dkim._domainkey.primocloud.in"]: _d, ...rest } = records;
   const r = await checkDeliverability(cfg(), dns(rest));
-  assert.equal((r as any).checks.find((c: any) => c.key === "dkim").status, "warn");
+  assert.equal((r as any).checks.find((c: any) => c.key === "dkim").status, "error");
 });
