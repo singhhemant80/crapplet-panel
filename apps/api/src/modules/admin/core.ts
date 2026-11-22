@@ -656,7 +656,7 @@ adminCore.get(
     const products = await prisma.product.findMany({
       where: { enabled: true },
       orderBy: [{ group: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
-      include: { group: { select: { id: true, name: true, sortOrder: true } }, pricing: true, osTemplates: { include: { osTemplate: true } } },
+      include: { group: { select: { id: true, name: true, sortOrder: true, hidden: true } }, pricing: true, osTemplates: { include: { osTemplate: true } } },
     });
     res.json({ products });
   }),

@@ -46,21 +46,29 @@ function NewOrder() {
   }, [q]);
 
   const products = (pd?.products ?? []).filter((p: any) => p.enabled);
-  // plans by product group (in the shop's order), each with its starting price
+  // plans by product group in the shop's order (group order, then cheapest first); plans hidden from
+  // the shop (old / retired) last, so they're still there for existing customers
   const groups = useMemo(() => {
-    const out: { name: string; items: any[] }[] = [];
-    for (const p of products) {
-      const name = p.group?.name ?? "Other";
-      let g = out.find((x) => x.name === name);
-      if (!g) out.push((g = { name, items: [] }));
-      g.items.push(p);
+    const monthly = (p: any) => {
+      const c = (p?.pricing ?? []).filter((x: any) => x.currency === "INR" && x.enabled);
+      return Number((c.find((x: any) => x.cycle === "MONTHLY") ?? c[0])?.price ?? Number.MAX_SAFE_INTEGER);
+    };
+    const byPlan = (a: any, b: any) => monthly(a) - monthly(b) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+    const map = new Map<string, { name: string; order: number; items: any[] }>();
+    for (const p of products.filter((p: any) => !p.hidden && !p.group?.hidden)) {
+      const k = p.group?.id ?? "-";
+      if (!map.has(k)) map.set(k, { name: p.group?.name ?? "Other", order: p.group?.sortOrder ?? 0, items: [] });
+      map.get(k)!.items.push(p);
     }
+    const out: { name: string; items: any[] }[] = [...map.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).map((g) => ({ name: g.name, items: g.items.sort(byPlan) }));
+    const old = products.filter((p: any) => p.hidden || p.group?.hidden).sort((a: any, b: any) => String(a.group?.name).localeCompare(String(b.group?.name)) || byPlan(a, b));
+    if (old.length) out.push({ name: "Hidden from the shop (old plans)", items: old });
     return out;
   }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
   const planLabel = (p: any) => {
     const prices = (p.pricing ?? []).filter((x: any) => x.currency === "INR" && x.enabled);
     const monthly = prices.find((x: any) => x.cycle === "MONTHLY") ?? prices[0];
-    return `${p.name}${monthly ? ` — ${money(monthly.price, "INR")}${monthly.cycle === "MONTHLY" ? "/mo" : ` ${(CYCLES[monthly.cycle] ?? monthly.cycle).toLowerCase()}`}` : " — no price set"}${p.hidden ? " · hidden from shop" : ""}`;
+    return `${p.name}${monthly ? ` — ${money(monthly.price, "INR")}${monthly.cycle === "MONTHLY" ? "/mo" : ` ${(CYCLES[monthly.cycle] ?? monthly.cycle).toLowerCase()}`}` : " — no price set"}${p.hidden || p.group?.hidden ? ` · ${p.group?.name ?? "hidden from shop"}` : ""}`;
   };
   const productOf = (l: Line) => products.find((x: any) => x.id === l.productId);
   const cyclesOf = (p: any) => (p?.pricing ?? []).filter((x: any) => x.currency === "INR" && x.enabled);
