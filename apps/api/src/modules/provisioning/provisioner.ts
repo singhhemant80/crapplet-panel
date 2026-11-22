@@ -4,6 +4,7 @@
  */
 import { prisma, Prisma, type Server, ServiceStatus } from "../../db";
 import { config } from "../../config";
+import { isResumedRun, recall, remember } from "./job-memo";
 import { decrypt, encrypt, generatePassword } from "../../lib/crypto";
 import { HttpError } from "../../lib/http";
 import { getSettings } from "../../lib/settings";
@@ -872,15 +873,24 @@ async function runProvisionActionUnlocked(serviceId: string, action: ProvisionAc
         } else if (prov === "VIRTUALIZOR") {
           const { server, remoteId } = requireRemote(svc);
           if (!os.virtualizorOsId) throw new ProvisionError("OS has no Virtualizor id", false);
-          await virtualizorFor(server).rebuild(remoteId, os.virtualizorOsId, password);
-          await prisma.service.update({ where: { id: svc.id }, data: { osTemplateId: os.id, passwordEnc: encrypt(password), username: loginUserOf(os) } });
-          await queueEmail("service.vps_ready", svc.user.email, { ...vars, password, username: loginUserOf(os), ip: svc.ips[0]?.address ?? "", os: os.name }, svc.userId);
+          // a run interrupted by a restart must never send a second rebuild — keep the one already sent
+          const sent = recall<{ passwordEnc: string }>("vzRebuild");
+          let login = password;
+          if (sent) login = decrypt(sent.passwordEnc);
+          else {
+            await remember("vzRebuild", { passwordEnc: encrypt(password) });
+            await virtualizorFor(server).rebuild(remoteId, os.virtualizorOsId, password);
+          }
+          await prisma.service.update({ where: { id: svc.id }, data: { osTemplateId: os.id, passwordEnc: encrypt(login), username: loginUserOf(os) } });
+          await queueEmail("service.vps_ready", svc.user.email, { ...vars, password: login, username: loginUserOf(os), ip: svc.ips[0]?.address ?? "", os: os.name }, svc.userId);
         }
         await log(svc.id, action, true, `Reinstalled with ${os.name}`);
         return { ok: true };
       }
       case "change_ip": {
         if (prov !== "VIRTUALIZOR") throw new ProvisionError("Changing IPs from the panel works for Virtualizor VPS only", false);
+        // repeating an interrupted IP change would swap the IP a second time
+        if (isResumedRun()) throw new ProvisionError("The IP change was interrupted by a panel restart — check the VPS's IPs before changing them again", false);
         const ips = Array.isArray(params.ips) ? (params.ips as string[]) : undefined;
         return { ok: true, ...(await replaceVirtualizorIps(svc.id, ips)) };
       }

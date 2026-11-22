@@ -5,6 +5,7 @@
 import { Worker, type Job } from "bullmq";
 import { bullConnection, maintenanceQueue, backupQueue, latencyQueue, campaignQueue, closeQueues, type EmailJob, type ProvisionJob } from "./jobs/queues";
 import { runProvisionAction, markCreateFailed } from "./modules/provisioning/provisioner";
+import { withJobMemo } from "./modules/provisioning/job-memo";
 import { sendTemplatedEmail } from "./modules/email/mailer";
 import { expireReservations } from "./modules/ipam/service";
 import { maybeRunScheduled } from "./jobs/billing";
@@ -27,7 +28,17 @@ const connection = bullConnection();
 
 const provisioning = new Worker<ProvisionJob>(
   "provisioning",
-  async (job: Job<ProvisionJob>) => runProvisionAction(job.data.serviceId, job.data.action, job.data.params ?? {}),
+  async (job: Job<ProvisionJob>) => {
+    const data = job.data as ProvisionJob & { memo?: Record<string, unknown> };
+    // a job that already started once and is picked up again after a restart: carry on, don't repeat
+    const memo = {
+      values: { ...(data.memo ?? {}), started: true } as Record<string, unknown>,
+      resumed: !!data.memo?.started || (job.stalledCounter ?? 0) > 0,
+      save: (values: Record<string, unknown>) => job.updateData({ ...job.data, memo: values } as never),
+    };
+    await memo.save(memo.values).catch(() => undefined);
+    return withJobMemo(memo, () => runProvisionAction(job.data.serviceId, job.data.action, job.data.params ?? {}));
+  },
   // short lock, renewed automatically while a job runs: a run killed by a restart is picked up again
   // within about a minute instead of looking "active" for half an hour
   { connection, concurrency: 4, lockDuration: 60_000, stalledInterval: 30_000, maxStalledCount: 3, autorun: false },
