@@ -259,9 +259,11 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
       /* unparsable */
     }
     const host = u?.hostname ?? "";
-    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost";
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
     const linkDomain = host.split(".").slice(-2).join(".");
-    if (!u || isIp) checks.push({ key: "links", label: "Links in emails", status: "error", detail: `Every email links to ${config.appUrl} (logo, "Client area", invoices). Links to an IP address are one of the strongest spam signals.`, fix: `Set APP_URL=https://${domain} (or your panel's domain) in apps/api/.env and restart, or re-run the installer with --domain.` });
+    if (host === "localhost" || host.endsWith(".localhost")) {
+      /* a development copy — nothing to judge */
+    } else if (!u || isIp) checks.push({ key: "links", label: "Links in emails", status: "error", detail: `Every email links to ${config.appUrl} (logo, "Client area", invoices). Links to an IP address are one of the strongest spam signals.`, fix: `Set APP_URL=https://${domain} (or your panel's domain) in apps/api/.env and restart, or re-run the installer with --domain.` });
     else if (u.protocol !== "https:") checks.push({ key: "links", label: "Links in emails", status: "warn", detail: `Emails link to ${config.appUrl} over plain http.`, fix: "Turn on HTTPS for the panel and set APP_URL to the https:// address." });
     else if (linkDomain !== domain.split(".").slice(-2).join(".")) checks.push({ key: "links", label: "Links in emails", status: "warn", detail: `Emails are sent from ${domain} but link to ${host}. A different domain in links lowers trust a little.`, fix: `Use a panel address on ${domain} (e.g. my.${domain}) if you can.` });
     else checks.push({ key: "links", label: "Links in emails", status: "ok", detail: `Emails link to ${config.appUrl} — same domain as the sender, over HTTPS.` });

@@ -32,7 +32,15 @@ export async function onInvoicePaid(invoiceId: string) {
       if (!svc) continue;
       const isRenewal = !!item.periodStart && svc.status !== "PENDING";
       if (!isRenewal) {
-        if (svc.status !== "PENDING") continue;
+        if (svc.status !== "PENDING") {
+          // first invoice paid after staff had already activated it: the paid period runs from the order,
+          // so the next due date moves on from the placeholder (the unpaid invoice's due date) or the gap
+          if (svc.billingCycle !== "ONETIME" && !["CANCELLED", "TERMINATED"].includes(svc.status)) {
+            const due = addCycle(svc.createdAt, svc.billingCycle);
+            if (!svc.nextDueDate || svc.nextDueDate < due) await prisma.service.update({ where: { id: svc.id }, data: { nextDueDate: due, nextInvoiceDate: due } });
+          }
+          continue;
+        }
         const due = svc.billingCycle === "ONETIME" ? null : addCycle(new Date(), svc.billingCycle);
         const automated = svc.product.provisioner === "PROXMOX" || svc.product.provisioner === "VIRTUALIZOR" || svc.product.provisioner === "CPANEL";
         if (automated && svc.product.autoSetup !== "MANUAL") {
@@ -114,4 +122,30 @@ export async function onInvoicePaid(invoiceId: string) {
     inv.userId,
     inv.isWalletTopup ? undefined : [{ filename: `${invoiceLabel(inv).replace(/\//g, "-")}.pdf`, invoiceId: inv.id }],
   );
+}
+
+/**
+ * Safety net (worker, every few minutes): a live service must always have a next due date. Fills it in for
+ * services that were activated before their first invoice was paid (older versions left it empty):
+ * paid → one billing cycle from the payment; unpaid → the invoice's due date; no invoice → one cycle from the order.
+ */
+export async function fillMissingDueDates() {
+  const svcs = await prisma.service.findMany({
+    where: { nextDueDate: null, billingCycle: { not: "ONETIME" }, status: { in: ["ACTIVE", "SUSPENDED", "PROVISIONING"] } },
+    select: { id: true, createdAt: true, billingCycle: true },
+    take: 500,
+  });
+  let fixed = 0;
+  for (const s of svcs) {
+    const first = await prisma.invoiceItem.findFirst({
+      where: { relId: s.id, type: "SERVICE", invoice: { status: { in: ["PAID", "UNPAID"] } } },
+      orderBy: { invoice: { createdAt: "asc" } },
+      select: { invoice: { select: { status: true, paidAt: true, dueDate: true } } },
+    });
+    const inv = first?.invoice;
+    const due = inv?.status === "PAID" ? addCycle(inv.paidAt ?? s.createdAt, s.billingCycle) : inv?.status === "UNPAID" && inv.dueDate ? inv.dueDate : addCycle(s.createdAt, s.billingCycle);
+    await prisma.service.update({ where: { id: s.id }, data: { nextDueDate: due, nextInvoiceDate: due } });
+    fixed++;
+  }
+  return { fixed };
 }

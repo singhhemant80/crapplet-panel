@@ -467,6 +467,11 @@ adminCore.post(
       if (b.action === "activate") {
         if (s.status === "SUSPENDED") await queue(s.id, "unsuspend");
         else if (s.status === "PENDING" || s.status === "FAILED") {
+          // activated before payment: due when the order's invoice is due (moves on a cycle once it's paid)
+          if (!s.nextDueDate && s.billingCycle !== "ONETIME") {
+            const due = o.invoice?.status === "UNPAID" && o.invoice.dueDate ? o.invoice.dueDate : (await import("../../lib/money")).addCycle(new Date(), s.billingCycle);
+            await prisma.service.update({ where: { id: s.id }, data: { nextDueDate: due, nextInvoiceDate: due } });
+          }
           if (automated(s.product)) {
             await prisma.service.update({ where: { id: s.id }, data: { status: "PROVISIONING" } });
             const { provisioningQueue } = await import("../../jobs/queues");

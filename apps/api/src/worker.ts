@@ -66,8 +66,11 @@ const maintenance = new Worker(
         return { released: await expireReservations() };
       case "reconcile-provisioning":
         return reconcileProvisioning();
-      case "reconcile-orders":
-        return reconcileOrderStatuses();
+      case "reconcile-orders": {
+        const { fillMissingDueDates } = await import("./modules/billing/hooks");
+        const due = await fillMissingDueDates().catch((e) => ({ error: String(e) }));
+        return { ...(await reconcileOrderStatuses()), dueDates: due };
+      }
       case "server-health":
         return checkAllServers();
       case "daily-billing": // schedule from older versions — replaced by automation-tick
