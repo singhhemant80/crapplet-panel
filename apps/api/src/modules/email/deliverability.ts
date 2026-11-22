@@ -38,6 +38,9 @@ const sysResolver = (): Resolver => {
 
 const FREE_MAIL = /^(gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|rediffmail|aol|icloud|me|proton|protonmail|zohomail)\.(com|in|co\.in|me)$/i;
 
+/** Selectors tried when none is set: mailcow, cPanel/DirectAdmin/Plesk, Microsoft 365, Google, Mailgun, Mailchimp, Zoho, others. */
+export const COMMON_DKIM_SELECTORS = ["dkim", "default", "mail", "selector1", "selector2", "google", "s1", "s2", "k1", "k2", "zoho", "mx", "smtp", "key1", "dkim1", "sig1"];
+
 async function txt(r: Resolver, name: string): Promise<string[]> {
   try {
     return (await r.resolveTxt(name)).map((parts) => parts.join(""));
@@ -217,7 +220,20 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
     else if (found.replace(/\s/g, "").includes(`p=${c.dkim.publicKey}`)) checks.push({ key: "dkim", label: "DKIM (panel signing)", status: "ok", detail: `${host} matches the panel's signing key.` });
     else checks.push({ key: "dkim", label: "DKIM (panel signing)", status: "error", detail: `${host} has a different key than the one the panel signs with.`, found, fix: "Replace the record with:", record });
   } else {
-    const sel = c.providerDkimSelector || preset.dkimSelector;
+    let sel = c.providerDkimSelector || preset.dkimSelector;
+    let guessed = false;
+    if (!sel && !own) {
+      // no selector typed in: look for the usual ones (mailcow "dkim", cPanel/DirectAdmin "default", Microsoft, Google…)
+      for (const candidate of COMMON_DKIM_SELECTORS) {
+        const h = `${candidate}._domainkey.${domain}`;
+        const [t, cname] = await Promise.all([txt(r, h), safe(r.resolveCname(h), [] as string[])]);
+        if (t.some((x) => /p=[A-Za-z0-9+/]/.test(x)) || cname.length > 0) {
+          sel = candidate;
+          guessed = true;
+          break;
+        }
+      }
+    }
     if (own) checks.push({ key: "dkim", label: "DKIM", status: "error", detail: "Mail sent straight from this server isn't DKIM-signed. Gmail and Outlook send most unsigned mail to spam.", fix: "Turn on DKIM signing below and add the record it shows." });
     else if (!sel && selfHosted) {
       const tried = ["dkim", "default", "mail", "s1", "selector1", "mailcow"];
@@ -229,7 +245,7 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
       const host = `${sel}._domainkey.${domain}`;
       const [t, cname] = await Promise.all([txt(r, host), safe(r.resolveCname(host), [] as string[])]);
       const ok = t.some((x) => /p=/.test(x)) || cname.length > 0;
-      checks.push(ok ? { key: "dkim", label: "DKIM", status: "ok", detail: `DKIM key found at ${host}${cname.length ? ` (→ ${cname[0]})` : ""}.` } : { key: "dkim", label: "DKIM", status: "error", detail: `No DKIM key at ${host}. Without it your provider's signature can't be verified.`, fix: `Turn on DKIM in ${preset.label} and add the TXT/CNAME record it shows.` });
+      checks.push(ok ? { key: "dkim", label: "DKIM", status: "ok", detail: `DKIM key found at ${host}${cname.length ? ` (→ ${cname[0]})` : ""}.${guessed ? ` Selector "${sel}" was found automatically${sel === "dkim" ? " (mailcow's default)" : ""} — your mail server must sign with it; the DKIM line in a received message's headers shows s=${sel} and dkim=pass when it does.` : ""}` } : { key: "dkim", label: "DKIM", status: "error", detail: `No DKIM key at ${host}. Without it your provider's signature can't be verified.`, fix: `Turn on DKIM in ${preset.label} and add the TXT/CNAME record it shows.` });
     }
   }
 
