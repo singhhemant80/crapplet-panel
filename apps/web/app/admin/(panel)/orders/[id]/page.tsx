@@ -10,6 +10,7 @@ import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { HypervisorSelect } from "@/components/admin/hypervisor-select";
 import { Ago, Avatar, initialsOf, planIcon } from "@/components/admin/list-kit";
+import { PasswordField, passwordProblem } from "@/components/password-field";
 
 const VPS = ["PROXMOX", "VIRTUALIZOR"];
 
@@ -56,6 +57,7 @@ export default function AdminOrder() {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
           {o.services.map((s: any) => <ServiceItem key={s.id} s={s} currency={o.currency} onSaved={reload} />)}
+          {!["CANCELLED", "FRAUD"].includes(o.status) && <AddServiceCard o={o} onAdded={reload} />}
           {o.domains.length > 0 && (
             <Card title="Domains" pad={false}>
               <ul className="divide-y divide-[#f3effb]">
@@ -423,6 +425,113 @@ function Timeline({ o, history }: { o: any; history: any[] }) {
           </li>
         ))}
       </ol>
+    </Card>
+  );
+}
+
+const DOMAIN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
+/**
+ * Add a service to this order by hand: for an order that came without one (e.g. a WHMCS order whose
+ * service wasn't imported) or a plan agreed outside the shop. "Activate / provision" then sets it up.
+ */
+function AddServiceCard({ o, onAdded }: { o: any; onAdded: () => void }) {
+  const empty = o.services.length === 0;
+  const [open, setOpen] = useState(empty);
+  const { data: pd } = useApi<{ products: any[] }>(open ? "/admin/products" : null);
+  const [productId, setProductId] = useState("");
+  const [cycle, setCycle] = useState("MONTHLY");
+  const [hostname, setHostname] = useState("");
+  const [os, setOs] = useState("");
+  const [password, setPassword] = useState("");
+  const [price, setPrice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const products = (pd?.products ?? []).filter((p: any) => p.enabled).sort((a: any, b: any) => (a.hidden ? 1 : 0) - (b.hidden ? 1 : 0) || String(a.group?.name).localeCompare(String(b.group?.name)) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+  const p = products.find((x: any) => x.id === productId);
+  const cur = o.invoice?.currency ?? o.currency ?? "INR";
+  const cycles = (p?.pricing ?? []).filter((x: any) => x.enabled && x.currency === cur);
+  const oses = (p?.osTemplates ?? []).map((x: any) => x.osTemplate).filter((x: any) => x?.enabled);
+  const isVps = p && VPS.includes(p.provisioner);
+  const isHosting = p && (["SHARED", "RESELLER_HOSTING", "WORDPRESS"].includes(p.type) || p.provisioner === "CPANEL");
+  useEffect(() => {
+    if (!p) return;
+    const c = cycles.find((x: any) => x.cycle === "MONTHLY") ?? cycles[0];
+    setCycle(c?.cycle ?? "MONTHLY");
+    setPrice(c ? String(c.price / 100) : "");
+    setOs(oses[0]?.id ?? "");
+  }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const c = cycles.find((x: any) => x.cycle === cycle);
+    if (c) setPrice(String(c.price / 100));
+  }, [cycle]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open)
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary-tint/60 py-3 text-sm font-extrabold text-primary-dark hover:border-primary">
+        <Icon name="add_circle" className="text-[20px]" /> Add a service to this order
+      </button>
+    );
+
+  async function add() {
+    if (!p) return toast.error("Choose a plan");
+    if (isHosting && !DOMAIN.test(hostname)) return toast.error("Enter the domain, e.g. example.com");
+    if (isVps && p.requireHostname && !DOMAIN.test(hostname)) return toast.error("Enter a hostname like server1.example.com");
+    const pw = isVps && password ? passwordProblem(password) : null;
+    if (pw) return toast.error(`Root password: ${pw}`);
+    const rupees = Number(price);
+    if (price !== "" && (!Number.isFinite(rupees) || rupees < 0)) return toast.error("Enter a valid price");
+    setBusy(true);
+    try {
+      const r = await api(`/admin/orders/${o.id}/services`, {
+        body: { productId, cycle, hostname: hostname || null, osTemplateId: isVps ? os || null : null, rootPassword: isVps ? password || null : null, recurringAmount: price === "" ? null : Math.round(rupees * 100) },
+      });
+      toast.success(`Service added${r.linkedInvoiceItem ? " and linked to the invoice" : ""} — use "Activate / provision" to set it up`);
+      setProductId(""); setHostname(""); setPassword("");
+      setOpen(false);
+      onAdded();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <Card title={empty ? "This order has no service yet" : "Add a service to this order"} action={!empty ? <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Close</Button> : undefined}>
+      {empty && <Alert tone="warn" className="mb-4">Nothing on this order can be set up — its service never arrived (e.g. a WHMCS order whose service wasn't imported) or was removed. Add the plan below, then press <b>Activate / provision</b>.</Alert>}
+      <div className="grid gap-4 sm:grid-cols-[1fr_200px_150px]">
+        <Field label="Plan">
+          <Select value={productId} onChange={(e) => setProductId(e.target.value)}>
+            <option value="">Choose…</option>
+            {products.map((x: any) => <option key={x.id} value={x.id}>{x.name}{x.group?.name ? ` · ${x.group.name}` : ""}{x.hidden ? " (hidden)" : ""}</option>)}
+          </Select>
+        </Field>
+        <Field label="Billing cycle">
+          <Select value={cycle} onChange={(e) => setCycle(e.target.value)} disabled={!p}>
+            {(cycles.length ? cycles : [{ cycle: "MONTHLY" }]).map((c: any) => <option key={c.cycle} value={c.cycle}>{CYCLES[c.cycle] ?? c.cycle}</option>)}
+          </Select>
+        </Field>
+        <Field label={`Price per cycle (${cur})`}><Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} disabled={!p} /></Field>
+      </div>
+      {(isHosting || isVps) && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label={isHosting ? "Domain" : "Hostname"}><Input value={hostname} onChange={(e) => setHostname(e.target.value.toLowerCase().trim())} placeholder={isHosting ? "example.com" : "server1.example.com"} /></Field>
+          {isVps && oses.length > 0 && (
+            <Field label="Operating system">
+              <Select value={os} onChange={(e) => setOs(e.target.value)}>{oses.map((x: any) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+            </Field>
+          )}
+        </div>
+      )}
+      {isVps && (
+        <div className="mt-4">
+          <div className="mb-1.5 text-sm font-bold text-ink">Root password</div>
+          <PasswordField value={password} onChange={setPassword} optionalHint="Leave empty to generate one — it's emailed to the customer when the server is ready" />
+        </div>
+      )}
+      <p className="mt-3 text-xs text-mute">
+        {o.invoice ? (o.invoice.status === "PAID" ? "The order's invoice is paid — the service is dated from that payment." : "The service is billed through this order's invoice.") : "This order has no invoice — the service starts without one; renewals are invoiced as usual."}
+      </p>
+      <Button className="mt-4" icon="add" loading={busy} onClick={add} disabled={!p}>Add service</Button>
     </Card>
   );
 }

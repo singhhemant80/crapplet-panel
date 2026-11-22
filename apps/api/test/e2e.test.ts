@@ -420,3 +420,40 @@ test("Proxmox client: real REST flow against a mock PVE API (clone â†’ config â†
   assert.ok(calls.includes("PUT /nodes/pve1/qemu/123/resize"));
   assert.ok(calls.includes("POST /nodes/pve1/qemu/123/status/start"));
 });
+
+test("order without its service: staff add the service by hand, it takes the invoice line, then Activate sets it up", async () => {
+  const bcrypt = (await import("bcryptjs")).default;
+  const role = await prisma.role.findUniqueOrThrow({ where: { name: "Administrator" } });
+  await prisma.user.create({ data: { type: "STAFF", email: `adder-${RUN}@t.test`, firstName: "Ad", passwordHash: await bcrypt.hash("Boss@123456", 10), roleId: role.id } });
+  const staff = new Session();
+  assert.equal((await staff.req("POST", "/api/auth/login", { email: `adder-${RUN}@t.test`, password: "Boss@123456", portal: "admin" })).status, 200);
+  const cust = new Session();
+  await registerClient(cust, `noservice-${RUN}@t.test`);
+  const custId = (await prisma.user.findUniqueOrThrow({ where: { email: `noservice-${RUN}@t.test` } })).id;
+  const plan = await prisma.product.findUniqueOrThrow({ where: { slug: "shared-basic" } });
+  const placed = await staff.req("POST", "/api/admin/orders", { userId: custId, items: [{ productId: plan.id, cycle: "MONTHLY", quantity: 1, hostname: `lost-${RUN}.example.in`, config: {}, addonIds: [] }], domains: [] });
+  assert.equal(placed.status, 201, JSON.stringify(placed.body));
+  // the service goes missing (like a WHMCS order imported without it)
+  const lost = await prisma.service.findFirstOrThrow({ where: { orderId: placed.body.orderId } });
+  await prisma.service.delete({ where: { id: lost.id } });
+
+  const page = await staff.req("GET", `/api/admin/orders/${placed.body.orderId}`);
+  assert.equal(page.body.order.services.length, 0);
+  assert.equal((await staff.req("POST", `/api/admin/orders/${placed.body.orderId}/services`, { productId: plan.id, cycle: "MONTHLY" })).status, 400, "hosting needs its domain");
+  const add = await staff.req("POST", `/api/admin/orders/${placed.body.orderId}/services`, { productId: plan.id, cycle: "MONTHLY", hostname: `lost-${RUN}.example.in`, recurringAmount: 4900 });
+  assert.equal(add.status, 201, JSON.stringify(add.body));
+  assert.equal(add.body.linkedInvoiceItem, true);
+  const svc = await prisma.service.findUniqueOrThrow({ where: { id: add.body.serviceId } });
+  assert.equal(svc.status, "PENDING");
+  assert.equal(svc.orderId, placed.body.orderId);
+  assert.equal(svc.recurringAmount, 4900);
+  assert.ok(svc.nextDueDate, "dated from the unpaid invoice");
+  const line = await prisma.invoiceItem.findFirstOrThrow({ where: { invoiceId: placed.body.invoiceId, type: "SERVICE" } });
+  assert.equal(line.relId, svc.id);
+
+  assert.equal((await staff.req("POST", "/api/auth/reauth", { password: "Boss@123456" })).status, 200);
+  const act = await staff.req("POST", `/api/admin/orders/${placed.body.orderId}/status`, { action: "activate" });
+  assert.equal(act.status, 200, JSON.stringify(act.body));
+  // automated plans start their setup; manual ones are marked delivered
+  assert.equal((await prisma.service.findUniqueOrThrow({ where: { id: svc.id } })).status, ["CPANEL", "PROXMOX", "VIRTUALIZOR"].includes(plan.provisioner) ? "PROVISIONING" : "ACTIVE");
+});

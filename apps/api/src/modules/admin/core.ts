@@ -514,6 +514,82 @@ async function checkOsChange(serviceId: string, osTemplateId: string | null) {
   if (svc.product.provisioner === "PROXMOX" && !os.proxmoxKvmVmid && !os.proxmoxLxcVolid) throw badRequest(`"${os.name}" has no Proxmox template configured`);
 }
 
+/**
+ * Add a service to an existing order by hand — for an order that arrived without one (a WHMCS order whose
+ * service wasn't imported, a removed service) or a plan agreed outside the shop. The service starts as
+ * Pending; "Activate / provision" on the order then sets it up. It's tied to the order's invoice so
+ * paying it (or the payment already made) dates the service like a normal order.
+ */
+const addOrderServiceSchema = z.object({
+  productId: z.string().min(1),
+  cycle: z.nativeEnum(BillingCycle),
+  hostname: z.string().trim().toLowerCase().max(253).nullish(),
+  osTemplateId: z.string().nullish(),
+  rootPassword: z.string().max(128).nullish(),
+  /** per-cycle price in paise; default = the plan's price for that cycle */
+  recurringAmount: z.number().int().min(0).max(1_000_000_000).nullish(),
+});
+adminCore.post(
+  "/orders/:id/services",
+  requireStaff("orders.manage"),
+  ah(async (req, res) => {
+    const b = parse(addOrderServiceSchema, req.body);
+    const o = await prisma.order.findUnique({ where: { id: req.params.id }, include: { invoice: { include: { items: true } } } });
+    if (!o) throw notFound("Order not found");
+    if (["CANCELLED", "FRAUD"].includes(o.status)) throw conflict("This order is cancelled — place a new order instead");
+    const p = await prisma.product.findUnique({ where: { id: b.productId }, include: { pricing: true, osTemplates: true } });
+    if (!p) throw badRequest("Choose a plan");
+    const { DOMAIN_RE, isHostingProduct, isVpsProduct } = await import("../../lib/product-kind");
+    const { addCycle } = await import("../../lib/money");
+    const vps = isVpsProduct(p);
+    const host = b.hostname || null;
+    if (isHostingProduct(p) && (!host || !DOMAIN_RE.test(host))) throw badRequest(`Enter the domain for ${p.name} (e.g. example.com)`);
+    if (vps && p.osTemplates.length && !b.osTemplateId) throw badRequest("Choose the operating system");
+    if (b.osTemplateId && !p.osTemplates.some((x) => x.osTemplateId === b.osTemplateId)) throw badRequest("That operating system isn't offered with this plan");
+    if (vps && b.rootPassword) {
+      const pw = rootPasswordSchema.safeParse(b.rootPassword);
+      if (!pw.success) throw badRequest(pw.error.issues[0]?.message ?? "Root password is too weak");
+    }
+    const currency = o.invoice?.currency ?? o.currency ?? "INR";
+    const price = p.pricing.find((x) => x.cycle === b.cycle && x.currency === currency) ?? p.pricing.find((x) => x.cycle === b.cycle && x.currency === "INR");
+    const recurring = b.recurringAmount ?? price?.price ?? 0;
+    const inv = o.invoice;
+    // a service line on the order's invoice that points at nothing (its service never arrived) is this one
+    const orphan = inv?.items.find((i) => i.type === "SERVICE" && (!i.relId || i.relId === ""));
+    const orphanByMissing = !orphan && inv ? await (async () => {
+      for (const i of inv.items.filter((x) => x.type === "SERVICE" && x.relId)) if (!(await prisma.service.findUnique({ where: { id: i.relId! }, select: { id: true } }))) return i;
+      return null;
+    })() : null;
+    const line = orphan ?? orphanByMissing ?? null;
+    const due = b.cycle === "ONETIME" ? null : inv?.status === "PAID" ? addCycle(inv.paidAt ?? new Date(), b.cycle) : inv?.status === "UNPAID" && inv.dueDate ? inv.dueDate : null;
+    const svc = await prisma.$transaction(async (tx) => {
+      const s = await tx.service.create({
+        data: {
+          userId: o.userId,
+          orderId: o.id,
+          productId: p.id,
+          billingCycle: b.cycle,
+          currency,
+          firstAmount: line?.unitPrice ?? recurring,
+          recurringAmount: recurring,
+          hostname: host,
+          osTemplateId: vps ? b.osTemplateId ?? null : null,
+          passwordEnc: vps && b.rootPassword ? encrypt(b.rootPassword) : null,
+          virtType: p.virtType,
+          nextDueDate: due,
+          nextInvoiceDate: due,
+          config: { addedByStaff: true },
+        },
+      });
+      if (line) await tx.invoiceItem.update({ where: { id: line.id }, data: { relId: s.id } });
+      return s;
+    });
+    await syncOrderStatus(o.id);
+    await audit({ actorId: req.user!.id, action: "order.service_added", entity: "order", entityId: o.id, details: { serviceId: svc.id, productId: p.id, cycle: b.cycle, linkedInvoiceItem: line?.id ?? null } });
+    res.status(201).json({ ok: true, serviceId: svc.id, linkedInvoiceItem: !!line, invoicePaid: inv?.status === "PAID" });
+  }),
+);
+
 adminCore.get(
   "/orders/:id",
   requireStaff("orders.view"),
