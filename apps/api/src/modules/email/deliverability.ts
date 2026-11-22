@@ -79,6 +79,54 @@ export function mergeSpf(current: string | undefined, add: string[]) {
   return parts.join(" ").replace(/\s\+?all$/i, " ~all");
 }
 
+const inCidr = (ip: string, cidr: string) => {
+  const [net, bitsS] = cidr.split("/");
+  const bits = bitsS === undefined ? 32 : Number(bitsS);
+  const n = (x: string) => x.split(".").reduce((a, o) => (a << 8) + (Number(o) & 255), 0) >>> 0;
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(net) || !(bits >= 0 && bits <= 32)) return false;
+  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+  return (n(ip) & mask) === (n(net) & mask);
+};
+
+/**
+ * Does the domain's SPF record let this IP send? Follows include:, redirect=, a, mx and ip4 like a
+ * receiving server would (10 lookups max). "unknown" when DNS can't be read.
+ */
+export async function spfAllows(r: Resolver, domain: string, ip: string, depth = 0, budget = { n: 0 }): Promise<"pass" | "fail" | "unknown"> {
+  if (depth > 6 || budget.n > 10) return "unknown";
+  const recs = (await txt(r, domain)).filter((t) => /^v=spf1(\s|$)/i.test(t));
+  if (!recs.length) return depth === 0 ? "fail" : "unknown";
+  const terms = recs[0].trim().split(/\s+/).slice(1);
+  let redirect = "";
+  for (const raw of terms) {
+    const qual = /^[+~?-]/.test(raw) ? raw[0] : "+";
+    const t = raw.replace(/^[+~?-]/, "");
+    const [mech, arg] = [t.split(/[:=/]/)[0].toLowerCase(), t.includes(":") ? t.slice(t.indexOf(":") + 1) : ""];
+    let hit = false;
+    if (mech === "ip4") hit = inCidr(ip, arg);
+    else if (mech === "a") {
+      budget.n++;
+      const [host, cidr] = (arg || domain).split("/");
+      hit = (await safe(r.resolve4(host || domain), [] as string[])).some((a) => inCidr(ip, `${a}/${cidr ?? 32}`));
+    } else if (mech === "mx") {
+      budget.n++;
+      const [host, cidr] = (arg || domain).split("/");
+      for (const m of await safe(r.resolveMx(host || domain), [] as { exchange: string; priority: number }[])) if ((await safe(r.resolve4(m.exchange), [] as string[])).some((a) => inCidr(ip, `${a}/${cidr ?? 32}`))) hit = true;
+    } else if (mech === "include") {
+      budget.n++;
+      hit = (await spfAllows(r, arg, ip, depth + 1, budget)) === "pass";
+    } else if (mech === "all") {
+      return qual === "+" || qual === "?" ? (qual === "+" ? "pass" : "fail") : "fail";
+    } else if (t.toLowerCase().startsWith("redirect=")) redirect = t.slice(9);
+    if (hit) return qual === "+" ? "pass" : "fail";
+  }
+  if (redirect) {
+    budget.n++;
+    return spfAllows(r, redirect, ip, depth + 1, budget);
+  }
+  return "fail";
+}
+
 const BLOCKLISTS = [
   { zone: "zen.spamhaus.org", name: "Spamhaus ZEN" },
   { zone: "bl.spamcop.net", name: "SpamCop" },
@@ -106,7 +154,10 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
   const checks: Check[] = [];
   const records: DnsRecord[] = [];
   const own = c.preset === "local" || /^(127\.|localhost$)/.test(c.host);
-  const ip = c.sendingIp || (own ? guessPublicIp() : "");
+  // your own mail server elsewhere (Mailcow, any "other" SMTP host): its IP is what Gmail/Outlook judge
+  const selfHosted = !own && (c.preset === "mailcow" || c.preset === "custom") && !!c.host;
+  const hostIps = selfHosted ? await safe(r.resolve4(c.host), [] as string[]) : [];
+  const ip = c.sendingIp || (own ? guessPublicIp() : hostIps[0] ?? "");
 
   // ── 1. Sending setup
   if (!c.host || !c.enabled) {
@@ -145,13 +196,15 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
   } else if (!spf) {
     checks.push({ key: "spf", label: "SPF", status: "error", detail: `${domain} has no SPF record, so receiving servers can't tell whether ${c.host || "your server"} may send for you.`, fix: "Add this TXT record:", record: { type: "TXT", host: "@", value: mergeSpf(undefined, need), why: "Authorises your mail provider to send as your domain" } });
   } else {
-    const okAny = own ? !ip || spf.includes(`ip4:${ip}`) || /\b(a|mx)\b/.test(spf) : !preset.spf.length || preset.spf.some((m) => spf.toLowerCase().includes(m.toLowerCase()));
+    const verdict = (own || selfHosted) && ip ? await spfAllows(r, domain, ip) : "unknown";
+    const okAny = own || selfHosted ? !ip || verdict !== "fail" : !preset.spf.length || preset.spf.some((m) => spf.toLowerCase().includes(m.toLowerCase()));
+    if (selfHosted && ip) need.push(`ip4:${ip}`);
     const lookups = spfLookups(spf);
     if (/[\s]\+?all$/i.test(spf)) checks.push({ key: "spf", label: "SPF", status: "error", detail: "Your SPF record ends in +all, which lets anyone in the world send as your domain. Filters treat that as no SPF at all.", found: spf, fix: "Replace it with:", record: { type: "TXT", host: "@", value: mergeSpf(spf.replace(/\s\+?all$/i, ""), need), why: "Only your providers may send" } });
     else if (!okAny) checks.push({ key: "spf", label: "SPF", status: "error", detail: `SPF exists but doesn't include ${need.join(" ") || preset.label}, so mail from the panel fails SPF.`, found: spf, fix: "Change the TXT record to:", record: { type: "TXT", host: "@", value: mergeSpf(spf, need), why: "Adds your mail provider to the existing SPF record" } });
     else if (lookups > 10) checks.push({ key: "spf", label: "SPF", status: "error", detail: `SPF needs ${lookups} DNS lookups; the limit is 10, so it fails.`, found: spf, fix: "Remove services you no longer use from the record." });
     else if (/\?all$/i.test(spf)) checks.push({ key: "spf", label: "SPF", status: "warn", detail: "SPF ends in ?all (neutral), which gives no protection.", found: spf, fix: "Change ?all to ~all." });
-    else checks.push({ key: "spf", label: "SPF", status: "ok", detail: `SPF authorises ${own ? ip || "this server" : preset.label}.`, found: spf });
+    else checks.push({ key: "spf", label: "SPF", status: "ok", detail: `SPF authorises ${own || selfHosted ? `${c.host && selfHosted ? `${c.host} (${ip})` : ip || "this server"}` : preset.label}.`, found: spf });
   }
 
   // ── 4. DKIM
@@ -166,7 +219,12 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
   } else {
     const sel = c.providerDkimSelector || preset.dkimSelector;
     if (own) checks.push({ key: "dkim", label: "DKIM", status: "error", detail: "Mail sent straight from this server isn't DKIM-signed. Gmail and Outlook send most unsigned mail to spam.", fix: "Turn on DKIM signing below and add the record it shows." });
-    else if (!sel) checks.push({ key: "dkim", label: "DKIM", status: "warn", detail: `Can't check DKIM without the selector name. ${preset.label === PRESETS.custom.label ? "Your provider" : preset.label} signs your mail only after you add its DKIM record to DNS.`, fix: "Enable DKIM in your mail provider's admin console, add the record it gives you, then type its selector (the part before ._domainkey) in “Provider DKIM selector”." });
+    else if (!sel && selfHosted) {
+      const tried = ["dkim", "default", "mail", "s1", "selector1", "mailcow"];
+      const hits = await Promise.all(tried.map(async (s) => ((await txt(r, `${s}._domainkey.${domain}`)).some((x) => /p=/.test(x)) ? s : "")));
+      const got = hits.find(Boolean);
+      checks.push(got ? { key: "dkim", label: "DKIM", status: "ok", detail: `DKIM key found at ${got}._domainkey.${domain}. Make sure your mail server signs with selector "${got}".` } : { key: "dkim", label: "DKIM", status: "error", detail: `No DKIM key found for ${domain} (tried selectors ${tried.join(", ")}).`, fix: "In Mailcow: Configuration → ARC/DKIM keys → add a key for the domain (selector dkim, 2048 bits) and publish the TXT record it shows at dkim._domainkey." });
+    } else if (!sel) checks.push({ key: "dkim", label: "DKIM", status: "warn", detail: `Can't check DKIM without the selector name. ${preset.label === PRESETS.custom.label ? "Your provider" : preset.label} signs your mail only after you add its DKIM record to DNS.`, fix: "Enable DKIM in your mail provider's admin console, add the record it gives you, then type its selector (the part before ._domainkey) in “Provider DKIM selector”." });
     else {
       const host = `${sel}._domainkey.${domain}`;
       const [t, cname] = await Promise.all([txt(r, host), safe(r.resolveCname(host), [] as string[])]);
@@ -185,13 +243,16 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
     else checks.push({ key: "dmarc", label: "DMARC", status: "ok", detail: `DMARC policy p=${p}.`, found: dmarc });
   }
 
-  // ── 6. Own server: reverse DNS + blocklists
-  if (own) {
+  // ── 6. Own / self-hosted mail server: reverse DNS + blocklists
+  if (own || selfHosted) {
     if (!ip) checks.push({ key: "ptr", label: "Reverse DNS", status: "warn", detail: "Couldn't detect this server's public IP.", fix: "Type it in “Sending IP”." });
     else {
       const ptr = await safe(r.reverse(ip), [] as string[]);
       const fwd = ptr[0] ? await safe(r.resolve4(ptr[0]), [] as string[]) : [];
       const generic = ptr[0] && (ptr[0].includes(ip.replace(/\./g, "-")) || /(^|\.)(ip|static|dynamic|host|vps|cust|pool)[-.]/i.test(ptr[0]));
+      // Mailcow / Postfix greet with their hostname: it should be the PTR name
+      if (selfHosted && ptr[0] && c.host && ptr[0].replace(/\.$/, "").toLowerCase() !== c.host.toLowerCase() && !generic)
+        checks.push({ key: "helo", label: "Hostname match", status: "warn", detail: `The IP's reverse DNS is ${ptr[0]} but you send through ${c.host}. Gmail and Outlook trust mail more when the server's name, its PTR and its A record all match.`, fix: `Set the PTR of ${ip} to ${c.host} (at your IP provider) and make sure Mailcow's hostname (MAILCOW_HOSTNAME) is ${c.host}.` });
       if (!ptr.length) checks.push({ key: "ptr", label: "Reverse DNS (PTR)", status: "error", detail: `${ip} has no reverse DNS. Gmail and Outlook reject or junk mail from IPs without it.`, fix: `Ask your server/IP provider to set the PTR of ${ip} to mail.${domain}, and add an A record mail.${domain} → ${ip}.`, record: { type: "PTR", host: ip, value: `mail.${domain}`, why: "Set at your IP provider, not in your domain's DNS" } });
       else if (!fwd.includes(ip)) checks.push({ key: "ptr", label: "Reverse DNS (PTR)", status: "error", detail: `${ip} → ${ptr[0]}, but ${ptr[0]} doesn't point back to ${ip}.`, fix: `Add an A record ${ptr[0]} → ${ip}.` });
       else if (generic) checks.push({ key: "ptr", label: "Reverse DNS (PTR)", status: "warn", detail: `PTR is ${ptr[0]}, which looks like a generic hosting name.`, fix: `Ask your provider to set it to mail.${domain}.` });
