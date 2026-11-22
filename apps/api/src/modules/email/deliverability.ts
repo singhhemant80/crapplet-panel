@@ -1,6 +1,7 @@
 import { promises as dnsp } from "dns";
 import os from "os";
 import { PRESETS, domainOf, type MailConfig } from "./mail-config";
+import { config } from "../../config";
 
 /**
  * Inbox-placement checks: everything Gmail, Outlook, Yahoo and Zoho look at before deciding
@@ -247,6 +248,23 @@ export async function checkDeliverability(c: MailConfig, r: Resolver = sysResolv
       const ok = t.some((x) => /p=/.test(x)) || cname.length > 0;
       checks.push(ok ? { key: "dkim", label: "DKIM", status: "ok", detail: `DKIM key found at ${host}${cname.length ? ` (→ ${cname[0]})` : ""}.${guessed ? ` Selector "${sel}" was found automatically${sel === "dkim" ? " (mailcow's default)" : ""} — your mail server must sign with it; the DKIM line in a received message's headers shows s=${sel} and dkim=pass when it does.` : ""}` } : { key: "dkim", label: "DKIM", status: "error", detail: `No DKIM key at ${host}. Without it your provider's signature can't be verified.`, fix: `Turn on DKIM in ${preset.label} and add the TXT/CNAME record it shows.` });
     }
+  }
+
+  // ── links in the emails: Gmail/Outlook score links to bare IPs, plain http and other domains as spam
+  {
+    let u: URL | null = null;
+    try {
+      u = new URL(config.appUrl);
+    } catch {
+      /* unparsable */
+    }
+    const host = u?.hostname ?? "";
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost";
+    const linkDomain = host.split(".").slice(-2).join(".");
+    if (!u || isIp) checks.push({ key: "links", label: "Links in emails", status: "error", detail: `Every email links to ${config.appUrl} (logo, "Client area", invoices). Links to an IP address are one of the strongest spam signals.`, fix: `Set APP_URL=https://${domain} (or your panel's domain) in apps/api/.env and restart, or re-run the installer with --domain.` });
+    else if (u.protocol !== "https:") checks.push({ key: "links", label: "Links in emails", status: "warn", detail: `Emails link to ${config.appUrl} over plain http.`, fix: "Turn on HTTPS for the panel and set APP_URL to the https:// address." });
+    else if (linkDomain !== domain.split(".").slice(-2).join(".")) checks.push({ key: "links", label: "Links in emails", status: "warn", detail: `Emails are sent from ${domain} but link to ${host}. A different domain in links lowers trust a little.`, fix: `Use a panel address on ${domain} (e.g. my.${domain}) if you can.` });
+    else checks.push({ key: "links", label: "Links in emails", status: "ok", detail: `Emails link to ${config.appUrl} — same domain as the sender, over HTTPS.` });
   }
 
   // ── 5. DMARC
