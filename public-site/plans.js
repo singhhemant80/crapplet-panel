@@ -64,7 +64,9 @@
     if (s.cpuCores) out.push({ icon: 'memory', value: s.cpuCores + ' vCPU', label: 'Processor' });
     if (s.ramMb) out.push({ icon: 'developer_board', value: gb(s.ramMb), label: 'RAM' });
     if (s.diskGb) out.push({ icon: 'hard_drive', value: tb(s.diskGb), label: 'NVMe SSD' });
+    // 0, or a placeholder "huge" value (e.g. 1000000 TB from Virtualizor/WHMCS), means no real limit
     if (s.bandwidthGb === 0) out.push({ icon: 'swap_vert', value: 'Unmetered', label: 'Bandwidth' });
+    else if (s.bandwidthGb >= 1000000) out.push({ icon: 'swap_vert', value: 'Unlimited', label: 'Bandwidth' });
     else if (s.bandwidthGb) out.push({ icon: 'swap_vert', value: tb(s.bandwidthGb), label: 'Bandwidth' });
     if (s.ipv4Count) out.push({ icon: 'lan', value: s.ipv4Count + ' IPv4', label: s.ipv4Count > 1 ? 'Dedicated IPs' : 'Dedicated IP' });
     return out;
