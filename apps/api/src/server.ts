@@ -24,6 +24,14 @@ setTimeout(async () => {
     const { getSettings, updateSettings } = await import("./lib/settings");
     const a = (await getSettings()).automation as Record<string, unknown>;
     if (!a.upgradesOnlySet) await updateSettings("automation", { clientDowngrades: false, upgradesOnlySet: true } as never);
+    // one-time: VPS plans that picked up Virtualizor's placeholder bandwidth (1000000 TB) get the standard 10 TB
+    if (!a.vpsBandwidthFixed) {
+      const { VPS_BANDWIDTH_GB } = await import("./modules/admin/catalog");
+      const { prisma } = await import("./db");
+      const r = await prisma.product.updateMany({ where: { type: { in: ["VPS_LINUX", "VPS_WINDOWS", "VPS_FOREX", "VPS_N8N", "VPS_MINECRAFT", "VPS_GOLD"] }, bandwidthGb: { gte: 1_000_000 } }, data: { bandwidthGb: VPS_BANDWIDTH_GB } });
+      if (r.count) console.log(`[catalog] ${r.count} VPS plan(s): placeholder bandwidth set to ${VPS_BANDWIDTH_GB / 1000} TB`);
+      await updateSettings("automation", { vpsBandwidthFixed: true } as never);
+    }
   } catch (e) {
     console.error("[settings] upgrades-only switch failed", e);
   }

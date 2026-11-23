@@ -232,7 +232,7 @@ export default function ProductEditor() {
                   onPick={(plan, virt, specs) =>
                     setP((cur: any) => ({
                       ...cur,
-                      ...(specs ? { cpuCores: specs.cores ?? cur.cpuCores, ramMb: specs.ramMb ?? cur.ramMb, diskGb: specs.diskGb ?? cur.diskGb, bandwidthGb: specs.bandwidthGb || cur.bandwidthGb } : {}),
+                      ...(specs ? { cpuCores: specs.cores ?? cur.cpuCores, ramMb: specs.ramMb ?? cur.ramMb, diskGb: specs.diskGb ?? cur.diskGb, bandwidthGb: specs.bandwidthGb && specs.bandwidthGb < 1_000_000 ? specs.bandwidthGb : cur.bandwidthGb } : {}),
                       virtType: /lxc|proxl|openvz|vzo/.test(virt) ? "LXC" : "KVM",
                       moduleConfig: { ...cur.moduleConfig, virtualizor: { ...cur.moduleConfig.virtualizor, planId: plan, virt } },
                     }))
