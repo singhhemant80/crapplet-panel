@@ -842,12 +842,12 @@
                     <p class="text-slate-600 max-w-2xl mx-auto">Purpose-built Linux servers with KVM virtualization. Choose your distro, scale your resources, and keep full root control.</p>
                 </div>
                 <div class="flex flex-wrap justify-center gap-4 mb-10 reveal rv2">
-                    <button class="tab-pill active-tab px-6 py-2 rounded-full font-bold text-sm" id="tab-gp">Container VPS</button>
-                    <button class="tab-pill px-6 py-2 rounded-full bg-slate-50 text-slate-600 font-bold text-sm border border-slate-200" id="tab-cpu">KVM VPS</button>
+                    <button class="tab-pill active-tab px-6 py-2 rounded-full font-bold text-sm" id="tab-cpu">KVM VPS</button>
+                    <button class="tab-pill px-6 py-2 rounded-full bg-slate-50 text-slate-600 font-bold text-sm border border-slate-200" id="tab-gp">Container VPS</button>
                 </div>
 
                 <!-- Container VPS Plans -->
-                <div class="flex flex-col gap-6 plans-grid" id="plans-gp" data-plans="VPS_LINUX" data-plans-virt="LXC" data-plans-tab="#tab-gp" data-plans-layout="rows">
+                <div class="flex flex-col gap-6 plans-grid hidden" id="plans-gp" data-plans="VPS_LINUX" data-plans-virt="LXC" data-plans-tab="#tab-gp" data-plans-layout="rows">
 
     <!-- VPS G1 -->
     <div class="grid grid-cols-1 lg:grid-cols-[150px_1fr_180px] items-center gap-6 p-5 md:p-6 rounded-2xl bg-white border border-slate-200">
@@ -957,7 +957,7 @@
 
                 <!-- KVM VPS Plans -->
                 <!-- KVM VPS Plans -->
-<div class="flex flex-col gap-6 plans-grid hidden" id="plans-cpu" data-plans="VPS_LINUX" data-plans-virt="KVM" data-plans-tab="#tab-cpu" data-plans-layout="rows">
+<div class="flex flex-col gap-6 plans-grid" id="plans-cpu" data-plans="VPS_LINUX" data-plans-virt="KVM" data-plans-tab="#tab-cpu" data-plans-layout="rows">
 
     <!-- VPS C1 -->
     <div class="grid grid-cols-1 lg:grid-cols-[150px_1fr_180px] items-center gap-6 p-5 md:p-6 rounded-2xl bg-white border border-slate-200">
