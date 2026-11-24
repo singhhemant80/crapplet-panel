@@ -297,15 +297,28 @@ adminInvoices.post(
 );
 
 // ───── delete ─────
-async function deleteInvoice(id: string) {
-  const inv = await prisma.invoice.findUnique({ where: { id }, include: { transactions: { select: { id: true } }, creditNotes: { select: { id: true } }, order: { select: { id: true, number: true } }, paymentIntents: { select: { status: true, createdAt: true } } } });
+/**
+ * Delete an invoice. Unpaid / draft / cancelled ones (also an order's invoice — the order is unlinked) go
+ * straight away. One with payments or a tax number needs `force` + a reason: its payment records are
+ * removed, account credit used on it goes back to the customer's wallet, and the whole invoice is kept in
+ * the audit log. Never: invoices with credit notes, or a paid wallet top-up (the credit was already given).
+ */
+async function deleteInvoice(id: string, opts: { force?: boolean; reason?: string } = {}) {
+  const inv = await prisma.invoice.findUnique({ where: { id }, include: { items: true, transactions: { select: { id: true, type: true, amount: true, gateway: true, gatewayTxnId: true } }, creditNotes: { select: { number: true } }, order: { select: { id: true, number: true } }, paymentIntents: { select: { status: true, createdAt: true } } } });
   if (!inv) throw notFound("Invoice not found");
-  if (inv.number || inv.transactions.length || inv.creditNotes.length || inv.amountPaid > 0 || inv.creditApplied > 0) throw conflict("This invoice has payments or a tax number — it can't be deleted (cancel or refund it instead)");
-  if (inv.order) throw conflict(`This invoice belongs to order ${inv.order.number} — cancel it instead`);
-  if (inv.paymentIntents.some((p) => (p.status === "CREATED" || p.status === "PENDING_REVIEW") && p.createdAt.getTime() > Date.now() - 2 * 3600_000)) throw conflict("The customer started paying this invoice in the last 2 hours — cancel it instead");
+  if (inv.creditNotes.length) throw conflict(`This invoice has credit note ${inv.creditNotes.map((c) => c.number).join(", ")} — it can't be deleted`);
+  if (inv.isWalletTopup && (inv.status === "PAID" || inv.amountPaid > 0)) throw conflict("A paid wallet top-up can't be deleted — the credit was already added (adjust the customer's credit instead)");
+  const recorded = !!inv.number || inv.transactions.length > 0 || inv.amountPaid > 0 || inv.creditApplied > 0;
+  if (recorded && !opts.force) throw conflict("This invoice has payments or a tax number — confirm with a reason to delete it");
+  if (recorded && !opts.reason?.trim()) throw conflict("Give a reason for deleting a paid / numbered invoice");
+  if (!opts.force && inv.paymentIntents.some((p) => (p.status === "CREATED" || p.status === "PENDING_REVIEW") && p.createdAt.getTime() > Date.now() - 2 * 3600_000)) throw conflict("The customer started paying this invoice in the last 2 hours — cancel it instead");
   await prisma.$transaction(async (tx) => {
     await tx.paymentIntent.deleteMany({ where: { invoiceId: id } });
     await tx.billableItem.updateMany({ where: { invoiceId: id }, data: { invoiceId: null, invoiced: false } });
+    if (inv.order) await tx.order.update({ where: { id: inv.order.id }, data: { invoiceId: null } });
+    if (inv.transactions.length) await tx.transaction.deleteMany({ where: { invoiceId: id } });
+    // account credit spent on this invoice goes back to the customer
+    if (inv.creditApplied > 0) await adjustCredit(tx, { userId: inv.userId, amount: inv.creditApplied, description: `Credit returned — ${invoiceLabel(inv)} deleted`, refType: "invoice", refId: id });
     await tx.invoice.delete({ where: { id } });
   });
   return inv;
@@ -314,9 +327,13 @@ adminInvoices.delete(
   "/invoices/:id",
   requireStaff("billing.manage"),
   ah(async (req, res) => {
-    const inv = await deleteInvoice(req.params.id);
-    await audit({ actorId: req.user!.id, userId: inv.userId, action: "invoice.deleted", entity: "invoice", entityId: inv.id, details: { invoice: invoiceLabel(inv), total: inv.total } });
-    res.json({ ok: true });
+    const b = parse(z.object({ force: z.boolean().optional(), reason: z.string().trim().max(300).optional() }), req.body ?? {});
+    const inv = await deleteInvoice(req.params.id, b);
+    await audit({
+      actorId: req.user!.id, userId: inv.userId, action: "invoice.deleted", entity: "invoice", entityId: inv.id,
+      details: { invoice: invoiceLabel(inv), status: inv.status, total: inv.total, amountPaid: inv.amountPaid, creditReturned: inv.creditApplied || undefined, order: inv.order?.number, reason: b.reason || undefined, items: inv.items.map((i) => ({ description: i.description, amount: i.amount })), payments: inv.transactions.map((t) => ({ type: t.type, amount: t.amount, gateway: t.gateway, ref: t.gatewayTxnId })) },
+    });
+    res.json({ ok: true, creditReturned: inv.creditApplied });
   }),
 );
 

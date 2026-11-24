@@ -1,4 +1,5 @@
 "use client";
+import { blockInfo, serviceBlock } from "@/lib/ip-block";
 import { bandwidth } from "@/lib/units";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
@@ -64,8 +65,8 @@ export default function ServicePage() {
     <>
       <PageHeader
         back="/client/services"
-        icon={isVps && svc.osTemplate ? <OsLogo os={svc.osTemplate} size={34} /> : <Icon name={isHosting ? "language" : isVps ? "terminal" : "widgets"} className="text-[26px]" />}
-        title={svc.hostname || svc.product.name}
+        icon={isVps && svc.osTemplate ? <OsLogo os={svc.osTemplate} size={34} /> : <Icon name={isHosting ? "language" : isVps ? "terminal" : svc.ipBlock ? "lan" : "widgets"} className="text-[26px]" />}
+        title={(svc.ipBlock && serviceBlock(svc)) || svc.hostname || svc.product.name}
         badge={<Badge status={svc.status} />}
         subtitle={isHosting ? `${svc.product.name} · ${reseller ? "Reseller hosting (cPanel + WHM)" : "cPanel web hosting"}` : isVps ? `${svc.product.name} · ${svc.product.virtType ?? "KVM"} VPS · ${svc.product.cpuCores} vCPU · ${gb(svc.product.ramMb)} · ${svc.product.diskGb} GB NVMe${svc.product.bandwidthGb ? ` · ${bandwidth(svc.product.bandwidthGb)} bandwidth` : ""}` : svc.product.name}
         meta={<>
@@ -175,8 +176,26 @@ export default function ServicePage() {
 
       <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         {!isHosting && (
-        <Card title={isVps ? "Server details" : svc.colo ? "Colocation details" : "Service details"}>
+        <Card title={isVps ? "Server details" : svc.colo ? "Colocation details" : svc.ipBlock ? "IP block" : "Service details"}>
           <dl className="grid grid-cols-[130px_1fr] gap-y-3 text-sm">
+            {svc.ipBlock && (() => {
+              const b = blockInfo(serviceBlock(svc));
+              const g = svc.ipBlock;
+              const rows: [string, React.ReactNode][] = b
+                ? [
+                    ["Block", <span key="b" className="flex items-center gap-1 font-mono">{b.cidr}<Copy text={b.cidr} /></span>],
+                    ["Addresses", `${b.total.toLocaleString("en-IN")} (${b.usable.toLocaleString("en-IN")} usable)`],
+                    ["Netmask", <span key="m" className="font-mono">{b.netmask}</span>],
+                    ["Usable range", <span key="r" className="font-mono">{b.first} – {b.last}</span>],
+                    ...(g.gateway ? [["Gateway", <span key="g" className="font-mono">{g.gateway}</span>] as [string, React.ReactNode]] : []),
+                    ...(g.routedTo ? [["Routed to", g.routedTo] as [string, React.ReactNode]] : []),
+                    ...(g.vlan ? [["VLAN", g.vlan] as [string, React.ReactNode]] : []),
+                    ...(g.notes ? [["Notes", g.notes] as [string, React.ReactNode]] : []),
+                  ]
+                : [["Block", svc.status === "ACTIVE" ? "Being assigned — we'll update this shortly" : "—"]];
+              return rows.map(([k, v]) => <Fragment key={k}><dt className="text-mute">{k}</dt><dd className="font-semibold text-ink">{v}</dd></Fragment>);
+            })()}
+            {!svc.ipBlock && <>
             {svc.colo && (() => {
               const c = svc.colo, sp = c.specs ?? {}, l = c.location ?? {}, e = c.equipment ?? {};
               const rows: [string, React.ReactNode][] = [
@@ -198,7 +217,8 @@ export default function ServicePage() {
             <dd className="flex items-center gap-1 font-semibold text-ink">
               {ip ?? "—"} {ip && <Copy text={ip} />}
             </dd>
-            {svc.ips.length > 1 && (
+            </>}
+            {svc.ips.length > 1 && !svc.ipBlock && (
               <>
                 <dt className="text-mute">Other IPs</dt>
                 <dd className="space-y-0.5 font-mono text-[13px]">{svc.ips.filter((i: any) => i.address !== ip).map((i: any) => <div key={i.address} className="flex items-center gap-1">{i.address}<Copy text={i.address} /></div>)}</dd>

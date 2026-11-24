@@ -18,6 +18,7 @@ export default function AdminInvoice() {
   const [split, setSplit] = useState(false);
   const [mail, setMail] = useState(false);
   const [undo, setUndo] = useState<"PAID" | "UNPAID" | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
   if (loading || !data) return <Loading />;
   const i = data.invoice;
@@ -33,7 +34,7 @@ export default function AdminInvoice() {
     ...(i.status === "UNPAID" && movable ? ([["Move back to draft", "edit_note", () => run(`/admin/invoices/${id}/status`, { status: "DRAFT" }, "Moved to draft — hidden from the customer")]] as any) : []),
     ...(i.status === "REFUNDED" ? ([["Mark as paid (undo the refund)…", "task_alt", () => setUndo("PAID")], ["Mark as unpaid (customer pays again)…", "replay", () => setUndo("UNPAID")]] as any) : []),
     ...(i.status === "CANCELLED" && !i.number && !i.transactions.length ? ([["Reopen as unpaid", "replay", () => run(`/admin/invoices/${id}/status`, { status: "UNPAID", sendEmail: false }, "Reopened")]] as any) : []),
-    ...(movable && !i.order ? ([["Delete invoice", "delete", () => confirm("Delete this invoice permanently? This can't be undone.") && run(`/admin/invoices/${id}`, undefined, "Invoice deleted", () => router.push("/admin/invoices"), "DELETE"), true]] as any) : []),
+    ...(!i.creditNotes.length && !(i.isWalletTopup && (i.status === "PAID" || i.amountPaid > 0)) ? ([["Delete invoice…", "delete", () => setDeleting(true), true]] as any) : []),
   ];
   return (
     <>
@@ -96,6 +97,7 @@ export default function AdminInvoice() {
       <PayModal open={pay} onClose={() => setPay(false)} id={id} due={i.total - i.amountPaid} currency={i.currency} onDone={reload} />
       <RefundModal open={refund} onClose={() => setRefund(false)} id={id} onDone={reload} />
       {edit && <EditModal inv={i} onClose={() => setEdit(false)} onDone={() => { setEdit(false); reload(); }} />}
+      {deleting && <DeleteInvoiceModal inv={i} onClose={() => setDeleting(false)} onDone={() => router.push("/admin/invoices")} />}
       {undo && <UndoRefundModal inv={i} to={undo} onClose={() => setUndo(null)} onDone={() => { setUndo(null); reload(); }} />}
       {split && <SplitModal inv={i} onClose={() => setSplit(false)} onDone={(nid) => { setSplit(false); toast.success("Split — opening the new invoice"); router.push(`/admin/invoices/${nid}`); }} />}
       <EmailModal open={mail} onClose={() => setMail(false)} id={id} status={i.status} />
@@ -376,6 +378,46 @@ function UndoRefundModal({ inv, to, onClose, onDone }: { inv: any; to: "PAID" | 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button icon={to === "PAID" ? "task_alt" : "replay"} loading={busy} disabled={reason.trim().length < 3} onClick={go}>{to === "PAID" ? "Mark as paid" : "Mark as unpaid"}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Delete an invoice. A paid / numbered one needs a reason and typing DELETE — its payment records go too. */
+function DeleteInvoiceModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; onDone: () => void }) {
+  const recorded = !!inv.number || inv.transactions.length > 0 || inv.amountPaid > 0 || inv.creditApplied > 0;
+  const [reason, setReason] = useState("");
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const label = inv.number ?? inv.proformaNumber ?? "this invoice";
+  async function go() {
+    setBusy(true);
+    try {
+      const r = await api(`/admin/invoices/${inv.id}`, { method: "DELETE", body: { force: true, reason: reason.trim() || undefined } });
+      toast.success(`Invoice deleted${r.creditReturned ? ` — ${money(r.creditReturned, inv.currency)} credit returned to the customer's wallet` : ""}`);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message);
+      setBusy(false);
+    }
+  }
+  const ready = !recorded || (reason.trim().length >= 3 && typed.trim().toUpperCase() === "DELETE");
+  return (
+    <Modal open onClose={onClose} title={`Delete ${label}?`}>
+      <div className="space-y-4">
+        <p className="text-sm text-mute">The invoice is removed permanently ({money(inv.total, inv.currency)}, {String(inv.status).toLowerCase()}).{inv.order ? <> It's unlinked from order <b>{inv.order.number}</b>; the order and its services stay.</> : null} A copy of it is kept in the activity log.</p>
+        {recorded && (
+          <Alert tone="warn">
+            This invoice {inv.number ? <>has tax number <b>{inv.number}</b>{inv.amountPaid > 0 ? " and " : ""}</> : null}{inv.amountPaid > 0 ? <>has {money(inv.amountPaid, inv.currency)} paid</> : null}{!inv.number && !(inv.amountPaid > 0) ? "has payment records" : ""}. Its payment records are deleted too
+            {inv.creditApplied > 0 ? <>, and the {money(inv.creditApplied, inv.currency)} account credit used on it goes back to the customer's wallet</> : null}. Money taken through a gateway or bank isn't refunded — do that there if needed. Deleting a numbered tax invoice leaves a gap in your GST invoice numbers; a credit note is usually the better choice.
+          </Alert>
+        )}
+        <Field label={recorded ? "Reason" : "Reason (optional)"} hint="Kept in the activity log"><Input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Duplicate invoice" /></Field>
+        {recorded && <Field label='Type "DELETE" to confirm'><Input value={typed} onChange={(e) => setTyped(e.target.value)} /></Field>}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" icon="delete" loading={busy} disabled={!ready} onClick={go}>Delete invoice</Button>
         </div>
       </div>
     </Modal>

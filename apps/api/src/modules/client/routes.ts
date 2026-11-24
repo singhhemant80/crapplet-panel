@@ -255,10 +255,13 @@ clientRouter.get(
     // is anything for this service still to be paid? (a paid manual-setup service is "being set up", not "awaiting payment")
     const unpaid = await prisma.invoice.findFirst({ where: { userId: req.user!.id, status: "UNPAID", items: { some: { relId: s.id, type: { in: ["SERVICE", "SETUP"] } } } }, select: { id: true } });
     const cfg = (config ?? {}) as Record<string, unknown>;
-    const { coloSpecs, isColoProduct } = await import("../../lib/product-kind");
+    const { coloSpecs, isColoProduct, isIpBlockProduct } = await import("../../lib/product-kind");
     // colocation: what the plan includes, where the equipment is racked (filled in by staff) and the equipment itself
     const colo = isColoProduct(s.product) ? { specs: coloSpecs((await prisma.product.findUnique({ where: { id: s.productId }, select: { moduleConfig: true } }))?.moduleConfig),  location: cfg.colo ?? null, equipment: cfg.equipment ?? null } : null;
-    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: cfg.requestedIpId ? true : false }, colo }, invoices, logs, busy: !!busy, unpaidInvoiceId: unpaid?.id ?? null });
+    // IP block / IP pool: the leased range (filled in by staff), shown instead of server details
+    const pg = await prisma.product.findUnique({ where: { id: s.productId }, select: { moduleConfig: true, group: { select: { name: true } } } });
+    const ipBlock = isIpBlockProduct({ ...s.product, groupName: pg?.group?.name, moduleConfig: pg?.moduleConfig }) ? { ...((cfg.ipBlock ?? {}) as Record<string, string>) } : null;
+    res.json({ service: { ...s, hasPassword: !!passwordEnc, config: { requestedIp: cfg.requestedIpId ? true : false }, colo, ipBlock }, invoices, logs, busy: !!busy, unpaidInvoiceId: unpaid?.id ?? null });
   }),
 );
 

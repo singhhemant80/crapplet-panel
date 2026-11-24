@@ -1002,16 +1002,28 @@ adminCore.put(
           .object({ device: z.string().trim().max(120), units: z.number().int().min(0).max(48).nullable(), powerW: z.number().int().min(0).max(20000).nullable(), psus: z.number().int().min(0).max(4).nullable(), serial: z.string().trim().max(80), notes: z.string().trim().max(500) })
           .partial()
           .optional(),
+        /** IP block / IP pool service: the leased range and where it's routed (staff-maintained, shown to the customer) */
+        ipBlock: z
+          .object({
+            cidr: z.string().trim().max(50).regex(/^$|^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$|^[0-9a-fA-F:]+\/\d{1,3}$/, "Write the block like 162.4.12.0/25"),
+            gateway: z.string().trim().max(50),
+            routedTo: z.string().trim().max(120),
+            vlan: z.string().trim().max(40),
+            notes: z.string().trim().max(500),
+          })
+          .partial()
+          .optional(),
       }),
       req.body,
     );
-    const { password, colo, equipment, ...data } = b;
-    if (colo || equipment) {
+    const { password, colo, equipment, ipBlock, ...data } = b;
+    if (colo || equipment || ipBlock) {
       const cur = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, select: { config: true } });
       const cfg = { ...((cur.config ?? {}) as Record<string, unknown>) };
       const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== "" && v !== null && v !== undefined));
       if (colo) cfg.colo = clean({ ...((cfg.colo ?? {}) as object), ...colo });
       if (equipment) cfg.equipment = clean({ ...((cfg.equipment ?? {}) as object), ...equipment });
+      if (ipBlock) cfg.ipBlock = clean({ ...((cfg.ipBlock ?? {}) as object), ...ipBlock });
       (data as Record<string, unknown>).config = cfg as Prisma.InputJsonValue;
     }
     if (data.terminationReason === "") data.terminationReason = null;

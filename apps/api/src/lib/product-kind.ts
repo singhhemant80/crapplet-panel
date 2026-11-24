@@ -58,3 +58,15 @@ export function coloInvoiceDetails(product: { type: string; moduleConfig: unknow
   ].filter(Boolean);
   return parts.length ? parts.join(" · ").slice(0, 500) : null;
 }
+
+/**
+ * IP block / IP pool plans: the customer leases a range of addresses, not a server (no hypervisor, CPU or RAM).
+ * Recognised by the plan or its group name ("IP Pool", "IPv4 block", "/24 subnet" …) on a manually delivered plan,
+ * or set explicitly with moduleConfig.kind = "ip_block".
+ */
+const IP_WORDS = /\b(ip|ipv4|ipv6|ips)[\s-]*(pool|block|subnet|range|lease|space|allocation)s?\b|\bsubnets?\b|\/(1[6-9]|2\d|3[0-2])\b/i;
+export function isIpBlockProduct(p: { type: string; provisioner: string; name?: string | null; groupName?: string | null; moduleConfig?: unknown }) {
+  if ((p.moduleConfig as { kind?: string } | null)?.kind === "ip_block") return true;
+  if (p.type === "COLOCATION" || ["PROXMOX", "VIRTUALIZOR", "CPANEL"].includes(p.provisioner)) return false;
+  return IP_WORDS.test(p.name ?? "") || IP_WORDS.test(p.groupName ?? "");
+}

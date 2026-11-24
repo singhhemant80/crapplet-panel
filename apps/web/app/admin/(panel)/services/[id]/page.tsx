@@ -7,6 +7,7 @@ import { ResetPasswordModal } from "@/components/reset-password-modal";
 import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { HypervisorSelect } from "@/components/admin/hypervisor-select";
+import { blockInfo, isIpBlockService, parseCidr, serviceBlock } from "@/lib/ip-block";
 import { ChangePlanButton } from "@/components/admin/change-plan";
 import { VirtualizorCheck } from "@/components/admin/virtualizor-check";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
@@ -38,6 +39,8 @@ export default function AdminService() {
   const isVps = s.product.provisioner === "PROXMOX" || s.product.provisioner === "VIRTUALIZOR";
   const isHosting = s.product.provisioner === "CPANEL";
   const isColo = s.product.type === "COLOCATION";
+  const isIp = !isColo && isIpBlockService(s.product);
+  const block = isIp ? serviceBlock(s) : null;
   const ended = ["TERMINATED", "CANCELLED"].includes(s.status);
   const primary = s.ips.find((i: any) => i.isPrimary) ?? s.ips[0];
   const days = s.nextDueDate ? Math.ceil((new Date(s.nextDueDate).getTime() - Date.now()) / 86400_000) : null;
@@ -64,11 +67,11 @@ export default function AdminService() {
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
           <div className="relative flex flex-wrap items-start gap-4 sm:gap-5">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white shadow-lg sm:h-16 sm:w-16 sm:rounded-2xl [&_img]:max-h-8 sm:[&_img]:max-h-10">
-              {s.osTemplate ? <OsLogo os={s.osTemplate} size={40} /> : <Icon name={isHosting ? "language" : isColo ? "shelves" : "dns"} className="text-[32px] text-primary-dark" />}
+              {s.osTemplate ? <OsLogo os={s.osTemplate} size={40} /> : <Icon name={isHosting ? "language" : isColo ? "shelves" : isIp ? "lan" : "dns"} className="text-[32px] text-primary-dark" />}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="min-w-0 break-all text-xl font-extrabold tracking-tight sm:text-2xl">{s.hostname || P.name}</h1>
+                <h1 className="min-w-0 break-all text-xl font-extrabold tracking-tight sm:text-2xl">{block ?? (s.hostname || P.name)}</h1>
                 <span className="rounded-lg bg-white/95 px-1 py-0.5"><Badge status={s.status} /></span>
                 {s.overrideAutoSuspend && <span className="rounded-md bg-amber-400/20 px-2 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/40">Auto-suspend off</span>}
               </div>
@@ -172,7 +175,7 @@ export default function AdminService() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_400px] [&>*]:min-w-0">
         <div className="space-y-6">
-          {isColo ? <ColoCard s={s} onSaved={reload} /> : isHosting ? <HostingCard s={s} live={live} id={id} /> : (
+          {isColo ? <ColoCard s={s} onSaved={reload} /> : isIp ? <IpBlockCard s={s} onSaved={reload} /> : isHosting ? <HostingCard s={s} live={live} id={id} /> : (
             <Card title="Server details">
               <div className="grid gap-x-8 md:grid-cols-2">
                 <Rows rows={[
@@ -308,7 +311,7 @@ export default function AdminService() {
               <Field label="Next due date"><Input type="date" value={edit.nextDueDate} onChange={(e) => setEdit({ ...edit, nextDueDate: e.target.value })} /></Field>
               <Field label={`Recurring (${s.currency ?? "INR"})`}><Input type="number" step="0.01" value={edit.recurringAmount} onChange={(e) => setEdit({ ...edit, recurringAmount: e.target.value })} /></Field>
               <Field label="Billing cycle"><Select value={edit.billingCycle} onChange={(e) => setEdit({ ...edit, billingCycle: e.target.value })}>{Object.entries(CYCLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-              <Field label={isColo ? "Server name" : "Hostname"}><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value.toLowerCase().trim() })} /></Field>
+              <Field label={isColo ? "Server name" : isIp ? "Label (e.g. 162-4-12-0-25)" : "Hostname"}><Input value={edit.hostname} onChange={(e) => setEdit({ ...edit, hostname: e.target.value.toLowerCase().trim() })} /></Field>
               {isVps && (
                 <Field label="Operating system" hint={s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? "Built — use Reinstall to change" : "Used on the next provisioning attempt"}>
                   <Select value={edit.osTemplateId} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} onChange={(e) => setEdit({ ...edit, osTemplateId: e.target.value })}>
@@ -318,15 +321,15 @@ export default function AdminService() {
                   </Select>
                 </Field>
               )}
-              {!isColo && (P.provisioner === "VIRTUALIZOR" || P.provisioner === "PROXMOX") && (
+              {!isColo && !isIp && (P.provisioner === "VIRTUALIZOR" || P.provisioner === "PROXMOX") && (
                 <HypervisorSelect type={P.provisioner} planServerIds={(P.servers ?? []).map((x: any) => x.serverId ?? x.server?.id)} value={edit.serverId} onChange={(v) => setEdit({ ...edit, serverId: v, node: "" })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status) ? "Built — terminate and recreate to move it" : undefined} />
               )}
-              {isColo ? null : P.provisioner === "VIRTUALIZOR" ? (
+              {isColo || isIp ? null : P.provisioner === "VIRTUALIZOR" ? (
                 <NodeSelect serverIds={edit.serverId ? [edit.serverId] : s.server ? [s.server.id] : []} value={edit.node} onChange={(v) => setEdit({ ...edit, node: v })} disabled={!!s.remoteId && ["ACTIVE", "SUSPENDED"].includes(s.status)} hint={s.remoteId ? "Change only if it was migrated in Virtualizor" : undefined} />
               ) : (
                 <Field label="Node"><Input value={edit.node} onChange={(e) => setEdit({ ...edit, node: e.target.value })} /></Field>
               )}
-              {!isColo && <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>}
+              {!isColo && !isIp && <Field label="VMID / VPS id"><Input value={edit.remoteId} onChange={(e) => setEdit({ ...edit, remoteId: e.target.value })} /></Field>}
               <div className="sm:col-span-2 xl:col-span-1 2xl:col-span-2"><Toggle checked={edit.overrideAutoSuspend} onChange={(v) => setEdit({ ...edit, overrideAutoSuspend: v })} label="Exempt from automatic suspension" /></div>
               {["TERMINATED", "CANCELLED"].includes(s.status) && <>
                 <Field label={s.status === "CANCELLED" ? "Cancelled on" : "Terminated on"}><Input type="date" value={edit.terminationDate} onChange={(e) => setEdit({ ...edit, terminationDate: e.target.value })} /></Field>
@@ -748,5 +751,63 @@ function TerminateModal({ hosting, username, onClose, onConfirm }: { hosting: bo
         <Button variant="danger" icon="delete_forever" disabled={!reason} onClick={() => onConfirm(reason)}>Terminate</Button>
       </div>
     </Modal>
+  );
+}
+
+/** IP block / IP pool service: the leased range, worked out from its CIDR, and where it's routed. */
+function IpBlockCard({ s, onSaved }: { s: any; onSaved: () => void }) {
+  const saved = s.config?.ipBlock ?? {};
+  const [f, setF] = useState<any>({ cidr: serviceBlock(s) ?? "", gateway: saved.gateway ?? s.ips.find((i: any) => i.subnet?.gateway)?.subnet?.gateway ?? "", routedTo: saved.routedTo ?? "", vlan: saved.vlan ?? "", notes: saved.notes ?? "" });
+  const [busy, setBusy] = useState(false);
+  const b = blockInfo(f.cidr);
+  async function save() {
+    const cidr = f.cidr.trim() ? parseCidr(f.cidr) : "";
+    if (cidr === null) return toast.error("Write the block like 162.4.12.0/25");
+    setBusy(true);
+    try {
+      await api(`/admin/services/${s.id}`, { method: "PUT", body: { ipBlock: { ...f, cidr } } });
+      toast.success("IP block details saved");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <Card title="IP block">
+      {b ? (
+        <div className="grid gap-x-8 md:grid-cols-2">
+          <Rows rows={[
+            ["Block", <span key="b" className="flex items-center gap-1 font-mono">{b.cidr}<Copy text={b.cidr} /></span>],
+            ["Addresses", `${b.total.toLocaleString("en-IN")} (${b.usable.toLocaleString("en-IN")} usable)`],
+            ["Netmask", <span key="m" className="font-mono">{b.netmask}</span>],
+            ["Usable range", <span key="r" className="font-mono">{b.first} – {b.last}</span>],
+          ]} />
+          <Rows rows={[
+            ["Network", <span key="n" className="font-mono">{b.network}</span>],
+            ["Broadcast", <span key="bc" className="font-mono">{b.total > 2 ? b.broadcast : "—"}</span>],
+            ["Gateway", <span key="g" className="font-mono">{saved.gateway || "—"}</span>],
+            ["Routed to", saved.routedTo || "—"],
+          ]} />
+        </div>
+      ) : <Alert tone="warn">No block set yet — enter it below (for example 162.4.12.0/25).</Alert>}
+      {s.ips.length > 0 && (
+        <div className="mt-5 border-t border-line pt-4">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-mute">Addresses assigned in the panel</div>
+          <div className="flex flex-wrap gap-1.5">{s.ips.map((i: any) => <span key={i.id} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 font-mono text-[12.5px] ring-1 ring-line">{i.address}<Copy text={i.address} /></span>)}</div>
+        </div>
+      )}
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-mute">Edit — the customer sees these</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Block (CIDR)"><Input value={f.cidr} placeholder="162.4.12.0/25" onChange={(e) => setF({ ...f, cidr: e.target.value.trim() })} /></Field>
+          <Field label="Gateway"><Input value={f.gateway} placeholder={b ? b.first : ""} onChange={(e) => setF({ ...f, gateway: e.target.value.trim() })} /></Field>
+          <Field label="Routed to" hint="The customer's server / next-hop IP"><Input value={f.routedTo} onChange={(e) => setF({ ...f, routedTo: e.target.value })} /></Field>
+          <Field label="VLAN"><Input value={f.vlan} onChange={(e) => setF({ ...f, vlan: e.target.value })} /></Field>
+        </div>
+        <Field label="Notes for the customer" className="mt-3"><Input value={f.notes} maxLength={500} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        <div className="mt-4 flex justify-end"><Button icon="save" loading={busy} onClick={save}>Save IP block</Button></div>
+      </div>
+    </Card>
   );
 }
