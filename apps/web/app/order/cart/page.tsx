@@ -61,6 +61,8 @@ export default function CartPage() {
     } catch (e: any) {
       toast.error(e.message);
       setBusy(false);
+      // identity check needed first: verify, then come back to this cart
+      if (e.body?.code === "KYC_REQUIRED" || e.body?.error?.code === "KYC_REQUIRED") router.push(`/client/kyc?next=${encodeURIComponent("/order/cart")}`);
     }
   }
 

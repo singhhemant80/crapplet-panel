@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, date, invNo, money } from "@/lib/api";
 import { Ago, planIcon } from "@/components/admin/list-kit";
+import { KycPanel } from "@/components/admin/kyc";
 import { Alert, Badge, Button, Card, Copy, Field, Icon, Input, Loading, PageHeader, Modal, Select, Table, Td, Textarea, Toggle, cx, toast, useApi } from "@/components/ui";
 
 const COUNTRY: Record<string, string> = { IN: "India", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", SG: "Singapore", CA: "Canada", AU: "Australia", DE: "Germany" };
@@ -184,6 +185,10 @@ export default function ClientDetail() {
               <Quick icon="call_merge" onClick={() => setModal("merge")}>Merge</Quick>
               <Quick icon="download" onClick={() => (window.location.href = `/api/admin/clients/${id}/export`)}>Export data</Quick>
             </div>
+          </Panel>
+
+          <Panel icon="badge" title="Identity (Aadhaar KYC)">
+            <KycPanel clientId={c.id} />
           </Panel>
 
           <Panel icon="contacts" title="Contacts" count={sum?.contacts?.length} action={<HeadBtn icon="add" onClick={() => setModal("contact")}>Add</HeadBtn>}>

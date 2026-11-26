@@ -102,6 +102,19 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
       btn("Sign in", "{{appUrl}}/client/login") +
       callout("amber", "Please change this password after signing in (Account → Security). If you didn't ask for this, contact us right away."),
   },
+  "kyc.verified": {
+    name: "Aadhaar KYC approved",
+    subject: "Your {{company.brand}} identity is verified",
+    body: hero("green", "Verified", "You're verified", "Hi {{name}}, our team has checked your Aadhaar verification — your account is now verified and you can order any service.") +
+      btn("Go to your client area", "{{appUrl}}/client"),
+  },
+  "kyc.rejected": {
+    name: "Aadhaar KYC not approved",
+    subject: "We couldn't verify your {{company.brand}} identity",
+    body: hero("amber", "Verification", "We couldn't verify your identity", "Hi {{name}}, the Aadhaar you shared doesn't match the details on your account.") +
+      note("{{reason}}") +
+      btn("Contact support", "{{appUrl}}/client/tickets"),
+  },
   "auth.welcome": {
     name: "Welcome",
     subject: "Welcome to {{company.brand}}",
@@ -322,6 +335,11 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
   "alert.ticket_reply": {
     name: "Staff alert: customer replied",
     subject: "💬 {{clientName}} replied on #{{ticketNumber}}: {{subject}}",
+    body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
+  },
+  "alert.kyc_review": {
+    name: "Staff alert: Aadhaar KYC review",
+    subject: "🪪 KYC review: {{clientName}} ({{clientEmail}})",
     body: `<p style="font-size:15px">{{headline}}</p>{{{details}}}<p><a href="{{adminUrl}}" style="display:inline-block;background:#6d28d9;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700">{{linkLabel}}</a></p><p style="color:#94a3b8;font-size:12px">Staff alert · {{alertName}} · {{sentAt}}. Change who gets these, or turn them off, in Admin → Email Delivery → Staff alerts.</p>`,
   },
   "alert.client_registered": {

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Button, Card, Icon, Loading, PageHeader, Toggle, toast, useApi } from "@/components/ui";
+import { KycCard } from "@/components/kyc-card";
 import { emptyProfile, ProfileFields, type ProfileValues } from "@/components/profile-fields";
 
 export default function Profile() {
@@ -30,6 +31,7 @@ export default function Profile() {
           <Button type="submit" className="mt-6" loading={busy} icon="save">Save changes</Button>
         </form>
       </Card>
+      <KycCard />
       <OffersPref on={me?.marketingEmails !== false} onChanged={reload} />
       <WhatsAppPref />
     </>

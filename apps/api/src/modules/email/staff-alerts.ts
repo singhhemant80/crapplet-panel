@@ -30,6 +30,7 @@ export const STAFF_ALERTS = {
   "ticket.cancellation": { name: "Cancellation request", group: "Support", on: true, template: "alert.cancellation", hint: "A customer asked to cancel a service." },
   "ticket.client_reply": { name: "Customer replied to a ticket", group: "Support", on: true, template: "alert.ticket_reply", hint: "A customer answered on an existing ticket." },
   "client.registered": { name: "New client signed up", group: "Clients", on: true, template: "alert.client_registered", hint: "Someone created an account." },
+  "kyc.review": { name: "Aadhaar KYC needs review", group: "Clients", on: true, template: "alert.kyc_review", hint: "A customer's Aadhaar name didn't match their account name." },
 } as const satisfies Record<string, { name: string; group: AlertGroup; on: boolean; template: string; hint: string }>;
 
 export type StaffAlert = keyof typeof STAFF_ALERTS;
@@ -324,6 +325,17 @@ export async function alertClientRegistered(userId: string, ip?: string | null) 
     rows: [...c.rows, ["Location", [p?.city, p?.state, p?.country].filter(Boolean).join(", ")], ["GSTIN", p?.gstin], ["IP address", ip]],
     link: adminLink(`/admin/clients/${userId}`),
     linkLabel: "Open the client",
+  });
+}
+
+export async function alertKycReview(userId: string, message: string) {
+  const c = await clientInfo(userId);
+  return alertStaff("kyc.review", {
+    subjectVars: { clientName: c.clientName, clientEmail: c.clientEmail },
+    headline: `${c.clientName || c.clientEmail} verified their Aadhaar, but it needs a look: ${message}`,
+    rows: c.rows,
+    link: adminLink(`/admin/clients/${userId}`),
+    linkLabel: "Review in admin",
   });
 }
 

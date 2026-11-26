@@ -73,6 +73,7 @@ model User {
   payMethods     PayMethod[]
   billableItems    BillableItem[]
   quotes           Quote[]
+  kycChecks     KycVerification[]
 }
 
 /** Extra people on a customer's account (billing, technical…) — WHMCS "Contacts". */
@@ -156,6 +157,43 @@ model ClientProfile {
   affiliateRef  String?
   /// client accepts WhatsApp notifications (they can switch it off in their profile)
   whatsappNotifications Boolean @default(true)
+  /// Aadhaar KYC (Cashfree SecureID / DigiLocker): NONE | PENDING | VERIFIED | REVIEW | REJECTED
+  kycStatus     String    @default("NONE")
+  kycVerifiedAt DateTime?
+  /// staff: this customer never has to verify
+  kycExempt     Boolean   @default(false)
+  /// staff: this customer must verify before ordering anything (even when the shop doesn't require it)
+  kycRequired   Boolean   @default(false)
+}
+
+/// One Aadhaar check through Cashfree SecureID (DigiLocker). The full Aadhaar number is never stored.
+model KycVerification {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// our id sent to Cashfree (verification_id)
+  verificationId String    @unique
+  referenceId    String?
+  provider       String    @default("cashfree_digilocker")
+  sandbox        Boolean   @default(false)
+  /// PENDING | VERIFIED | REVIEW | REJECTED | EXPIRED | CONSENT_DENIED | FAILED
+  status         String    @default("PENDING")
+  nameOnAadhaar  String?
+  dob            String?
+  gender         String?
+  state          String?
+  pincode        String?
+  aadhaarLast4   String?
+  /// 0–100: how closely the Aadhaar name matches the account name
+  nameScore      Int?
+  message        String?
+  reviewedById   String?
+  reviewNote     String?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
 
 model Role {

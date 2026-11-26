@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../db";
-import { ah, badRequest, clientIp, notFound, parse } from "../../lib/http";
+import { ah, badRequest, clientIp, HttpError, notFound, parse } from "../../lib/http";
 import { requireAuth, requireClient } from "../../middleware/auth";
 import { listAvailableIps, releaseIpReservation, reserveIp } from "../ipam/service";
 import { cartSchema, priceCart } from "../orders/pricing";
@@ -323,6 +323,15 @@ catalogRouter.post(
     const s = await getSettings();
     if (s.orders.requireEmailVerification && !u.emailVerifiedAt) throw badRequest("Please verify your email address before ordering");
     if (!u.profile?.address1) throw badRequest("Please complete your billing address before ordering");
+    // Aadhaar KYC, when staff have switched it on for these plans (or for this customer)
+    {
+      const { kycNeededFor } = await import("../kyc/kyc");
+      const types = body.items.length ? (await prisma.product.findMany({ where: { id: { in: body.items.map((i) => i.productId) } }, select: { type: true } })).map((p) => p.type as string) : [];
+      if (await kycNeededFor(u.id, body.domains.length && !types.length ? ["DOMAIN"] : types)) {
+        const st = u.profile?.kycStatus;
+        throw new HttpError(403, st === "REVIEW" ? "Your Aadhaar verification is with our team for review — you can order once it's approved" : "Please verify your identity with Aadhaar (takes about 2 minutes) before placing this order", "KYC_REQUIRED");
+      }
+    }
     const r = await checkout({ userId: u.id, cart: body, ip: clientIp(req), notes: body.notes, useCredit: body.useCredit });
     res.status(201).json(r);
   }),

@@ -34,6 +34,7 @@ export const NAV: Group[] = [
       { href: "/admin/clients", label: "Customers", icon: "group", desc: "Accounts, profiles, balances", perm: "clients.view" },
       { href: "/admin/orders", label: "Orders", icon: "shopping_bag", desc: "New and pending orders", perm: "orders.view", badge: "orders" },
       { href: "/admin/resellers", label: "Resellers", icon: "storefront", desc: "White-label partners", perm: "resellers.manage" },
+      { href: "/admin/kyc", label: "Identity (KYC)", icon: "badge", desc: "Aadhaar verification on / off", perm: "settings.manage" },
       { href: "/admin/affiliates", label: "Affiliates", icon: "handshake", desc: "Referrals and payouts", perm: "clients.view" },
       { href: "/admin/campaigns", label: "Email Campaigns", icon: "outgoing_mail", desc: "Newsletters and offers", perm: "campaigns.manage" },
     ],
