@@ -1,13 +1,21 @@
 "use client";
 /** Where DigiLocker sends the customer back (?vid=…): fetch the result, then continue (e.g. back to the cart). */
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { safeNext } from "@/lib/safe-next";
 import { Alert, Button, Card, Icon, PageHeader } from "@/components/ui";
 import { KycCard } from "@/components/kyc-card";
 
-export default function KycPage() {
+export default function Page() {
+  return (
+    <Suspense>
+      <KycPage />
+    </Suspense>
+  );
+}
+
+function KycPage() {
   const sp = useSearchParams();
   const vid = sp.get("vid");
   const next = safeNext(sp.get("next") ?? readNext(), "");
