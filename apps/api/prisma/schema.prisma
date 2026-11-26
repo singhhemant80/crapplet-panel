@@ -209,6 +209,7 @@ model LoginHistory {
 enum TokenType {
   EMAIL_VERIFY
   PASSWORD_RESET
+  LOGIN_OTP
 }
 
 model VerificationToken {

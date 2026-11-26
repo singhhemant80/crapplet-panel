@@ -95,6 +95,13 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
       btn("Sign in", "{{appUrl}}/client/login") +
       callout("amber", "Please change this password after signing in (Account → Security). If you didn't ask for this, contact us right away."),
   },
+  "auth.login_otp": {
+    name: "Sign-in code",
+    subject: "{{code}} is your {{company.brand}} sign-in code",
+    body: hero("purple", "Security", "Your sign-in code", "Hi {{name}}, use this code to sign in to your account.") +
+      details([["Sign-in code", mono("{{code}}")]]) +
+      note("The code expires in 10 minutes and can be used once. If you didn't try to sign in, you can ignore this email — your account is safe."),
+  },
   "auth.welcome": {
     name: "Welcome",
     subject: "Welcome to {{company.brand}}",

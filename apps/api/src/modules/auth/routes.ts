@@ -8,7 +8,8 @@ import { z } from "zod";
 import { config } from "../../config";
 import { prisma } from "../../db";
 import { ah, badRequest, clientIp, HttpError, notFound, parse } from "../../lib/http";
-import { decrypt, encrypt, randomToken, sha256 } from "../../lib/crypto";
+import { decrypt, encrypt, randomToken, safeEqual, sha256 } from "../../lib/crypto";
+import crypto from "crypto";
 import { getSettings } from "../../lib/settings";
 import { audit } from "../../lib/audit";
 import { requireAuth, requireStaff, signAccessToken } from "../../middleware/auth";
@@ -241,6 +242,83 @@ authRouter.post(
     });
     await startSession(req, res, user);
     res.json({ user: await publicUser(user.id) });
+  }),
+);
+
+// ───── Sign in with an email code (clients only; the password login still works) ─────
+const OTP_MINUTES = 10;
+const OTP_MAX_TRIES = 5;
+// tokenHash is unique across all tokens, so a 6-digit code is stored salted: "otp:<salt>:<sha256(salt:code)>"
+const otpHash = (salt: string, code: string) => sha256(`${salt}:${code}`);
+const otpEmail = z.string().trim().toLowerCase().email();
+const canUseOtp = (u: { type: string; status: string; ownerResellerId: string | null } | null) =>
+  !!u && u.type === "CLIENT" && u.status !== "CLOSED" && !u.ownerResellerId;
+
+authRouter.post(
+  "/login/otp/request",
+  strictLimiter,
+  ah(async (req, res) => {
+    const { email } = parse(z.object({ email: otpEmail }), req.body);
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (canUseOtp(user)) {
+      const recent = await prisma.verificationToken.findFirst({
+        where: { userId: user!.id, type: "LOGIN_OTP", usedAt: null, createdAt: { gt: new Date(Date.now() - 60_000) } },
+        select: { id: true },
+      });
+      if (!recent) {
+        const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+        const salt = randomToken(12);
+        await prisma.$transaction([
+          // only the newest code works
+          prisma.verificationToken.updateMany({ where: { userId: user!.id, type: "LOGIN_OTP", usedAt: null }, data: { usedAt: new Date() } }),
+          prisma.verificationToken.create({
+            data: { userId: user!.id, type: "LOGIN_OTP", tokenHash: `otp:${salt}:${otpHash(salt, code)}`, expiresAt: new Date(Date.now() + OTP_MINUTES * 60_000) },
+          }),
+        ]);
+        await queueEmail("auth.login_otp", user!.email, { name: user!.firstName, code }, user!.id);
+      }
+    }
+    // same answer whether or not the account exists
+    res.json({ ok: true, minutes: OTP_MINUTES });
+  }),
+);
+
+authRouter.post(
+  "/login/otp/verify",
+  limiter,
+  ah(async (req, res) => {
+    const body = parse(z.object({ email: otpEmail, code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code") }), req.body);
+    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    const wrong = () => new HttpError(401, "That code is wrong or has expired — request a new one", "INVALID_OTP");
+    if (!canUseOtp(user)) throw wrong();
+    if ((await recentFailures({ userId: user!.id }, ["bad_otp"])) >= OTP_MAX_TRIES * 2) throw tooMany();
+    const t = await prisma.verificationToken.findFirst({
+      where: { userId: user!.id, type: "LOGIN_OTP", usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+    });
+    const [, salt, hash] = t?.tokenHash.split(":") ?? [];
+    if (!t || !salt || !hash || !safeEqual(otpHash(salt, body.code), hash)) {
+      await prisma.loginHistory.create({
+        data: { userId: user!.id, email: user!.email, ip: clientIp(req), userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300), success: false, reason: "bad_otp" },
+      });
+      // too many wrong guesses at this code → it stops working
+      if (t && (await prisma.loginHistory.count({ where: { userId: user!.id, success: false, reason: "bad_otp", createdAt: { gt: t.createdAt } } })) >= OTP_MAX_TRIES) {
+        await prisma.verificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } });
+      }
+      throw wrong();
+    }
+    await prisma.verificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } });
+    // the code proves they own the inbox
+    if (!user!.emailVerifiedAt) await prisma.user.update({ where: { id: user!.id }, data: { emailVerifiedAt: new Date() } });
+    if (user!.totpEnabled) {
+      const challenge = jwt.sign({ sub: user!.id, purpose: "2fa" }, config.jwtSecret, { expiresIn: 300, issuer: "crapplet", algorithm: "HS256" });
+      return res.json({ twoFactorRequired: true, challenge });
+    }
+    await prisma.loginHistory.create({
+      data: { userId: user!.id, email: user!.email, ip: clientIp(req), userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300), success: true, reason: "email_otp" },
+    });
+    await startSession(req, res, user!);
+    res.json({ user: await publicUser(user!.id) });
   }),
 );
 
