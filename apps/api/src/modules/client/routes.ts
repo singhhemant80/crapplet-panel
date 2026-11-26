@@ -130,9 +130,19 @@ clientRouter.get(
       prisma.invoice.findMany({ where: { userId, status: "UNPAID" }, select: { total: true, amountPaid: true, dueDate: true } }),
       prisma.ticket.count({ where: { userId, status: "ANSWERED" } }),
       prisma.service.count({ where: { userId, status: { in: ["ACTIVE", "SUSPENDED", "PROVISIONING", "PENDING"] } } }),
-      prisma.clientProfile.findUnique({ where: { userId }, select: { creditBalance: true, currency: true } }),
+      prisma.clientProfile.findUnique({ where: { userId }, select: { creditBalance: true, currency: true, kycStatus: true, kycExempt: true, kycRequired: true } }),
     ]);
     const now = Date.now();
+    // Aadhaar KYC (only when staff have it switched on, or the customer is already verified)
+    const { getKycSettings } = await import("../kyc/kyc");
+    const ks = await getKycSettings();
+    const kycStatus = profile?.kycStatus ?? "NONE";
+    const kyc = {
+      show: (ks.enabled && !profile?.kycExempt) || kycStatus === "VERIFIED",
+      status: kycStatus,
+      required: ks.enabled && !profile?.kycExempt && kycStatus !== "VERIFIED" && (!!profile?.kycRequired || ks.require !== "optional"),
+      requiredFor: profile?.kycRequired ? "all_orders" : ks.require,
+    };
     res.json({
       unpaidInvoices: unpaid.length,
       overdueInvoices: unpaid.filter((i) => i.dueDate.getTime() < now).length,
@@ -141,6 +151,7 @@ clientRouter.get(
       services: active,
       creditBalance: profile?.creditBalance ?? 0,
       currency: profile?.currency ?? "INR",
+      kyc,
     });
   }),
 );

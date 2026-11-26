@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { money } from "@/lib/api";
 import { Icon, cx } from "@/components/ui";
 
-export type Shell = { unpaidInvoices: number; overdueInvoices: number; outstanding: number; ticketsAwaitingReply: number; services: number; byType?: Record<string, number>; domains?: number; creditBalance: number; currency: string };
+export type Shell = { unpaidInvoices: number; overdueInvoices: number; outstanding: number; ticketsAwaitingReply: number; services: number; byType?: Record<string, number>; domains?: number; creditBalance: number; currency: string; kyc?: { show: boolean; status: string; required: boolean; requiredFor: string } };
 
 /** Service kinds shown with counts in the sidebar ("VPS servers 3 · Web hosting 1 …") and as filters on My services. */
 export const SERVICE_KINDS: { key: string; label: string; icon: string; desc: string; types: string[] }[] = [
@@ -62,6 +62,7 @@ export const CLIENT_NAV: Section[] = [
     items: [
       { href: "/client/profile", label: "Profile & billing", icon: "person", desc: "Name, address, GSTIN" },
       { href: "/client/security", label: "Security", icon: "shield_lock", desc: "Password and 2FA" },
+      { href: "/client/kyc", label: "Identity verification", icon: "badge", desc: "Aadhaar via DigiLocker", count: (s) => (s.kyc?.required ? 1 : 0), tone: "rose" },
       { href: "/client/affiliates", label: "Affiliates", icon: "handshake", desc: "Earn by referring" },
       { href: "/client/reseller", label: "VPS reseller", icon: "storefront", desc: "Sell under your brand" },
       { href: "/api-docs", label: "API documentation", icon: "code", desc: "Automate your account", external: true },
@@ -108,6 +109,8 @@ export function ClientSidebar({ me, shell, rail, onToggleRail, mobile, onClose, 
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const cur = shell?.currency ?? me.profile?.currency ?? "INR";
+  // Identity verification appears only while staff have Aadhaar KYC switched on (or the customer is verified)
+  const showItem = (i: { href: string }) => i.href !== "/client/kyc" || !!shell?.kyc?.show;
   const initials = `${me.firstName?.[0] ?? ""}${me.lastName?.[0] ?? ""}`.toUpperCase() || me.email[0].toUpperCase();
 
   useEffect(() => {
@@ -127,7 +130,7 @@ export function ClientSidebar({ me, shell, rail, onToggleRail, mobile, onClose, 
   const waiting = (g: Section) => !!shell && g.key !== "home" && g.items.some((i) => i.tone !== "violet" && (i.count?.(shell) ?? 0) > 0);
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return s ? ALL.filter((i) => i.label.toLowerCase().includes(s) || i.desc.toLowerCase().includes(s) || i.section.title.toLowerCase().includes(s)) : [];
+    return s ? ALL.filter(showItem).filter((i) => i.label.toLowerCase().includes(s) || i.desc.toLowerCase().includes(s) || i.section.title.toLowerCase().includes(s)) : [];
   }, [q]);
   const pickSection = (k: string) => {
     setSec(k);
@@ -166,6 +169,8 @@ export function ClientSidebar({ me, shell, rail, onToggleRail, mobile, onClose, 
   const needs: { item: Item; sub: string; count: number; tone: keyof typeof TONE }[] = [];
   if (shell?.overdueInvoices) needs.push({ item: { href: "/client/invoices?status=UNPAID", label: "Overdue invoices", icon: "warning", desc: "" }, sub: "Pay now to avoid suspension", count: shell.overdueInvoices, tone: "rose" });
   else if (shell?.unpaidInvoices) needs.push({ item: { href: "/client/invoices?status=UNPAID", label: "Invoices to pay", icon: "receipt_long", desc: "" }, sub: `${money(shell.outstanding, cur)} due`, count: shell.unpaidInvoices, tone: "rose" });
+  if (shell?.kyc?.show && shell.kyc.status === "REVIEW") needs.push({ item: { href: "/client/kyc", label: "Verification under review", icon: "hourglass_top", desc: "" }, sub: "Our team is checking it", count: 0, tone: "amber" });
+  else if (shell?.kyc?.show && shell.kyc.status !== "VERIFIED" && (shell.kyc.required || shell.kyc.status === "REJECTED")) needs.push({ item: { href: "/client/kyc", label: "Verify your identity", icon: "badge", desc: "" }, sub: shell.kyc.requiredFor === "servers" ? "Needed before ordering a VPS" : "Needed before ordering · 2 min", count: 1, tone: "rose" });
   if (shell?.ticketsAwaitingReply) needs.push({ item: { href: "/client/tickets", label: "Tickets answered", icon: "forum", desc: "" }, sub: "Our team replied", count: shell.ticketsAwaitingReply, tone: "amber" });
 
   const listPane = (
@@ -206,7 +211,7 @@ export function ClientSidebar({ me, shell, rail, onToggleRail, mobile, onClose, 
         ) : (
           <>
             <div className="px-2.5 pb-2.5 text-[11px] font-extrabold uppercase tracking-[.14em] text-[#7c3aed]">{current.title}</div>
-            {current.items.map((i) => row(i))}
+            {current.items.filter(showItem).map((i) => row(i))}
             {current.key === "services" && shell?.byType && (
               <>
                 {heading(`Your services · ${shell.services} active`)}
@@ -310,6 +315,7 @@ export function ClientSidebar({ me, shell, rail, onToggleRail, mobile, onClose, 
                 <div className="border-t border-[#f1eff8] pt-1">
                   <Link href="/client/profile" className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-[#f5f2fd]"><Icon name="person" className="text-[18px] text-[#7c3aed]" />Profile & billing</Link>
                   <Link href="/client/security" className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-[#f5f2fd]"><Icon name="shield_lock" className="text-[18px] text-[#7c3aed]" />Security</Link>
+                  {shell?.kyc?.show && <Link href="/client/kyc" className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-[#f5f2fd]"><Icon name="badge" className="text-[18px] text-[#7c3aed]" />Identity verification{shell.kyc.status === "VERIFIED" && <Icon name="verified" fill className="ml-auto text-[16px] text-emerald-600" />}</Link>}
                   <button onClick={onSignOut} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-600"><Icon name="logout" className="text-[18px]" />Sign out</button>
                 </div>
               </div>

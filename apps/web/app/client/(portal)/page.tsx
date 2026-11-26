@@ -7,6 +7,7 @@ import { CYCLES, date, gb, invNo, money } from "@/lib/api";
 import { Badge, Copy, Icon, Loading, cx, useApi } from "@/components/ui";
 import { LiveBadge, useLiveStates } from "@/components/live-state";
 import { OsLogo } from "@/components/os-logo";
+import { KycCard } from "@/components/kyc-card";
 
 const greet = () => {
   const h = new Date().getHours();
@@ -58,6 +59,8 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      <KycCard compact hideVerified />
 
       {/* ── alerts ── */}
       {(s.overdueInvoices > 0 || s.suspendedServices > 0 || s.failedServices > 0 || data.expiringDomains.length > 0) && (

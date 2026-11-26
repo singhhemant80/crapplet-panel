@@ -4,10 +4,11 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { Button, Card, Icon, cx, toast, useApi } from "@/components/ui";
 
-export function KycCard({ compact }: { compact?: boolean }) {
+export function KycCard({ compact, hideVerified }: { compact?: boolean; hideVerified?: boolean }) {
   const { data } = useApi<any>("/client/kyc");
   const [busy, setBusy] = useState(false);
   if (!data?.enabled && data?.status !== "VERIFIED") return null;
+  if (data.exempt || (hideVerified && data.status === "VERIFIED")) return null;
   async function start() {
     setBusy(true);
     try {
