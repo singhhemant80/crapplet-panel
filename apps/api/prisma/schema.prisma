@@ -209,6 +209,8 @@ model LoginHistory {
 enum TokenType {
   EMAIL_VERIFY
   PASSWORD_RESET
+  /// one-time 6-digit sign-in code sent by email (passwordless login)
+  LOGIN_CODE
 }
 
 model VerificationToken {

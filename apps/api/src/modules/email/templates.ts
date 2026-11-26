@@ -87,6 +87,13 @@ export const DEFAULT_TEMPLATES: Record<string, { name: string; subject: string; 
       btn("Choose a new password", "{{link}}") +
       note("This link expires in 60 minutes. If you didn't ask for this, ignore this email — your password won't change."),
   },
+  "auth.login_code": {
+    name: "Sign-in code",
+    subject: "{{code}} is your {{company.brand}} sign-in code",
+    body: hero("purple", "Security", "Your sign-in code", "Hi {{name}}, use this code to sign in to {{company.brand}}.") +
+      `<div style="margin:22px 0;text-align:center"><span style="display:inline-block;font-family:SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#0f172a;background:#f5f0ff;border:1px solid #e9e1fb;border-radius:14px;padding:14px 22px">{{code}}</span></div>` +
+      note("The code works once and expires in 10 minutes. Requested from IP {{ip}}. If this wasn't you, ignore this email — nobody can sign in without the code — and consider changing your password."),
+  },
   "auth.password_set": {
     name: "Password set by staff",
     subject: "Your {{company.brand}} password was reset",

@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { z } from "zod";
+import { randomInt } from "node:crypto";
 import { config } from "../../config";
 import { prisma } from "../../db";
 import { ah, badRequest, clientIp, HttpError, notFound, parse } from "../../lib/http";
@@ -211,6 +212,86 @@ authRouter.post(
     }
     await prisma.loginHistory.create({
       data: { userId: user.id, email: user.email, ip: clientIp(req), userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300), success: true },
+    });
+    await startSession(req, res, user);
+    res.json({ user: await publicUser(user.id) });
+  }),
+);
+
+// ───── sign in with a code sent by email (customers only) ─────
+const CODE_TTL = 10 * 60_000;
+const codeHash = (tokenId: string, code: string) => sha256(`${tokenId}:${code}:${config.jwtSecret}`);
+const emailCodeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
+
+/**
+ * Send a 6-digit sign-in code. Always answers the same way (no hint whether the email has an account);
+ * at most one code a minute and 5 an hour per account. Staff and reseller customers never get one.
+ */
+authRouter.post(
+  "/login/email-code",
+  emailCodeLimiter,
+  ah(async (req, res) => {
+    const body = parse(z.object({ email: z.string().trim().toLowerCase().email() }), req.body);
+    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    let tokenId = randomToken(12); // unknown email: a challenge that can never succeed
+    let sub = "none";
+    if (user && user.type === "CLIENT" && user.status !== "CLOSED" && !user.ownerResellerId) {
+      const recent = await prisma.verificationToken.findMany({ where: { userId: user.id, type: "LOGIN_CODE", createdAt: { gt: new Date(Date.now() - 3600_000) } }, select: { createdAt: true }, orderBy: { createdAt: "desc" } });
+      if (recent[0] && recent[0].createdAt.getTime() > Date.now() - 60_000) throw new HttpError(429, "A code was just sent — wait a minute before asking for another", "TOO_MANY");
+      if (recent.length >= 5) throw new HttpError(429, "Too many codes requested — try again in an hour, or sign in with your password", "TOO_MANY");
+      const code = String(randomInt(100000, 1000000));
+      // older unused codes stop working
+      await prisma.verificationToken.updateMany({ where: { userId: user.id, type: "LOGIN_CODE", usedAt: null }, data: { usedAt: new Date() } });
+      const t = await prisma.verificationToken.create({ data: { userId: user.id, type: "LOGIN_CODE", tokenHash: `pending-${randomToken(16)}`, expiresAt: new Date(Date.now() + CODE_TTL) } });
+      await prisma.verificationToken.update({ where: { id: t.id }, data: { tokenHash: codeHash(t.id, code) } });
+      await queueEmail("auth.login_code", user.email, { name: user.firstName, code, ip: clientIp(req) ?? "unknown" }, user.id);
+      tokenId = t.id;
+      sub = user.id;
+    }
+    const challenge = jwt.sign({ sub, tid: tokenId, purpose: "email_code" }, config.jwtSecret, { expiresIn: CODE_TTL / 1000, issuer: "crapplet", algorithm: "HS256" });
+    res.json({ ok: true, challenge });
+  }),
+);
+
+/** Check the emailed code; 5 wrong tries and that code stops working. 2FA (if on) is still asked after it. */
+authRouter.post(
+  "/login/email-code/verify",
+  limiter,
+  ah(async (req, res) => {
+    const body = parse(z.object({ challenge: z.string(), code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code") }), req.body);
+    let payload: { sub: string; tid: string; purpose: string };
+    try {
+      payload = jwt.verify(body.challenge, config.jwtSecret, { issuer: "crapplet", algorithms: ["HS256"] }) as typeof payload;
+    } catch {
+      throw new HttpError(401, "The code has expired — ask for a new one", "CODE_EXPIRED");
+    }
+    if (payload.purpose !== "email_code") throw new HttpError(401, "Invalid challenge");
+    const wrong = () => new HttpError(401, "That code isn't right — check the latest email", "INVALID_CODE");
+    const t = payload.sub === "none" ? null : await prisma.verificationToken.findUnique({ where: { id: payload.tid }, include: { user: true } });
+    if (!t || t.type !== "LOGIN_CODE" || t.userId !== payload.sub) throw wrong();
+    if (t.usedAt || t.expiresAt < new Date()) throw new HttpError(401, "This code has expired or was replaced — ask for a new one", "CODE_EXPIRED");
+    const user = t.user;
+    if (user.type !== "CLIENT" || user.status === "CLOSED" || user.ownerResellerId) throw wrong();
+    if (t.tokenHash !== codeHash(t.id, body.code)) {
+      await prisma.loginHistory.create({ data: { userId: user.id, email: user.email, ip: clientIp(req), success: false, reason: "bad_email_code" } });
+      const tries = await prisma.loginHistory.count({ where: { userId: user.id, reason: "bad_email_code", createdAt: { gte: t.createdAt } } });
+      if (tries >= 5) {
+        await prisma.verificationToken.update({ where: { id: t.id }, data: { usedAt: new Date() } });
+        throw new HttpError(401, "Too many wrong codes — ask for a new one", "CODE_EXPIRED");
+      }
+      throw wrong();
+    }
+    // single use
+    const used = await prisma.verificationToken.updateMany({ where: { id: t.id, usedAt: null }, data: { usedAt: new Date() } });
+    if (!used.count) throw new HttpError(401, "This code was already used — ask for a new one", "CODE_EXPIRED");
+    // they've just proved they own the mailbox
+    if (!user.emailVerifiedAt) await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    if (user.totpEnabled) {
+      const challenge = jwt.sign({ sub: user.id, purpose: "2fa" }, config.jwtSecret, { expiresIn: 300, issuer: "crapplet", algorithm: "HS256" });
+      return res.json({ twoFactorRequired: true, challenge });
+    }
+    await prisma.loginHistory.create({
+      data: { userId: user.id, email: user.email, ip: clientIp(req), userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300), success: true, reason: "email_code" },
     });
     await startSession(req, res, user);
     res.json({ user: await publicUser(user.id) });
