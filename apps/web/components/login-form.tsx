@@ -106,6 +106,10 @@ export function LoginForm({ portal = "client" }: { portal?: "client" | "admin" }
         );
         return;
       }
+      // a fresh sign-in shows the identity-verification prompt again (if it applies)
+      try {
+        Object.keys(sessionStorage).filter((k) => k.startsWith("kyc.popup.")).forEach((k) => sessionStorage.removeItem(k));
+      } catch {}
       await reload();
       router.replace(next);
     } catch (e: any) {

@@ -7,6 +7,7 @@ import { api, money } from "@/lib/api";
 import { readCart } from "@/lib/cart";
 import { Alert, Button, Icon, Loading, cx, toast } from "@/components/ui";
 import { ClientSidebar, currentItem, useClientRail, type Shell } from "@/components/client/sidebar";
+import { KycPopup } from "@/components/kyc-card";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { me, loading, logout } = useSession();
@@ -63,12 +64,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const cur = shell?.currency ?? me.profile?.currency ?? "INR";
   const initials = `${me.firstName?.[0] ?? ""}${me.lastName?.[0] ?? ""}`.toUpperCase() || me.email[0].toUpperCase();
   const signOut = async () => {
+    try {
+      sessionStorage.removeItem(`kyc.popup.${me.id}`);
+    } catch {}
     await logout();
     router.replace("/client/login");
   };
 
   return (
     <div className="min-h-screen bg-[#f5f3fb]">
+      {/* Aadhaar KYC prompt after sign-in (only while staff have verification switched on) */}
+      <KycPopup userId={me.id} kyc={shell?.kyc} hidden={!!me.impersonatedBy || path.startsWith("/client/kyc")} />
       {/* desktop sidebar */}
       <aside className={cx("fixed inset-y-0 left-0 z-40 hidden lg:block", rail ? "w-[92px]" : "w-[344px]")}>
         <ClientSidebar me={me} shell={shell} rail={rail} onToggleRail={toggle} onSignOut={signOut} />
