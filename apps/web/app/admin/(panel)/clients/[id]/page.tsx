@@ -27,7 +27,8 @@ export default function ClientDetail() {
     reload();
     reloadSum();
   };
-  if (loading || !data) return <Loading />;
+  // only show the spinner on first load / a different client — a background refresh must not unmount the open modal
+  if (!data || (loading && data.client?.id !== id)) return <Loading />;
   const c = data.client;
   const p = c.profile ?? {};
   const cur = p.currency ?? "INR";
@@ -562,6 +563,7 @@ function SetPasswordModal({ open, onClose, client: c, onDone }: { open: boolean;
     try {
       const r = await api(`/admin/clients/${c.id}/set-password`, { body: { ...(mode === "own" ? { password: pw } : {}), sendEmail, sendWhatsapp: sendWa, signOut } });
       setResult(r);
+      toast.success(`Password changed for ${c.email}`);
       onDone();
     } catch (e: any) {
       toast.error(e.message);

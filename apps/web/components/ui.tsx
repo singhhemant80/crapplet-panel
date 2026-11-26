@@ -322,7 +322,7 @@ export function Toaster() {
     };
   }, []);
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-[min(380px,calc(100vw-32px))] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[150] flex w-[min(380px,calc(100vw-32px))] flex-col gap-2">
       {items.map((t) => (
         <div key={t.id} className={cx("pointer-events-auto flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold shadow-xl", t.tone === "success" ? "bg-emerald-600 text-white" : t.tone === "error" ? "bg-rose-600 text-white" : "bg-ink text-white")}>
           <Icon name={t.tone === "success" ? "check_circle" : t.tone === "error" ? "error" : "info"} className="text-[19px]" />
