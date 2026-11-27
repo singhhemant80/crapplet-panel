@@ -65,7 +65,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const initials = `${me.firstName?.[0] ?? ""}${me.lastName?.[0] ?? ""}`.toUpperCase() || me.email[0].toUpperCase();
   const signOut = async () => {
     try {
-      sessionStorage.removeItem(`kyc.popup.${me.id}`);
+      localStorage.removeItem(`kyc.popup.${me.id}`);
     } catch {}
     await logout();
     router.replace("/client/login");

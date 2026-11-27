@@ -441,6 +441,20 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
   const firstServer = serverIds[0];
   const groups = useApi(firstServer ? `/admin/virtualizor/${firstServer}/groups` : null, [firstServer]);
   const nodes: any[] = (mon.data?.servers ?? []).filter((s: any) => s.type === "VIRTUALIZOR" && (!serverIds.length || serverIds.includes(s.id))).flatMap((s: any) => s.nodes.map((n: any) => ({ ...n, serverName: s.name })));
+  const masters = new Set(nodes.map((n) => n.serverName)).size;
+  const [refreshing, setRefreshing] = useState(false);
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      const ids = serverIds.length ? serverIds : [...new Set((mon.data?.servers ?? []).filter((s: any) => s.type === "VIRTUALIZOR").map((s: any) => s.id))];
+      for (const id of ids) await api("/admin/monitoring/refresh", { body: { serverId: id } });
+      await mon.reload();
+      toast.success("Nodes refreshed from Virtualizor");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setRefreshing(false);
+  }
   const mode = value.placement ?? (value.slaveServerId !== undefined && value.slaveServerId !== null && value.slaveServerId !== "" ? "fixed" : "auto");
   const chosen: string[] = value.nodeIds ?? (value.slaveServerId !== undefined && value.slaveServerId !== null && value.slaveServerId !== "" ? [String(value.slaveServerId)] : []);
   const toggle = (id: string) => onChange({ placement: mode, nodeIds: mode === "fixed" ? [id] : chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id], slaveServerId: undefined });
@@ -471,7 +485,13 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
       {mode !== "auto" && (
         <div>
           <div className="mb-1.5 text-xs font-bold text-mute">{mode === "fixed" ? "Build on this node" : `Allowed nodes ${chosen.length ? `(${chosen.length})` : "(none ticked = all nodes)"}`}</div>
-          {!nodes.length && <Alert tone="warn">No nodes yet — open Node Monitoring and click Refresh now.</Alert>}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-mute">
+            <span>Added a node in Virtualizor? Refresh to load it.</span>
+            <button type="button" disabled={refreshing} onClick={refresh} className="inline-flex items-center gap-1 font-bold text-primary-dark hover:underline disabled:opacity-60">
+              <Icon name="refresh" className={cx("text-[16px]", refreshing && "animate-spin")} />{refreshing ? "Refreshing nodes…" : "Refresh nodes"}
+            </button>
+          </div>
+          {!nodes.length && <Alert tone="warn">No nodes yet — click Refresh nodes.</Alert>}
           <div className="grid gap-2 sm:grid-cols-2">
             {nodes.map((n) => {
               const on = chosen.includes(n.externalId);
@@ -481,7 +501,7 @@ function VirtualizorPlacement({ serverIds, value, onChange }: { serverIds: strin
                   className={cx("flex items-center gap-3 rounded-xl border p-2.5 text-left transition", on ? "border-primary bg-white ring-2 ring-primary/20" : "border-line bg-white hover:border-primary/40", (!n.online || !n.enabled) && "opacity-60")}>
                   <span className={cx("grid h-5 w-5 shrink-0 place-items-center border-2", mode === "fixed" ? "rounded-full" : "rounded-md", on ? "border-primary bg-primary text-white" : "border-slate-300")}>{on && <Icon name="check" className="text-[14px]" />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-ink">{n.name} <span className="font-mono text-xs text-mute">#{n.externalId}</span></span>
+                    <span className="block truncate text-sm font-bold text-ink">{n.name.replace(/ #\d+$/, "")} <span className="font-mono text-xs text-mute">#{n.externalId}</span>{masters > 1 && <span className="ml-1 text-[11px] font-semibold text-mute">· {n.serverName}</span>}</span>
                     <span className="block text-xs text-mute">{n.online ? `RAM ${ram}% · CPU ${Math.round(n.cpuPct)}% · ${n.meta?.vpsCount ?? 0} VPS` : "offline"}{!n.enabled && " · new VPS off"}{n.meta?.locked && " · locked"}</span>
                   </span>
                 </button>

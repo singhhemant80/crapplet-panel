@@ -45,7 +45,7 @@ export function KycCard({ compact, hideVerified }: { compact?: boolean; hideVeri
 
 /**
  * Shown once after a customer signs in while Aadhaar KYC is switched on and they aren't verified yet.
- * "Later" hides it until their next sign-in (or browser session).
+ * Not shown again on refresh or other pages — only after the next sign-in.
  */
 export function KycPopup({ userId, kyc, hidden }: { userId: string; kyc?: { show: boolean; status: string; required: boolean; requiredFor: string }; hidden?: boolean }) {
   const key = `kyc.popup.${userId}`;
@@ -53,24 +53,19 @@ export function KycPopup({ userId, kyc, hidden }: { userId: string; kyc?: { show
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (hidden || !kyc?.show || !["NONE", "REJECTED", "PENDING"].includes(kyc.status)) return setOpen(false);
+    // once per sign-in: marked as shown straight away, so refreshing or moving between pages
+    // (or opening another tab) doesn't bring it back; signing in again clears the mark
     let seen = false;
     try {
-      seen = sessionStorage.getItem(key) === "1";
+      seen = localStorage.getItem(key) === "1";
+      if (!seen) localStorage.setItem(key, "1");
     } catch {}
     if (!seen) setOpen(true);
   }, [kyc?.show, kyc?.status, hidden, key]);
   if (!open || !kyc) return null;
-  const later = () => {
-    try {
-      sessionStorage.setItem(key, "1");
-    } catch {}
-    setOpen(false);
-  };
+  const later = () => setOpen(false);
   async function start() {
     setBusy(true);
-    try {
-      sessionStorage.setItem(key, "1");
-    } catch {}
     try {
       const r = await api("/client/kyc/start", { body: {} });
       window.location.href = r.url;

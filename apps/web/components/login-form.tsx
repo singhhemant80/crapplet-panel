@@ -108,7 +108,7 @@ export function LoginForm({ portal = "client" }: { portal?: "client" | "admin" }
       }
       // a fresh sign-in shows the identity-verification prompt again (if it applies)
       try {
-        Object.keys(sessionStorage).filter((k) => k.startsWith("kyc.popup.")).forEach((k) => sessionStorage.removeItem(k));
+        Object.keys(localStorage).filter((k) => k.startsWith("kyc.popup.")).forEach((k) => localStorage.removeItem(k));
       } catch {}
       await reload();
       router.replace(next);

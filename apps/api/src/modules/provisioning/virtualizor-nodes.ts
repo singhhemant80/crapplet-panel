@@ -64,9 +64,23 @@ export async function syncVirtualizorNodes(server: Server) {
   const servs = Array.isArray(list.servs) ? list.servs : Object.entries(list.servs ?? {}).map(([k, v]) => ({ serid: k, ...(v as object) }));
   const loads = (loadsRes as any)?.loads ?? (loadsRes as any)?.server_loads ?? (loadsRes as any)?.serverloads ?? null;
 
+  // Nodes are stored by name, but two nodes can share one — a freshly added slave is often still
+  // called "localhost", like the master. Then the later ones get their id added ("localhost #12"),
+  // otherwise they'd overwrite each other and the new node would never show.
+  const baseName = (s: Record<string, any>) => String(s.server_name ?? s.servername ?? s.name ?? `Node ${s.serid ?? s.id ?? "0"}`).trim() || `Node ${s.serid ?? s.id ?? "0"}`;
+  const seen = new Map<string, number>();
+  const sorted = [...(servs as Record<string, any>[])].sort((a, b) => Number(a.serid ?? a.id ?? 0) - Number(b.serid ?? b.id ?? 0));
+  const nameOf = new Map<Record<string, any>, string>();
+  for (const s of sorted) {
+    const n = baseName(s);
+    const k = n.toLowerCase();
+    nameOf.set(s, seen.has(k) ? `${n} #${s.serid ?? s.id ?? "0"}` : n);
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
+
   const nodes = await pool(servs as Record<string, any>[], 5, async (s) => {
     const serid = String(s.serid ?? s.id ?? "0");
-    const name = String(s.server_name ?? s.servername ?? s.name ?? `Node ${serid}`);
+    const name = nameOf.get(s)!;
     // figures from the server list (ram/space = FREE amounts in Virtualizor)
     const ramTotal = num(s.total_ram);
     const ramFree = num(s.ram);
