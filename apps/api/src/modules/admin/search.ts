@@ -28,7 +28,7 @@ export function clientWhere(qRaw: string): Prisma.UserWhereInput {
     { id: q },
     { id: { endsWith: q.toLowerCase() } },
     // anything on their services: IP, hostname, VPS id, cPanel user
-    { services: { some: { OR: [{ hostname: ci(q) }, { remoteId: q }, { username: q }, { ips: { some: { address: { startsWith: q } } } }] } } },
+    { services: { some: { OR: [{ hostname: ci(q) }, { remoteId: q }, { username: q }, { ips: { some: { address: { startsWith: q } } } }, { lastIps: { has: q } }] } } },
     { domains: { some: { name: ci(q) } } },
     { contacts: { some: { OR: [{ email: ci(q) }, { firstName: ci(q) }, ...(phone ? [{ phone: { contains: phone } }] : [])] } } },
   ];
@@ -48,6 +48,8 @@ export function serviceWhere(qRaw: string): Prisma.ServiceWhereInput {
       { username: q },
       { id: q },
       { ips: { some: { address: { startsWith: q } } } },
+      // last known IPs: still found when Virtualizor hasn't synced this VPS's IPs
+      { lastIps: { has: q } },
       { ips: { some: { rdns: ci(q) } } },
       { product: { name: ci(q) } },
       { order: { number: ci(q) } },
