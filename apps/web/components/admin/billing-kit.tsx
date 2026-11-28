@@ -16,7 +16,20 @@ export const linesToApi = (lines: Line[], withId = true) =>
 export const linesTotal = (lines: Line[]) => lines.reduce((a, l) => a + toPaise(l.unitPrice) * Math.max(1, Math.round(Number(l.quantity) || 1)), 0);
 
 /** Editable table of lines. Negative prices are discounts. */
-export function LineEditor({ lines, onChange, currency = "INR", hsn = true }: { lines: Line[]; onChange: (l: Line[]) => void; currency?: string; hsn?: boolean }) {
+/** GST on the lines as they are being edited (the invoice recalculates exactly on save). */
+export type GstPreview = { rate: number; split: "cgst_sgst" | "igst" | "none"; inclusive?: boolean };
+export function gstOf(lines: Line[], g: GstPreview) {
+  const all = linesTotal(lines);
+  const taxable = lines.filter((l) => l.taxable).reduce((a, l) => a + toPaise(l.unitPrice) * Math.max(1, Math.round(Number(l.quantity) || 1)), 0);
+  if (g.split === "none" || g.rate <= 0 || taxable <= 0) return { before: all, tax: 0, half: 0, total: all };
+  const r = g.rate / 100;
+  // tax-inclusive prices already contain the GST: take it out; otherwise add it on top
+  const tax = g.inclusive ? Math.round(taxable - taxable / (1 + r)) : Math.round(taxable * r);
+  const half = Math.round(tax / 2);
+  return { before: g.inclusive ? all - tax : all, tax, half, total: g.inclusive ? all : all + tax };
+}
+
+export function LineEditor({ lines, onChange, currency = "INR", hsn = true, gst }: { lines: Line[]; onChange: (l: Line[]) => void; currency?: string; hsn?: boolean; gst?: GstPreview }) {
   const set = (k: string, p: Partial<Line>) => onChange(lines.map((l) => (l.key === k ? { ...l, ...p } : l)));
   return (
     <div className="overflow-hidden rounded-xl border border-line">
@@ -46,7 +59,30 @@ export function LineEditor({ lines, onChange, currency = "INR", hsn = true }: { 
           <Button type="button" size="sm" variant="ghost" icon="add" onClick={() => onChange([...lines, newLine()])}>Add line</Button>
           <Button type="button" size="sm" variant="ghost" icon="sell" onClick={() => onChange([...lines, newLine({ description: "Discount", unitPrice: "", taxable: true })])}>Add discount</Button>
         </div>
-        <span className="text-sm text-mute">Before tax <b className="text-ink">{money(linesTotal(lines), currency)}</b></span>
+        {!gst ? (
+          <span className="text-sm text-mute">Before tax <b className="text-ink">{money(linesTotal(lines), currency)}</b></span>
+        ) : (
+          (() => {
+            const t = gstOf(lines, gst);
+            const pct = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+            return (
+              <dl className="min-w-[230px] space-y-0.5 text-sm">
+                <div className="flex justify-between gap-6"><dt className="text-mute">Before tax</dt><dd className="font-semibold text-ink">{money(t.before, currency)}</dd></div>
+                {gst.split === "none" ? (
+                  <div className="flex justify-between gap-6"><dt className="text-mute">GST</dt><dd className="font-semibold text-mute">not charged</dd></div>
+                ) : gst.split === "igst" ? (
+                  <div className="flex justify-between gap-6"><dt className="text-mute">IGST {pct(gst.rate)}</dt><dd className="font-semibold text-ink">{money(t.tax, currency)}</dd></div>
+                ) : (
+                  <>
+                    <div className="flex justify-between gap-6"><dt className="text-mute">CGST {pct(gst.rate / 2)}</dt><dd className="font-semibold text-ink">{money(t.half, currency)}</dd></div>
+                    <div className="flex justify-between gap-6"><dt className="text-mute">SGST {pct(gst.rate / 2)}</dt><dd className="font-semibold text-ink">{money(t.tax - t.half, currency)}</dd></div>
+                  </>
+                )}
+                <div className="flex justify-between gap-6 border-t border-line pt-1"><dt className="font-bold text-ink">Total with GST</dt><dd className="font-extrabold text-ink">{money(t.total, currency)}</dd></div>
+              </dl>
+            );
+          })()
+        )}
       </div>
     </div>
   );

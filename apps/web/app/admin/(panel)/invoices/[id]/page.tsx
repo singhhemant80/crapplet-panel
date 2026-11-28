@@ -96,7 +96,7 @@ export default function AdminInvoice() {
       </div>
       <PayModal open={pay} onClose={() => setPay(false)} id={id} due={i.total - i.amountPaid} currency={i.currency} onDone={reload} />
       <RefundModal open={refund} onClose={() => setRefund(false)} id={id} onDone={reload} />
-      {edit && <EditModal inv={i} onClose={() => setEdit(false)} onDone={() => { setEdit(false); reload(); }} />}
+      {edit && <EditModal inv={i} sellerState={data?.company?.stateCode ?? null} onClose={() => setEdit(false)} onDone={() => { setEdit(false); reload(); }} />}
       {deleting && <DeleteInvoiceModal inv={i} onClose={() => setDeleting(false)} onDone={() => router.push("/admin/invoices")} />}
       {undo && <UndoRefundModal inv={i} to={undo} onClose={() => setUndo(null)} onDone={() => { setUndo(null); reload(); }} />}
       {split && <SplitModal inv={i} onClose={() => setSplit(false)} onDone={(nid) => { setSplit(false); toast.success("Split — opening the new invoice"); router.push(`/admin/invoices/${nid}`); }} />}
@@ -238,7 +238,7 @@ function MoreMenu({ items }: { items: [string, string, () => void, boolean?][] }
 }
 
 /** Edit lines, dates, notes and the customer's GSTIN on an unpaid / draft invoice. */
-function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; onDone: () => void }) {
+function EditModal({ inv, sellerState, onClose, onDone }: { inv: any; sellerState: string | null; onClose: () => void; onDone: () => void }) {
   const [lines, setLines] = useState<Line[]>(() => linesFromApi(inv.items));
   const [v, setV] = useState({ issueDate: dateInput(inv.issueDate), dueDate: dateInput(inv.dueDate), notes: inv.notes ?? "", customerGstin: inv.customerGstin ?? "" });
   const [busy, setBusy] = useState(false);
@@ -266,7 +266,13 @@ function EditModal({ inv, onClose, onDone }: { inv: any; onClose: () => void; on
             {inv.status === "PAID" && <> If the new total is higher than what was paid, the invoice becomes <b>unpaid</b> for the balance; it can't go below the paid amount.</>}
           </Alert>
         )}
-        <LineEditor lines={lines} onChange={setLines} currency={inv.currency} />
+        <LineEditor
+          lines={lines}
+          onChange={setLines}
+          currency={inv.currency}
+          // same rate and split (within the state: CGST + SGST; across states: IGST; export / no GST: none) as the invoice
+          gst={{ rate: inv.gstRate ?? 18, inclusive: !!inv.taxInclusive, split: inv.igst > 0 ? "igst" : inv.cgst > 0 || inv.sgst > 0 ? "cgst_sgst" : inv.taxTotal === 0 && inv.taxableAmount > 0 ? "none" : inv.placeOfSupplyCode && sellerState && inv.placeOfSupplyCode !== sellerState ? "igst" : "cgst_sgst" }}
+        />
         {lines.some((l) => linked.includes(l.id)) && <p className="text-xs text-mute"><Icon name="link" className="mr-1 align-[-3px] text-[15px]" />Lines for services, addons and domains stay linked — paying the invoice still renews them. Removing one means it won't be renewed by this invoice.</p>}
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Invoice date"><Input type="date" value={v.issueDate} onChange={(e) => setV({ ...v, issueDate: e.target.value })} /></Field>
