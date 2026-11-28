@@ -691,6 +691,27 @@ model IpHistory {
   @@index([ipId, createdAt])
 }
 
+/// A service's IP history: every address it gained or lost, kept even after the IP is gone from
+/// IP Management. Changes made in the panel and changes made directly in Virtualizor (picked up by
+/// the IP sync) are both recorded.
+model ServiceIpChange {
+  id        String   @id @default(cuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  address   String
+  /// ADDED | REMOVED | BASELINE (already there when history started)
+  action    String
+  primary   Boolean  @default(false)
+  /// PROVISIONED | CHANGE_IP | VIRTUALIZOR | STAFF | SYNC
+  source    String
+  actorId   String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([serviceId, createdAt])
+  @@index([address])
+}
+
 // ───────────────────────────── Orders & services ─────────────────────────────
 
 enum OrderStatus {
@@ -785,6 +806,7 @@ model Service {
   @@index([userId])
 
   @@unique([resellerId, resellerRef])
+  ipChanges         ServiceIpChange[]
 }
 
 model ServiceAddon {

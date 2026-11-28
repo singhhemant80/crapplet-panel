@@ -536,6 +536,8 @@ adminInfra.post(
       }
       return svc;
     });
+    const { trackServiceIps } = await import("../provisioning/ip-history");
+    await trackServiceIps(svc.id, "STAFF", { actorId: req.user!.id, note: "Imported existing VPS" });
     res.status(201).json({ id: svc.id });
   }),
 );
@@ -702,7 +704,11 @@ adminInfra.post(
   requireStaff("ips.manage"),
   ah(async (req, res) => {
     const { serviceId } = parse(z.object({ serviceId: z.string() }), req.body);
-    res.json({ ip: await adminAssignIp(req.params.id, serviceId, req.user!.id) });
+    const before = (await prisma.ipAddress.findUnique({ where: { id: req.params.id }, select: { serviceId: true } }))?.serviceId;
+    const ip = await adminAssignIp(req.params.id, serviceId, req.user!.id);
+    const { trackServiceIps } = await import("../provisioning/ip-history");
+    await trackServiceIps([serviceId, ...(before ? [before] : [])], "STAFF", { actorId: req.user!.id, note: "Assigned in IP Management" });
+    res.json({ ip });
   }),
 );
 
@@ -716,6 +722,8 @@ adminInfra.post(
     const to: IpStatus = quarantine ? "QUARANTINED" : "AVAILABLE";
     await prisma.ipAddress.update({ where: { id: ip.id }, data: { status: to, serviceId: null, isPrimary: false } });
     await logIp(prisma, { ipId: ip.id, action: "unassigned", from: ip.status, to, serviceId: ip.serviceId, actorId: req.user!.id });
+    const { trackServiceIps } = await import("../provisioning/ip-history");
+    await trackServiceIps(ip.serviceId, "STAFF", { actorId: req.user!.id, note: "Unassigned in IP Management" });
     res.json({ ok: true, note: "Remember to remove the address from the VM's network configuration." });
   }),
 );

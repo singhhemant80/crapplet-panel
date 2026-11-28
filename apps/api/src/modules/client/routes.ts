@@ -391,6 +391,19 @@ clientRouter.post(
   }),
 );
 
+/** The VPS's IP history (who changed it is shown only as "you", "our team" or "automatically"). */
+clientRouter.get(
+  "/services/:id/ip-history",
+  requireClient,
+  ah(async (req, res) => {
+    const s = await prisma.service.findFirst({ where: { id: req.params.id, userId: req.user!.id }, select: { id: true } });
+    if (!s) throw notFound("Service not found");
+    const { serviceIpHistory } = await import("../provisioning/ip-history");
+    const events = (await serviceIpHistory(s.id)).filter((e) => e.added.length || e.removed.length || e.baseline.length).map((e) => ({ at: e.at, added: e.added, removed: e.removed, baseline: e.baseline, how: e.source === "PROVISIONED" ? "Server set up" : e.source === "TERMINATED" ? "Service terminated" : e.source === "SYNC" ? "Starting point" : "IP changed" }));
+    res.json({ events });
+  }),
+);
+
 clientRouter.get(
   "/services/:id/activity",
   ah(async (req, res) => {

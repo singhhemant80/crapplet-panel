@@ -1,5 +1,6 @@
 "use client";
 import { blockInfo, serviceBlock } from "@/lib/ip-block";
+import { IpHistory } from "@/components/ip-history";
 import { bandwidth } from "@/lib/units";
 import { POWER_TONE } from "@/components/power-tones";
 import { ReinstallModal } from "@/components/reinstall-modal";
@@ -303,6 +304,8 @@ export default function ServicePage() {
           </Card>
         )}
       </div>
+
+      {isVps && <IpHistory url={`/client/services/${id}/ip-history`} className="mt-6" />}
 
       <ServiceInvoices invoices={data.invoices} />
 

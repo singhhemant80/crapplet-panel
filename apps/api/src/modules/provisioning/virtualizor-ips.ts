@@ -58,6 +58,10 @@ export async function syncVirtualizorIps(server: Server) {
     if (rows.length < 1000) break;
   }
   const ourVps = new Map((await prisma.service.findMany({ where: { serverId: server.id, remoteId: { not: null } }, select: { id: true, remoteId: true } })).map((s) => [s.remoteId!, s.id]));
+  // IP history: record what Virtualizor had before this sync changes anything (first sync = baseline)
+  const { trackServiceIps } = await import("./ip-history");
+  const touched = new Set<string>([...ourVps.values()]);
+  await trackServiceIps([...touched], "VIRTUALIZOR", { note: "Changed in Virtualizor" });
   let available = 0, used = 0, created = 0, removed = 0;
   const seen = new Set<string>();
   const perService = new Map<string, string[]>();
@@ -106,5 +110,7 @@ export async function syncVirtualizorIps(server: Server) {
     const keep = [...subnetByPool.values()];
     await prisma.ipSubnet.deleteMany({ where: { serverId: server.id, id: { notIn: keep }, ips: { none: {} } } });
   }
-  return { pools: subnets, ips: ips.length, created, available, used, removed };
+  // whatever moved since — added, removed or swapped directly in Virtualizor — goes into each service's history
+  const ipChanges = await trackServiceIps([...touched], "VIRTUALIZOR", { note: "Changed in Virtualizor" });
+  return { pools: subnets, ips: ips.length, created, available, used, removed, ipChanges };
 }

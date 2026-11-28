@@ -937,6 +937,16 @@ adminCore.post(
 );
 
 /** What's running / just finished on this service (progress card on the service page). */
+/** Every IP the service has had: added / removed, by the panel or directly in Virtualizor. */
+adminCore.get(
+  "/services/:id/ip-history",
+  requireStaff("services.view"),
+  ah(async (req, res) => {
+    const { serviceIpHistory } = await import("../provisioning/ip-history");
+    res.json({ events: await serviceIpHistory(req.params.id) });
+  }),
+);
+
 adminCore.get(
   "/services/:id/activity",
   requireStaff("services.view"),
@@ -955,7 +965,7 @@ adminCore.post(
     const s = await prisma.service.findUniqueOrThrow({ where: { id: req.params.id }, include: { product: { select: { provisioner: true } } } });
     if (s.product.provisioner !== "VIRTUALIZOR" || !s.remoteId) throw badRequest("This service has no Virtualizor VPS yet");
     // runs in the background so the service page can show its progress
-    await enqueueProvision({ serviceId: s.id, action: "change_ip", params: { ips: b.ips }, actorId: req.user!.id });
+    await enqueueProvision({ serviceId: s.id, action: "change_ip", params: { ips: b.ips, by: req.user!.id }, actorId: req.user!.id });
     await audit({ actorId: req.user!.id, userId: s.userId, action: "service.ips_replaced", entity: "service", entityId: s.id, details: { ips: b.ips ?? "free IPs from Virtualizor" } });
     res.status(202).json({ queued: true });
   }),

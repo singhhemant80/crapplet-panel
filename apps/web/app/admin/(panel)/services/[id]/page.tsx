@@ -8,6 +8,7 @@ import { OsLogo } from "@/components/os-logo";
 import { NodeSelect } from "@/components/admin/node-select";
 import { HypervisorSelect } from "@/components/admin/hypervisor-select";
 import { blockInfo, isIpBlockService, parseCidr, serviceBlock } from "@/lib/ip-block";
+import { IpHistory } from "@/components/ip-history";
 import { ChangePlanButton } from "@/components/admin/change-plan";
 import { VirtualizorCheck } from "@/components/admin/virtualizor-check";
 import { ProvisioningTracker } from "@/components/provisioning-tracker";
@@ -268,6 +269,7 @@ export default function AdminService() {
             ) : <p className="p-5 text-sm text-mute">No invoices yet.</p>}
           </Card>
 
+          {(isVps || isIp) && <IpHistory url={`/admin/services/${id}/ip-history`} admin />}
           <Card title="Activity log" pad={false}>
             <ul className="max-h-96 divide-y divide-[#f3effb] overflow-y-auto text-sm">
               {s.logs.map((l: any) => (
