@@ -153,7 +153,7 @@ async function schedule() {
   // before billing runs, so renewal invoices use today's rate
   await q.upsertJobScheduler("sync-os", { pattern: "0 3 * * *", tz: "Asia/Kolkata" }, { name: "sync-os" });
   await q.upsertJobScheduler("sync-ips", { every: 10 * 60_000 }, { name: "sync-ips" });
-  await q.upsertJobScheduler("sync-services", { every: 30 * 60_000 }, { name: "sync-services" });
+  await q.upsertJobScheduler("sync-services", { every: 60 * 60_000 }, { name: "sync-services" }); // hourly: reads every VPS from each master
   await q.upsertJobScheduler("autopay", { every: 60 * 60_000 }, { name: "autopay" });
   await q.upsertJobScheduler("fx-rates", { pattern: "30 8 * * *", tz: "Asia/Kolkata" }, { name: "fx-rates" });
   // automatic database backups: checked every 5 minutes against Settings → Backups

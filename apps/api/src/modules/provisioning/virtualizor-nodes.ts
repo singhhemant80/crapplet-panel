@@ -58,8 +58,8 @@ async function pool<T, R>(items: T[], size: number, fn: (t: T) => Promise<R>): P
  * Pulls every node (master + slaves) from a Virtualizor master with live usage,
  * stores them as ServerNode rows and removes nodes that no longer exist.
  */
-export async function syncVirtualizorNodes(server: Server) {
-  const c = virtualizorFor(server);
+export async function syncVirtualizorNodes(server: Server, fresh = false) {
+  const c = fresh ? virtualizorFor(server).fresher() : virtualizorFor(server);
   const [list, loadsRes] = await Promise.all([c.servers(), c.serverLoads().catch(() => null)]);
   const servs = Array.isArray(list.servs) ? list.servs : Object.entries(list.servs ?? {}).map(([k, v]) => ({ serid: k, ...(v as object) }));
   const loads = (loadsRes as any)?.loads ?? (loadsRes as any)?.server_loads ?? (loadsRes as any)?.serverloads ?? null;
@@ -78,7 +78,7 @@ export async function syncVirtualizorNodes(server: Server) {
     seen.set(k, (seen.get(k) ?? 0) + 1);
   }
 
-  const nodes = await pool(servs as Record<string, any>[], 5, async (s) => {
+  const nodes = await pool(servs as Record<string, any>[], 2, async (s) => {
     const serid = String(s.serid ?? s.id ?? "0");
     const name = nameOf.get(s)!;
     // figures from the server list (ram/space = FREE amounts in Virtualizor)

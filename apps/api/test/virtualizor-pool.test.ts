@@ -30,14 +30,15 @@ test("parallel Virtualizor calls reuse at most 4 connections per master", async 
   const port = (server.address() as AddressInfo).port;
   try {
     const creds = { host: "127.0.0.1", port, apiKey: "k", apiPass: "p", verifyTls: false };
-    // a new client object per call, as the panel's code does
-    const results = await Promise.all(Array.from({ length: 40 }, () => new VirtualizorClient(creds).call("serverloads")));
-    assert.equal(results.length, 40);
-    assert.equal(requests, 40);
-    assert.ok(connections <= 4, `40 calls used ${connections} connections`);
-    // later calls keep using the same connections
-    await Promise.all(Array.from({ length: 10 }, () => new VirtualizorClient(creds).call("serverloads")));
-    assert.ok(connections <= 4, `50 calls used ${connections} connections`);
+    // a new client object per call, as the panel's code does (different queries, so none are shared)
+    const results = await Promise.all(Array.from({ length: 12 }, (_, i) => new VirtualizorClient(creds).call("serverloads", { n: i })));
+    assert.equal(results.length, 12);
+    assert.equal(requests, 12);
+    assert.ok(connections <= 4, `12 calls used ${connections} connections`);
+    // the same read from many places at once is one request
+    await Promise.all(Array.from({ length: 30 }, () => new VirtualizorClient(creds).call("serverloads", { n: "same" })));
+    assert.equal(requests, 13);
+    assert.ok(connections <= 4, `calls used ${connections} connections`);
   } finally {
     server.closeAllConnections();
     server.close();

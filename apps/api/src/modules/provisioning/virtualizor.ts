@@ -6,6 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Agent, request } from "undici";
 import { explainNetError } from "../../lib/net-errors";
+import { guarded } from "./virtualizor-guard";
 
 export interface VirtualizorCreds {
   host: string;
@@ -69,8 +70,13 @@ function poolFor(creds: VirtualizorCreds) {
 export class VirtualizorClient {
   private agent: Agent;
   private slowAgent: Agent;
-  constructor(private creds: VirtualizorCreds) {
+  /** fresh: skip answers kept by the guard (for staff "Refresh now" buttons) */
+  constructor(private creds: VirtualizorCreds, private fresh = false) {
     ({ agent: this.agent, slowAgent: this.slowAgent } = poolFor(creds));
+  }
+  /** same master, but reads ask Virtualizor again instead of using kept answers */
+  fresher() {
+    return new VirtualizorClient(this.creds, true);
   }
 
   private url(act: string, query: Record<string, string | number | undefined> = {}, port = this.creds.port) {
@@ -84,7 +90,18 @@ export class VirtualizorClient {
     return `https://${host}:${port}/index.php?${q.toString()}`;
   }
 
+  /**
+   * One API call. Goes through the per-master guard (rate limit, shared short-lived answers for
+   * reads, back-off while the master struggles) — see virtualizor-guard.ts.
+   */
   async call<T = Record<string, unknown>>(act: string, query: Record<string, string | number | undefined> = {}, post?: Record<string, unknown>, opts: { slow?: boolean; cookies?: Record<string, string>; port?: number } = {}): Promise<T> {
+    const host = this.creds.host.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
+    // cookies pick the node for form reads (addvs) — never share those answers
+    const q = { ...query, ...(opts.port ? { _port: opts.port } : {}), ...(opts.cookies && Object.keys(opts.cookies).length ? { _ck: JSON.stringify(opts.cookies) } : {}) };
+    return guarded(`${host}|${this.creds.apiKey.trim()}`, act, q, post, () => this.send<T>(act, query, post, opts), this.fresh);
+  }
+
+  private async send<T>(act: string, query: Record<string, string | number | undefined>, post: Record<string, unknown> | undefined, opts: { slow?: boolean; cookies?: Record<string, string>; port?: number }): Promise<T> {
     let body: string | undefined;
     if (post) {
       const form = new URLSearchParams();

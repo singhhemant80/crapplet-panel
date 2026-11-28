@@ -35,7 +35,8 @@ export default function ServicePage() {
     const tick = () => api(`/client/services/${id}/status`).then((r) => setLive(r.live)).catch(() => {});
     tick();
     if (isVps) api(`/client/services/${id}/usage?timeframe=day`).then((r) => setUsage(r.points)).catch(() => {});
-    const t = setInterval(tick, isVps ? 15000 : 60000);
+    // every 30 s (hosting 60 s), and only while the tab is on screen — each check reaches the server's panel
+    const t = setInterval(() => document.visibilityState === "visible" && tick(), isVps ? 30000 : 60000);
     return () => clearInterval(t);
   }, [svc?.status, isVps, isHosting, id]); // eslint-disable-line react-hooks/exhaustive-deps
 

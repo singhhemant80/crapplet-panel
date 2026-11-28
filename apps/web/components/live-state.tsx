@@ -25,7 +25,7 @@ export function LiveBadge({ state, reason, loading, className }: { state?: strin
   );
 }
 
-/** Polls live states for a list of services (every 30 s). */
+/** Polls live states for a list of services (every 60 s while visible). */
 export function useLiveStates(path: string | null) {
   const [states, setStates] = useState<Record<string, { state: LiveState; reason?: string }>>({});
   const [loading, setLoading] = useState(!!path);
@@ -38,7 +38,8 @@ export function useLiveStates(path: string | null) {
         .catch(() => {})
         .finally(() => alive && setLoading(false));
     load();
-    const t = setInterval(load, 30_000);
+    // only while the tab is on screen: each refresh reaches the Virtualizor masters
+    const t = setInterval(() => document.visibilityState === "visible" && load(), 60_000);
     return () => {
       alive = false;
       clearInterval(t);

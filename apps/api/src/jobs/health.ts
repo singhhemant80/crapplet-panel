@@ -3,7 +3,8 @@ import { proxmoxFor } from "../modules/provisioning/provisioner";
 import { syncVirtualizorNodes } from "../modules/provisioning/virtualizor-nodes";
 
 /** Connection test + node resource snapshot for one server. */
-export async function checkServer(serverId: string) {
+/** fresh: staff pressed Refresh — ask Virtualizor again instead of using its last answers */
+export async function checkServer(serverId: string, fresh = false) {
   const s = await prisma.server.findUniqueOrThrow({ where: { id: serverId } });
   const started = Date.now();
   try {
@@ -24,7 +25,7 @@ export async function checkServer(serverId: string) {
       }
       status = { ok: true, version: version.version, nodes: nodes.length, online: nodes.filter((n) => n.status === "online").length };
     } else if (s.type === "VIRTUALIZOR") {
-      const r = await syncVirtualizorNodes(s);
+      const r = await syncVirtualizorNodes(s, fresh);
       status = { ok: true, nodes: r.nodes, online: r.online };
     } else if (s.type === "CPANEL") {
       const { whmFor } = await import("../modules/provisioning/cpanel-provisioner");

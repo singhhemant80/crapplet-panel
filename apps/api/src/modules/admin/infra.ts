@@ -278,7 +278,9 @@ adminInfra.get(
       orderBy: { name: "asc" },
       select: { id: true, name: true, type: true, hostname: true, enabled: true, lastCheckAt: true, lastStatus: true, location: { select: { name: true } }, nodes: { orderBy: { name: "asc" } }, _count: { select: { services: { where: { status: { in: ["ACTIVE", "SUSPENDED"] } } } } } },
     });
-    res.json({ servers });
+    // how hard this panel (web process) is using each Virtualizor master: calls, answers reused, back-off
+    const { guardStats } = await import("../provisioning/virtualizor-guard");
+    res.json({ servers, virtualizorLoad: guardStats() });
   }),
 );
 
@@ -289,7 +291,7 @@ adminInfra.post(
   ah(async (req, res) => {
     const id = typeof req.body?.serverId === "string" ? req.body.serverId : null;
     const servers = await prisma.server.findMany({ where: { type: { in: ["PROXMOX", "VIRTUALIZOR"] }, ...(id ? { id } : { enabled: true }) }, select: { id: true } });
-    const results = await Promise.all(servers.map((s) => checkServer(s.id).then((r) => ({ id: s.id, ...r }))));
+    const results = await Promise.all(servers.map((s) => checkServer(s.id, true).then((r) => ({ id: s.id, ...r }))));
     res.json({ results });
   }),
 );

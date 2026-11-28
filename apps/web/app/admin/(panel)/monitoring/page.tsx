@@ -219,6 +219,17 @@ export default function Monitoring() {
       />
 
       {error && <Alert tone="error" className="mb-6">{error}</Alert>}
+      {(data?.virtualizorLoad ?? []).map((g: any) => (
+        <div key={g.master} className={cx("mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl px-4 py-3 text-[13px] ring-1", g.pausedForSec ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-white text-slate-600 ring-line")}>
+          <span className="inline-flex items-center gap-1.5 font-bold text-ink"><Icon name="speed" className="text-[18px] text-primary-dark" />Panel load on {g.master}</span>
+          <span>max <b>{g.maxPerSecond}</b> requests/s</span>
+          <span><b>{g.calls.toLocaleString("en-IN")}</b> sent</span>
+          <span><b>{(g.cached + g.shared).toLocaleString("en-IN")}</b> answered from the panel's recent copy</span>
+          {g.queued > 0 && <span><b>{g.queued}</b> waiting</span>}
+          {g.pausedForSec > 0 && <span className="font-bold">Master not answering — panel paused its checks for {g.pausedForSec}s</span>}
+          <span className="text-mute">since {new Date(g.since).toLocaleTimeString("en-IN", { timeStyle: "short" })}</span>
+        </div>
+      ))}
       {failing.map((s) => (
         <Alert key={s.id} tone="error" className="mb-4">
           <b>{s.name}</b>: {s.lastStatus.error} <Link href="/admin/servers" className="ml-1 font-bold underline">Check server settings</Link>
