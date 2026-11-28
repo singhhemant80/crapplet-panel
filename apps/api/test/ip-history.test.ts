@@ -79,3 +79,29 @@ test("starting point, direct Virtualizor changes, and panel changes are all reco
   assert.ok((await prisma.serviceIpChange.count({ where: { address: `${net}.12` } })) >= 2);
   assert.equal(await trackServiceIps(ids.a, "VIRTUALIZOR"), 0);
 });
+
+test("last known IPs: kept on the service and shown when it has no IP rows", async () => {
+  const { withKnownIps } = await import("../src/lib/known-ips");
+  // the earlier test left service a with history; its lastIps were kept up to date
+  const a = await prisma.service.findUniqueOrThrow({ where: { id: ids.a }, select: { lastIps: true } });
+  assert.ok(a.lastIps.length >= 1, "lastIps recorded");
+  const out = withKnownIps({ services: [{ id: "x", ips: [], lastIps: ["10.1.1.5", "10.1.1.6"] }, { id: "y", ips: [{ address: "10.2.2.2" }], lastIps: ["10.9.9.9"] }] });
+  assert.equal(out.services[0].ips[0].address, "10.1.1.5");
+  assert.equal(out.services[0].ips[0].isPrimary, true);
+  assert.equal((out.services[0] as any).ipsStale, true);
+  assert.equal(out.services[1].ips[0].address, "10.2.2.2", "current IPs win");
+});
+
+test("a partial answer from Virtualizor doesn't remove IPs", async () => {
+  const P = VirtualizorClient.prototype as any;
+  const server = await prisma.server.findUniqueOrThrow({ where: { id: ids.server } });
+  // the panel holds 30 IPs for this master
+  P.ips = async () => ({ ips: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [String(i), { ip: `${net}.${100 + i}`, vpsid: "0", ippid: 1, locked: "0" }])) });
+  await syncVirtualizorIps(server);
+  const before = await prisma.ipAddress.count({ where: { serverId: ids.server } });
+  // Virtualizor busy: answers with only 5
+  P.ips = async () => ({ ips: Object.fromEntries(Array.from({ length: 5 }, (_, i) => [String(i), { ip: `${net}.${100 + i}`, vpsid: "0", ippid: 1, locked: "0" }])) });
+  const r = await syncVirtualizorIps(server);
+  assert.equal(r.removed, 0);
+  assert.equal(await prisma.ipAddress.count({ where: { serverId: ids.server } }), before);
+});

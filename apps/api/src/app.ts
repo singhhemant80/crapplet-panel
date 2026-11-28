@@ -1,3 +1,4 @@
+import { withKnownIps } from "./lib/known-ips";
 import express, { Router } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -53,6 +54,12 @@ export function createApp() {
   app.use(csrfGuard);
 
   const api = Router();
+  // services with no IP rows right now still show their last known IPs (see lib/known-ips.ts)
+  api.use((_req, res, next) => {
+    const json = res.json.bind(res);
+    res.json = (body?: unknown) => json(withKnownIps(body));
+    next();
+  });
   api.get("/health", ah(async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ ok: true, time: new Date().toISOString() });

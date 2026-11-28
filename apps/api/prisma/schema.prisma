@@ -806,6 +806,8 @@ model Service {
   @@index([userId])
 
   @@unique([resellerId, resellerRef])
+  /// last IPs we knew this service had (primary first) — still shown when Virtualizor is unreachable or a sync drops them
+  lastIps           String[]          @default([])
   ipChanges         ServiceIpChange[]
 }
 

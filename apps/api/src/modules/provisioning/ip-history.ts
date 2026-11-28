@@ -22,6 +22,11 @@ export async function trackServiceIps(serviceIds: string | string[], source: IpS
   for (const serviceId of ids) {
     try {
       const now = await prisma.ipAddress.findMany({ where: { serviceId }, select: { address: true, isPrimary: true } });
+      // the service's last known IPs: updated whenever it has some, never cleared by an empty answer
+      if (now.length) {
+        const list = [...now].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.address.localeCompare(b.address)).map((i) => i.address);
+        await prisma.service.updateMany({ where: { id: serviceId, NOT: { lastIps: { equals: list } } }, data: { lastIps: list } });
+      }
       const { have, started } = await recorded(serviceId);
       const cur = new Set(now.map((i) => i.address));
       const added = now.filter((i) => !have.has(i.address));

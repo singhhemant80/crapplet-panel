@@ -104,7 +104,11 @@ export async function syncVirtualizorIps(server: Server) {
     if (!hasPrimary) await prisma.ipAddress.update({ where: { address: addrs.sort()[0] }, data: { isPrimary: true } });
   }
   // remove what Virtualizor doesn't have (typo'd or hand-added ranges) — only when Virtualizor answered with IPs
-  if (seen.size) {
+  const held = await prisma.ipAddress.count({ where: { version: 4, OR: [{ serverId: server.id }, { subnet: { serverId: server.id } }] } });
+  // a partial answer (Virtualizor busy / cut off) must not wipe IPs: only clean up when it looks complete
+  const complete = seen.size > 0 && !(held > 20 && seen.size < held * 0.5);
+  if (!complete && seen.size) console.warn(`[ip-sync] ${server.name}: Virtualizor listed ${seen.size} IPs but the panel holds ${held} — keeping them, not removing anything this time`);
+  if (complete) {
     const stale = await prisma.ipAddress.findMany({ where: { version: 4, OR: [{ serverId: server.id }, { subnet: { serverId: server.id } }], address: { notIn: [...seen] } }, select: { id: true } });
     if (stale.length) removed = (await prisma.ipAddress.deleteMany({ where: { id: { in: stale.map((x) => x.id) } } })).count;
     const keep = [...subnetByPool.values()];

@@ -215,6 +215,7 @@ export default function AdminService() {
                     </table>
                   </div>
                 ) : <p className="text-sm text-mute">No IP assigned.</p>}
+                {s.ipsStale && <p className="mt-2 text-xs font-semibold text-amber-700"><Icon name="history" className="mr-1 align-[-3px] text-[15px]" />Last known IPs — the panel has no current IP data for this VPS (Virtualizor not reachable or not synced yet). They update on the next successful sync.</p>}
                 {ok && live.ips?.length > 0 && live.ips.join(",") !== s.ips.map((i: any) => i.address).join(",") && <p className="mt-2 text-xs font-semibold text-amber-700">Virtualizor shows {live.ips.join(", ")} — click “Sync from Virtualizor” to update this one, or <span className="inline-block align-middle"><VirtualizorSyncAll label="sync all services" variant="outline" /></span>.</p>}
               </div>
               {(s.hasPassword || s.username) && (

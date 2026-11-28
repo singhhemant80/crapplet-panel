@@ -312,7 +312,7 @@ adminCore.get(
     const ticketNo = /^#?[\w-]{3,20}$/.test(q) ? q.replace(/^#/, "") : null;
     const [clients, services, orders, invoices, domains, tickets, transactions] = await Promise.all([
       can("clients.view") ? prisma.user.findMany({ where: { type: "CLIENT", ...clientWhere(q) }, take, orderBy: { createdAt: "desc" }, select: { id: true, email: true, firstName: true, lastName: true, phone: true, status: true, profile: { select: { companyName: true, gstin: true, city: true } } } }) : none,
-      can("services.view") ? prisma.service.findMany({ where: serviceWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, hostname: true, status: true, remoteId: true, username: true, product: { select: { name: true, provisioner: true } }, ips: { select: { address: true } }, user: { select: { id: true, email: true, firstName: true, lastName: true } } } }) : none,
+      can("services.view") ? prisma.service.findMany({ where: serviceWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, hostname: true, status: true, remoteId: true, username: true, lastIps: true, product: { select: { name: true, provisioner: true } }, ips: { select: { address: true } }, user: { select: { id: true, email: true, firstName: true, lastName: true } } } }) : none,
       can("orders.view") ? prisma.order.findMany({ where: orderWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, number: true, status: true, total: true, currency: true, createdAt: true, user: { select: { email: true, firstName: true, lastName: true } } } }) : none,
       can("billing.view") ? prisma.invoice.findMany({ where: invoiceWhere(q), take, orderBy: { createdAt: "desc" }, select: { id: true, number: true, proformaNumber: true, status: true, total: true, currency: true, user: { select: { email: true, firstName: true, lastName: true } } } }) : none,
       can("clients.view") ? prisma.domain.findMany({ where: { name: { contains: q.toLowerCase(), mode: "insensitive" } }, take, select: { id: true, name: true, status: true, expiryDate: true, user: { select: { id: true, email: true } } } }) : none,
@@ -352,7 +352,7 @@ adminCore.get(
         include: {
           user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true, profile: { select: { companyName: true } } } },
           invoice: { select: { id: true, status: true, total: true, amountPaid: true, dueDate: true, paidAt: true } },
-          services: { select: { id: true, hostname: true, status: true, billingCycle: true, product: { select: { name: true, type: true, provisioner: true } }, ips: { select: { address: true }, take: 1 } } },
+          services: { select: { id: true, hostname: true, status: true, billingCycle: true, lastIps: true, product: { select: { name: true, type: true, provisioner: true } }, ips: { select: { address: true }, take: 1 } } },
           domains: { select: { id: true, name: true, action: true, status: true } },
         },
       }),

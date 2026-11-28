@@ -312,7 +312,7 @@ export default function ServicePage() {
       <ReinstallModal open={modal === "reinstall"} onClose={() => setModal(null)} svc={svc} onSubmit={(os, confirmText, password) => act("reinstall", { osTemplateId: os, confirm: confirmText, ...(password ? { password } : {}) })} busy={busy === "reinstall"} />
       <CancelModal open={modal === "cancel"} onClose={() => setModal(null)} id={id} />
       <ResetPasswordModal open={modal === "resetpw"} onClose={() => setModal(null)} busy={busy === "reset_password"} windows={/windows/i.test(svc.osTemplate?.family ?? svc.osTemplate?.name ?? "")} onSubmit={(password) => { setCred(null); act("reset_password", password ? { password } : {}); }} />
-      <RdnsModal open={modal === "rdns"} onClose={() => setModal(null)} id={id} ips={svc.ips} />
+      <RdnsModal open={modal === "rdns"} onClose={() => setModal(null)} id={id} ips={svc.ips.filter((i: any) => !i.stale)} />
       <HostingPasswordModal open={modal === "password"} onClose={() => setModal(null)} id={id} username={svc.username} onDone={() => setCred(null)} />
     </>
   );
